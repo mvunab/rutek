@@ -1,33 +1,93 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
-  Plus, Search, Map, Truck, Clock,
-  Edit2, Trash2, Eye, UserCheck, Car, Play,
-  CheckCircle2, Package
+  Plus, Search, ChevronUp, ChevronDown, ChevronsUpDown,
+  CheckCircle2, Circle, Truck, Clock, RotateCcw, XCircle,
+  Download, RefreshCw, SlidersHorizontal, Edit2, Eye, Map
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { RouteStatusBadge, OrderStatusBadge } from '../../components/ui/Badge';
-import { Modal, ConfirmModal } from '../../components/ui/Modal';
+import { Modal } from '../../components/ui/Modal';
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useRouteStore } from '../../store/useRouteStore';
-import { useOrderStore } from '../../store/useOrderStore';
-import { mockUsers, mockVehicles } from '../../data/mockData';
-import type { Route, RouteStatus } from '../../types';
+import { mockDeliveryRecords } from '../../data/mockData';
+import type { DeliveryRecord, DeliveryStatus } from '../../types';
 import { clsx } from 'clsx';
 
+// ─── Status config ────────────────────────────────────────────────────────────
+const statusConfig: Record<DeliveryStatus, {
+  label: string;
+  bg: string;
+  text: string;
+  dot: string;
+  icon: React.ReactNode;
+}> = {
+  entregado:    { label: 'Entregado',    bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500', icon: <CheckCircle2 size={12} /> },
+  en_ruta:      { label: 'En Ruta',      bg: 'bg-blue-100',    text: 'text-blue-800',    dot: 'bg-blue-500',    icon: <Truck size={12} /> },
+  pendiente:    { label: 'Pendiente',    bg: 'bg-stone-100',   text: 'text-stone-600',   dot: 'bg-stone-400',   icon: <Circle size={12} /> },
+  reprogramado: { label: 'Reprogramado', bg: 'bg-amber-100',   text: 'text-amber-800',   dot: 'bg-amber-500',   icon: <RotateCcw size={12} /> },
+  rechazado:    { label: 'Rechazado',    bg: 'bg-red-100',     text: 'text-red-800',     dot: 'bg-red-500',     icon: <XCircle size={12} /> },
+  parcial:      { label: 'Parcial',      bg: 'bg-violet-100',  text: 'text-violet-800',  dot: 'bg-violet-500',  icon: <Clock size={12} /> },
+};
+
+// ─── Status Badge ─────────────────────────────────────────────────────────────
+function StatusBadge({ status }: { status: DeliveryStatus }) {
+  const cfg = statusConfig[status];
+  return (
+    <span className={clsx(
+      'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold whitespace-nowrap',
+      cfg.bg, cfg.text
+    )}>
+      {cfg.icon}
+      {cfg.label}
+    </span>
+  );
+}
+
+// ─── Sort icon ────────────────────────────────────────────────────────────────
+type SortDir = 'asc' | 'desc' | null;
+
+function SortIcon({ dir }: { dir: SortDir }) {
+  if (dir === 'asc')  return <ChevronUp size={12} className="text-primary-600" />;
+  if (dir === 'desc') return <ChevronDown size={12} className="text-primary-600" />;
+  return <ChevronsUpDown size={12} className="text-stone-300 group-hover:text-stone-400" />;
+}
+
+// ─── Column header ────────────────────────────────────────────────────────────
+function ColHeader({
+  label, col, sortCol, sortDir, onSort, className,
+}: {
+  label: string;
+  col: keyof DeliveryRecord;
+  sortCol: keyof DeliveryRecord | null;
+  sortDir: SortDir;
+  onSort: (col: keyof DeliveryRecord) => void;
+  className?: string;
+}) {
+  return (
+    <th
+      onClick={() => onSort(col)}
+      className={clsx(
+        'group px-3 py-2.5 text-left text-xs font-semibold text-stone-500 uppercase tracking-wide',
+        'cursor-pointer select-none hover:text-stone-700 whitespace-nowrap border-b border-stone-200',
+        className
+      )}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        <SortIcon dir={sortCol === col ? sortDir : null} />
+      </div>
+    </th>
+  );
+}
+
+// ─── Route Form (create/edit) ─────────────────────────────────────────────────
 interface RouteFormData {
-  name: string;
-  notes: string;
-  startTime: string;
-  estimatedDistance: number;
-  estimatedDuration: number;
+  name: string; notes: string; startTime: string;
+  estimatedDistance: number; estimatedDuration: number;
 }
 
 function RouteForm({
-  initial,
-  onSubmit,
-  onCancel,
-  submitLabel = 'Guardar',
+  initial, onSubmit, onCancel, submitLabel = 'Guardar',
 }: {
   initial?: Partial<RouteFormData>;
   onSubmit: (data: RouteFormData) => void;
@@ -35,29 +95,20 @@ function RouteForm({
   submitLabel?: string;
 }) {
   const [form, setForm] = useState<RouteFormData>({
-    name: '',
-    notes: '',
-    startTime: '08:00',
-    estimatedDistance: 0,
-    estimatedDuration: 60,
-    ...initial,
+    name: '', notes: '', startTime: '08:00', estimatedDistance: 0, estimatedDuration: 60, ...initial,
   });
-
-  const setField = (field: keyof RouteFormData) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const val = e.target.type === 'number' ? Number(e.target.value) : e.target.value;
-      setForm(prev => ({ ...prev, [field]: val }));
-    };
-
+  const f = (field: keyof RouteFormData) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm(p => ({ ...p, [field]: e.target.type === 'number' ? Number(e.target.value) : e.target.value }));
   return (
     <div className="space-y-4">
-      <Input label="Nombre de la ruta" placeholder="Ej: Ruta Santiago Norte" value={form.name} onChange={setField('name')} />
+      <Input label="Nombre de la ruta" placeholder="Ej: Ruta Santiago Norte" value={form.name} onChange={f('name')} />
       <div className="grid grid-cols-3 gap-3">
-        <Input label="Hora de inicio" type="time" value={form.startTime} onChange={setField('startTime')} />
-        <Input label="Distancia (km)" type="number" min={0} value={form.estimatedDistance} onChange={setField('estimatedDistance')} />
-        <Input label="Duración (min)" type="number" min={0} value={form.estimatedDuration} onChange={setField('estimatedDuration')} />
+        <Input label="Hora inicio" type="time" value={form.startTime} onChange={f('startTime')} />
+        <Input label="Distancia (km)" type="number" min={0} value={form.estimatedDistance} onChange={f('estimatedDistance')} />
+        <Input label="Duración (min)" type="number" min={0} value={form.estimatedDuration} onChange={f('estimatedDuration')} />
       </div>
-      <Textarea label="Notas" placeholder="Observaciones, instrucciones..." value={form.notes} onChange={setField('notes')} rows={3} />
+      <Textarea label="Notas" placeholder="Instrucciones..." value={form.notes} onChange={f('notes')} rows={3} />
       <div className="flex justify-end gap-3 pt-2">
         <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
         <Button onClick={() => onSubmit(form)} disabled={!form.name.trim()}>{submitLabel}</Button>
@@ -66,227 +117,63 @@ function RouteForm({
   );
 }
 
-function AssignDriverModal({ route, onClose }: { route: Route; onClose: () => void }) {
-  const { assignDriver } = useRouteStore();
-  const drivers = mockUsers.filter(u => u.role === 'driver' && u.active);
-
+// ─── Detail Modal ─────────────────────────────────────────────────────────────
+function DeliveryDetailModal({ record, onClose }: { record: DeliveryRecord; onClose: () => void }) {
+  const cfg = statusConfig[record.estado];
   return (
-    <Modal open onClose={onClose} title="Asignar repartidor" description={route.name} size="sm">
-      <div className="space-y-2">
-        {drivers.map((driver) => (
-          <button
-            key={driver.id}
-            onClick={() => { assignDriver(route.id, driver.id, driver.name); onClose(); }}
-            className={clsx(
-              'w-full flex items-center gap-3 p-4 rounded-xl border transition-all text-left',
-              route.driverId === driver.id
-                ? 'bg-primary-50 border-primary-200'
-                : 'bg-stone-50 border-stone-200 hover:border-stone-300 hover:bg-white'
-            )}
-          >
-            <div className="w-9 h-9 bg-stone-200 rounded-full flex items-center justify-center text-sm font-bold text-stone-600 flex-shrink-0">
-              {driver.name.charAt(0)}
-            </div>
-            <div>
-              <p className={clsx('text-sm font-medium', route.driverId === driver.id ? 'text-primary-700' : 'text-stone-800')}>{driver.name}</p>
-              <p className="text-xs text-stone-400">{driver.email}</p>
-            </div>
-            {route.driverId === driver.id && (
-              <CheckCircle2 size={16} className="ml-auto text-primary-600" />
-            )}
-          </button>
-        ))}
-      </div>
-    </Modal>
-  );
-}
-
-function AssignVehicleModal({ route, onClose }: { route: Route; onClose: () => void }) {
-  const { assignVehicle } = useRouteStore();
-
-  const vehicleTypeLabels: Record<string, string> = {
-    van: 'Furgoneta',
-    truck: 'Camión',
-    motorcycle: 'Motocicleta',
-    cargo_truck: 'Camión de carga',
-  };
-
-  return (
-    <Modal open onClose={onClose} title="Asignar vehículo" description={route.name} size="sm">
-      <div className="space-y-2">
-        {mockVehicles.map((vehicle) => (
-          <button
-            key={vehicle.id}
-            onClick={() => { assignVehicle(route.id, vehicle.id, vehicle.plate); onClose(); }}
-            className={clsx(
-              'w-full flex items-center gap-3 p-4 rounded-xl border transition-all text-left',
-              route.vehicleId === vehicle.id
-                ? 'bg-primary-50 border-primary-200'
-                : vehicle.available
-                  ? 'bg-stone-50 border-stone-200 hover:border-stone-300 hover:bg-white'
-                  : 'bg-stone-50 border-stone-100 opacity-50 cursor-not-allowed'
-            )}
-            disabled={!vehicle.available && route.vehicleId !== vehicle.id}
-          >
-            <div className="p-2 bg-stone-100 rounded-lg flex-shrink-0">
-              <Truck size={14} className="text-stone-500" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-stone-800">{vehicle.brand} {vehicle.model}</p>
-              <p className="text-xs text-stone-400">{vehicle.plate} · {vehicleTypeLabels[vehicle.type]} · {vehicle.capacity.toLocaleString()} kg</p>
-            </div>
-            {!vehicle.available && route.vehicleId !== vehicle.id && (
-              <span className="text-[10px] text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">En uso</span>
-            )}
-            {route.vehicleId === vehicle.id && (
-              <CheckCircle2 size={16} className="text-primary-600" />
-            )}
-          </button>
-        ))}
-      </div>
-    </Modal>
-  );
-}
-
-function AddOrdersModal({ route, onClose }: { route: Route; onClose: () => void }) {
-  const { orders, assignToRoute } = useOrderStore();
-  const { addOrderToRoute } = useRouteStore();
-
-  const availableOrders = orders.filter(
-    o => !o.routeId && (o.status === 'pending' || o.status === 'confirmed')
-  );
-
-  const handleAssign = (orderId: string) => {
-    assignToRoute(orderId, route.id);
-    addOrderToRoute(route.id, orderId);
-  };
-
-  return (
-    <Modal open onClose={onClose} title="Agregar pedidos a ruta" description={route.name} size="lg">
-      {availableOrders.length === 0 ? (
-        <p className="text-sm text-stone-400 text-center py-6">No hay pedidos disponibles sin ruta asignada</p>
-      ) : (
-        <div className="space-y-2">
-          {availableOrders.map((order) => {
-            const isAssigned = route.orderIds.includes(order.id);
-            return (
-              <div key={order.id} className={clsx(
-                'flex items-center gap-4 p-4 rounded-lg border transition-all',
-                isAssigned ? 'bg-primary-50 border-primary-200' : 'bg-stone-50 border-stone-200'
-              )}>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-mono font-semibold text-stone-700">{order.code}</span>
-                    <OrderStatusBadge status={order.status} />
-                  </div>
-                  <p className="text-xs text-stone-400">{order.clientName} · {order.destination.city}</p>
-                </div>
-                <Button
-                  variant={isAssigned ? 'success' : 'secondary'}
-                  size="xs"
-                  onClick={() => !isAssigned && handleAssign(order.id)}
-                  disabled={isAssigned}
-                >
-                  {isAssigned ? 'Asignado' : 'Asignar'}
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      <div className="flex justify-end mt-4">
-        <Button onClick={onClose}>Cerrar</Button>
-      </div>
-    </Modal>
-  );
-}
-
-function RouteDetail({ route, onClose }: { route: Route; onClose: () => void }) {
-  return (
-    <Modal open onClose={onClose} title={route.name} description={route.code} size="xl">
-      <div className="space-y-5">
+    <Modal open onClose={onClose} title="Detalle de entrega" description={`Pedido ${record.pedido}`} size="lg">
+      <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <RouteStatusBadge status={route.status} />
-          <span className="text-xs text-stone-400">Creado: {route.createdAt}</span>
+          <StatusBadge status={record.estado} />
+          <span className="text-xs text-stone-400">Zona: <strong className="text-stone-600">{record.zona}</strong></span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            ['Cliente',    record.cliente],
+            ['Entrega',    record.entrega],
+            ['Pedido',     record.pedido],
+            ['Factura',    record.factura || '—'],
+            ['Tipo',       record.tipo],
+            ['Referencia', record.ref],
+            ['Bultos',     String(record.bultos)],
+            ['RUT',        record.rut],
+          ].map(([k, v]) => (
+            <div key={k} className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">
+              <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">{k}</p>
+              <p className="text-sm font-medium text-stone-800 mt-0.5">{v}</p>
+            </div>
+          ))}
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-stone-50 rounded-lg p-3 text-center border border-stone-200">
-            <p className="text-xl font-bold text-stone-900">{route.estimatedDistance} km</p>
-            <p className="text-xs text-stone-400 mt-0.5">Distancia</p>
-          </div>
-          <div className="bg-stone-50 rounded-lg p-3 text-center border border-stone-200">
-            <p className="text-xl font-bold text-stone-900">{Math.floor(route.estimatedDuration / 60)}h {route.estimatedDuration % 60}m</p>
-            <p className="text-xs text-stone-400 mt-0.5">Duración est.</p>
-          </div>
-          <div className="bg-stone-50 rounded-lg p-3 text-center border border-stone-200">
-            <p className="text-xl font-bold text-stone-900">{route.orderIds.length}</p>
-            <p className="text-xs text-stone-400 mt-0.5">Pedidos</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
-            <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2">Repartidor</p>
-            {route.driverName ? (
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-primary-100 rounded-full flex items-center justify-center text-xs font-bold text-primary-700">
-                  {route.driverName.charAt(0)}
-                </div>
-                <span className="text-sm text-stone-800">{route.driverName}</span>
-              </div>
-            ) : (
-              <span className="text-sm text-stone-400">Sin asignar</span>
-            )}
-          </div>
-          <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
-            <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2">Vehículo</p>
-            {route.vehiclePlate ? (
-              <div className="flex items-center gap-2">
-                <Truck size={14} className="text-stone-500" />
-                <span className="text-sm text-stone-800">{route.vehiclePlate}</span>
-              </div>
-            ) : (
-              <span className="text-sm text-stone-400">Sin asignar</span>
-            )}
-          </div>
-        </div>
-
-        {route.stops.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Paradas</p>
-            <div className="relative">
-              <div className="absolute left-4 top-4 bottom-4 w-px bg-stone-200" />
-              <div className="space-y-3">
-                {route.stops.map((stop, index) => (
-                  <div key={stop.id} className="flex items-start gap-4">
-                    <div className={clsx(
-                      'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 z-10',
-                      stop.status === 'completed'
-                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                        : 'bg-white text-stone-500 border border-stone-300'
-                    )}>
-                      {stop.status === 'completed' ? <CheckCircle2 size={14} /> : index + 1}
-                    </div>
-                    <div className="flex-1 bg-stone-50 rounded-lg p-3 border border-stone-200">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-stone-800">{stop.clientName}</p>
-                        <span className="text-xs text-stone-400">{stop.estimatedTime}{stop.actualTime && ` → ${stop.actualTime}`}</span>
-                      </div>
-                      <p className="text-xs text-stone-400 mt-0.5">{stop.address.street}, {stop.address.city}</p>
-                      <p className="text-[10px] text-stone-400 font-mono mt-1">{stop.orderCode}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {[
+            ['Chofer',     record.chofer || '—'],
+            ['Vehículo',   record.vehiculo || '—'],
+            ['Peoneta',    record.peoneta || '—'],
+          ].map(([k, v]) => (
+            <div key={k} className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">
+              <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">{k}</p>
+              <p className="text-sm font-medium text-stone-800 mt-0.5">{v}</p>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
 
-        {route.notes && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <p className="text-xs font-medium text-amber-700 mb-1">Notas</p>
-            <p className="text-xs text-stone-700">{route.notes}</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">
+            <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Recepción</p>
+            <p className="text-sm font-medium text-stone-800 mt-0.5">{record.recepcion || '—'}</p>
+          </div>
+          <div className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">
+            <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Fecha / Hora</p>
+            <p className="text-sm font-medium text-stone-800 mt-0.5">{record.fechaHora || '—'}</p>
+          </div>
+        </div>
+
+        {record.obs && (
+          <div className={clsx('border rounded-lg px-3 py-2', cfg.bg, 'border-stone-200')}>
+            <p className="text-[10px] font-semibold text-stone-500 uppercase tracking-wide">Observaciones</p>
+            <p className={clsx('text-sm font-medium mt-0.5', cfg.text)}>{record.obs}</p>
           </div>
         )}
       </div>
@@ -294,274 +181,420 @@ function RouteDetail({ route, onClose }: { route: Route; onClose: () => void }) 
   );
 }
 
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export function RoutesPage() {
-  const { getFilteredRoutes, filters, setFilters, addRoute, updateRoute, updateRouteStatus, deleteRoute } = useRouteStore();
-  const [showForm, setShowForm] = useState(false);
-  const [editingRoute, setEditingRoute] = useState<Route | null>(null);
-  const [detailRoute, setDetailRoute] = useState<Route | null>(null);
-  const [assignDriverRoute, setAssignDriverRoute] = useState<Route | null>(null);
-  const [assignVehicleRoute, setAssignVehicleRoute] = useState<Route | null>(null);
-  const [addOrdersRoute, setAddOrdersRoute] = useState<Route | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Route | null>(null);
+  const { addRoute } = useRouteStore();
 
-  const filteredRoutes = getFilteredRoutes();
+  // Table state
+  const [records] = useState<DeliveryRecord[]>(mockDeliveryRecords);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sortCol, setSortCol] = useState<keyof DeliveryRecord | null>('estado');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState<DeliveryStatus | 'all'>('all');
+  const [filterZona, setFilterZona] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
+  const [detailRecord, setDetailRecord] = useState<DeliveryRecord | null>(null);
+  const [showNewRoute, setShowNewRoute] = useState(false);
 
-  const handleAdd = (data: RouteFormData) => {
-    addRoute({
-      name: data.name,
-      status: 'planned',
-      stops: [],
-      orderIds: [],
-      estimatedDistance: data.estimatedDistance,
-      estimatedDuration: data.estimatedDuration,
-      startTime: data.startTime,
-      notes: data.notes,
-    });
-    setShowForm(false);
+  // Sort handler
+  const handleSort = (col: keyof DeliveryRecord) => {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : d === 'desc' ? null : 'asc');
+      if (sortDir === 'desc') setSortCol(null);
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
   };
 
-  const handleEdit = (data: RouteFormData) => {
-    if (!editingRoute) return;
-    updateRoute(editingRoute.id, {
-      name: data.name,
+  // Derived data
+  const zonas = useMemo(() => ['all', ...Array.from(new Set(records.map(r => r.zona)))], [records]);
+
+  const filtered = useMemo(() => {
+    let data = records.filter(r => {
+      if (filterStatus !== 'all' && r.estado !== filterStatus) return false;
+      if (filterZona !== 'all' && r.zona !== filterZona) return false;
+      if (search) {
+        const t = search.toLowerCase();
+        return (
+          r.cliente.toLowerCase().includes(t) ||
+          r.entrega.toLowerCase().includes(t) ||
+          r.pedido.includes(t) ||
+          r.factura.includes(t) ||
+          r.chofer.toLowerCase().includes(t) ||
+          r.vehiculo.toLowerCase().includes(t) ||
+          r.zona.toLowerCase().includes(t)
+        );
+      }
+      return true;
+    });
+
+    if (sortCol && sortDir) {
+      data = [...data].sort((a, b) => {
+        const av = a[sortCol] ?? '';
+        const bv = b[sortCol] ?? '';
+        const cmp = String(av).localeCompare(String(bv), 'es', { numeric: true });
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+    return data;
+  }, [records, filterStatus, filterZona, search, sortCol, sortDir]);
+
+  // Selection
+  const allSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id));
+  const toggleAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(filtered.map(r => r.id)));
+  };
+  const toggleRow = (id: string) => {
+    setSelected(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
+
+  // Stats
+  const statuses: DeliveryStatus[] = ['entregado', 'en_ruta', 'pendiente', 'reprogramado', 'rechazado', 'parcial'];
+  const counts = useMemo(() =>
+    Object.fromEntries(statuses.map(s => [s, records.filter(r => r.estado === s).length])),
+  [records]);
+
+  const handleAddRoute = (data: RouteFormData) => {
+    addRoute({
+      name: data.name, status: 'planned', stops: [], orderIds: [],
       estimatedDistance: data.estimatedDistance,
       estimatedDuration: data.estimatedDuration,
-      startTime: data.startTime,
-      notes: data.notes,
+      startTime: data.startTime, notes: data.notes,
     });
-    setEditingRoute(null);
+    setShowNewRoute(false);
   };
 
   const statusOptions = [
     { value: 'all', label: 'Todos los estados' },
-    { value: 'planned', label: 'Planificadas' },
-    { value: 'active', label: 'Activas' },
-    { value: 'completed', label: 'Completadas' },
-    { value: 'cancelled', label: 'Canceladas' },
+    ...statuses.map(s => ({ value: s, label: statusConfig[s].label })),
   ];
 
-  const statusActions: Partial<Record<RouteStatus, { label: string; next: RouteStatus; icon: React.ReactNode }>> = {
-    planned: { label: 'Iniciar', next: 'active', icon: <Play size={12} /> },
-    active: { label: 'Completar', next: 'completed', icon: <CheckCircle2 size={12} /> },
-  };
+  const zonaOptions = zonas.map(z => ({ value: z, label: z === 'all' ? 'Todas las zonas' : z }));
+
+  const colProps = { sortCol, sortDir, onSort: handleSort };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 -mt-1">
+      {/* Summary counters */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {statuses.map(s => {
+          const cfg = statusConfig[s];
+          const active = filterStatus === s;
+          return (
+            <button
+              key={s}
+              onClick={() => setFilterStatus(active ? 'all' : s)}
+              className={clsx(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all',
+                active
+                  ? clsx(cfg.bg, cfg.text, 'border-transparent shadow-sm')
+                  : 'bg-white border-stone-200 text-stone-500 hover:border-stone-300 hover:text-stone-700'
+              )}
+            >
+              <span className={clsx('h-1.5 w-1.5 rounded-full', cfg.dot)} />
+              {cfg.label}
+              <span className={clsx(
+                'ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold',
+                active ? 'bg-white/60' : 'bg-stone-100 text-stone-500'
+              )}>
+                {counts[s] ?? 0}
+              </span>
+            </button>
+          );
+        })}
+        <div className="flex-1" />
+        <span className="text-xs text-stone-400">
+          {selected.size > 0 && <span className="font-semibold text-stone-700 mr-1">{selected.size} seleccionados ·</span>}
+          {filtered.length} de {records.length} registros
+        </span>
+      </div>
+
       {/* Toolbar */}
-      <div className="flex gap-3">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
           <input
             type="text"
-            placeholder="Buscar por código, nombre, repartidor..."
-            value={filters.search ?? ''}
-            onChange={(e) => setFilters({ search: e.target.value })}
-            className="w-full pl-9 pr-3 py-2 bg-white border border-stone-300 rounded-lg text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
+            placeholder="Buscar pedido, cliente, chofer..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-8 pr-3 py-2 bg-white border border-stone-300 rounded-lg text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
           />
         </div>
-        <Select
-          value={filters.status ?? 'all'}
-          onChange={(e) => setFilters({ status: e.target.value as RouteStatus | 'all' })}
-          options={statusOptions}
-          containerClassName="w-48"
-        />
-        <Button onClick={() => setShowForm(true)} icon={<Plus size={16} />}>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowFilters(!showFilters)}
+          icon={<SlidersHorizontal size={14} />}
+        >
+          Filtros
+          {(filterZona !== 'all') && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-primary-500" />}
+        </Button>
+
+        <Button variant="secondary" size="sm" icon={<RefreshCw size={14} />}>
+          Actualizar
+        </Button>
+
+        <Button variant="secondary" size="sm" icon={<Download size={14} />}>
+          Exportar
+        </Button>
+
+        <div className="flex-1" />
+
+        <Button size="sm" onClick={() => setShowNewRoute(true)} icon={<Plus size={14} />}>
           Nueva ruta
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: 'Total', value: filteredRoutes.length, color: 'text-stone-700', bg: 'bg-white' },
-          { label: 'Planificadas', value: filteredRoutes.filter(r => r.status === 'planned').length, color: 'text-blue-700', bg: 'bg-blue-50' },
-          { label: 'Activas', value: filteredRoutes.filter(r => r.status === 'active').length, color: 'text-emerald-700', bg: 'bg-emerald-50' },
-          { label: 'Completadas', value: filteredRoutes.filter(r => r.status === 'completed').length, color: 'text-stone-500', bg: 'bg-white' },
-        ].map((s) => (
-          <div key={s.label} className={`${s.bg} border border-stone-200 rounded-xl p-4 text-center shadow-sm`}>
-            <p className={clsx('text-2xl font-bold', s.color)}>{s.value}</p>
-            <p className="text-xs text-stone-400 mt-0.5">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Routes Grid */}
-      {filteredRoutes.length === 0 ? (
-        <EmptyState
-          icon={<Map size={32} />}
-          title="No se encontraron rutas"
-          description="Crea una nueva ruta para comenzar la planificación"
-          action={{ label: 'Crear ruta', onClick: () => setShowForm(true), icon: <Plus size={14} /> }}
-        />
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredRoutes.map((route) => {
-            const action = statusActions[route.status];
-            const completedStops = route.stops.filter(s => s.status === 'completed').length;
-            const progress = route.stops.length > 0 ? (completedStops / route.stops.length) * 100 : 0;
-
-            return (
-              <div key={route.id} className="bg-white border border-stone-200 rounded-xl p-5 hover:border-stone-300 hover:shadow-md transition-all shadow-sm">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div>
-                    <p className="text-sm font-semibold text-stone-800">{route.name}</p>
-                    <p className="text-xs font-mono text-stone-400 mt-0.5">{route.code}</p>
-                  </div>
-                  <RouteStatusBadge status={route.status} />
-                </div>
-
-                {/* Stats row */}
-                <div className="flex items-center gap-4 text-xs text-stone-400 mb-3">
-                  <span className="flex items-center gap-1.5">
-                    <Package size={11} className="text-stone-300" />
-                    {route.orderIds.length} pedidos
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Map size={11} className="text-stone-300" />
-                    {route.estimatedDistance} km
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Clock size={11} className="text-stone-300" />
-                    {Math.floor(route.estimatedDuration / 60)}h {route.estimatedDuration % 60}m
-                  </span>
-                </div>
-
-                {/* Driver & Vehicle */}
-                <div className="flex items-center gap-2 mb-3">
-                  <button
-                    onClick={() => setAssignDriverRoute(route)}
-                    disabled={route.status === 'completed' || route.status === 'cancelled'}
-                    className={clsx(
-                      'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border',
-                      route.driverName
-                        ? 'bg-primary-50 text-primary-700 border-primary-200 hover:bg-primary-100'
-                        : 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-stone-100',
-                      (route.status === 'completed' || route.status === 'cancelled') && 'cursor-default opacity-70'
-                    )}
-                  >
-                    <UserCheck size={12} />
-                    {route.driverName ?? 'Asignar repartidor'}
-                  </button>
-                  <button
-                    onClick={() => setAssignVehicleRoute(route)}
-                    disabled={route.status === 'completed' || route.status === 'cancelled'}
-                    className={clsx(
-                      'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border',
-                      route.vehiclePlate
-                        ? 'bg-stone-100 text-stone-700 border-stone-200 hover:bg-stone-200'
-                        : 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-stone-100',
-                      (route.status === 'completed' || route.status === 'cancelled') && 'cursor-default opacity-70'
-                    )}
-                  >
-                    <Car size={12} />
-                    {route.vehiclePlate ?? 'Asignar vehículo'}
-                  </button>
-                </div>
-
-                {/* Progress bar for active routes */}
-                {route.status === 'active' && route.stops.length > 0 && (
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between text-xs text-stone-400 mb-1">
-                      <span>Progreso</span>
-                      <span>{completedStops}/{route.stops.length} paradas</span>
-                    </div>
-                    <div className="w-full bg-stone-100 rounded-full h-1.5">
-                      <div
-                        className="bg-primary-500 h-1.5 rounded-full transition-all"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Stops preview */}
-                {route.stops.length > 0 && (
-                  <div className="space-y-1 mb-3">
-                    {route.stops.slice(0, 2).map((stop, i) => (
-                      <div key={stop.id} className="flex items-center gap-2 text-xs text-stone-400">
-                        <div className={clsx(
-                          'w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0',
-                          stop.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-500'
-                        )}>
-                          {stop.status === 'completed' ? '✓' : i + 1}
-                        </div>
-                        <span className="truncate">{stop.clientName}</span>
-                        <span className="text-stone-300 flex-shrink-0">{stop.estimatedTime}</span>
-                      </div>
-                    ))}
-                    {route.stops.length > 2 && (
-                      <p className="text-[10px] text-stone-400 pl-6">+{route.stops.length - 2} paradas más</p>
-                    )}
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex items-center gap-1 pt-3 border-t border-stone-100">
-                  {action && (
-                    <Button
-                      variant="primary"
-                      size="xs"
-                      onClick={() => updateRouteStatus(route.id, action.next)}
-                      icon={action.icon}
-                    >
-                      {action.label}
-                    </Button>
-                  )}
-                  {(route.status === 'planned' || route.status === 'active') && (
-                    <Button variant="ghost" size="xs" onClick={() => setAddOrdersRoute(route)} icon={<Package size={13} />}>
-                      Pedidos
-                    </Button>
-                  )}
-                  <div className="flex-1" />
-                  <Button variant="ghost" size="xs" onClick={() => setDetailRoute(route)} icon={<Eye size={13} />} />
-                  {route.status !== 'active' && route.status !== 'completed' && (
-                    <Button variant="ghost" size="xs" onClick={() => setEditingRoute(route)} icon={<Edit2 size={13} />} />
-                  )}
-                  {route.status !== 'active' && (
-                    <Button variant="ghost" size="xs" onClick={() => setDeleteTarget(route)} icon={<Trash2 size={13} />} className="hover:text-red-600" />
-                  )}
-                </div>
-              </div>
-            );
-          })}
+      {/* Expanded filters */}
+      {showFilters && (
+        <div className="flex items-center gap-3 p-3 bg-white border border-stone-200 rounded-xl shadow-sm">
+          <Select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value as DeliveryStatus | 'all')}
+            options={statusOptions}
+            containerClassName="w-44"
+          />
+          <Select
+            value={filterZona}
+            onChange={e => setFilterZona(e.target.value)}
+            options={zonaOptions}
+            containerClassName="w-40"
+          />
+          <Button variant="ghost" size="sm" onClick={() => { setFilterStatus('all'); setFilterZona('all'); setShowFilters(false); }}>
+            Limpiar
+          </Button>
         </div>
       )}
 
-      <Modal open={showForm} onClose={() => setShowForm(false)} title="Crear ruta" description="Define los parámetros de la nueva ruta" size="md">
-        <RouteForm onSubmit={handleAdd} onCancel={() => setShowForm(false)} submitLabel="Crear ruta" />
-      </Modal>
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={<Map size={32} />}
+          title="Sin registros"
+          description="No se encontraron entregas con los filtros aplicados"
+        />
+      ) : (
+        <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse min-w-[1200px]">
+              <thead className="bg-stone-50">
+                <tr>
+                  {/* Checkbox */}
+                  <th className="w-10 px-3 py-2.5 border-b border-stone-200">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      className="w-3.5 h-3.5 rounded border-stone-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                    />
+                  </th>
+                  <ColHeader label="Estado"     col="estado"    {...colProps} className="min-w-[120px]" />
+                  <ColHeader label="Cliente"    col="cliente"   {...colProps} className="min-w-[140px]" />
+                  <ColHeader label="Entrega"    col="entrega"   {...colProps} className="min-w-[170px]" />
+                  <ColHeader label="Pedido"     col="pedido"    {...colProps} className="min-w-[110px]" />
+                  <ColHeader label="Factura"    col="factura"   {...colProps} className="min-w-[110px]" />
+                  <ColHeader label="Tipo"       col="tipo"      {...colProps} className="w-14" />
+                  <ColHeader label="Ref."       col="ref"       {...colProps} className="min-w-[90px]" />
+                  <ColHeader label="Bultos"     col="bultos"    {...colProps} className="w-16 text-center" />
+                  <ColHeader label="Rut"        col="rut"       {...colProps} className="min-w-[110px]" />
+                  <ColHeader label="Recepción"  col="recepcion" {...colProps} className="min-w-[130px]" />
+                  <ColHeader label="Fecha/Hora" col="fechaHora" {...colProps} className="min-w-[120px]" />
+                  <ColHeader label="Chofer"     col="chofer"    {...colProps} className="min-w-[130px]" />
+                  <ColHeader label="Vehículo"   col="vehiculo"  {...colProps} className="min-w-[90px]" />
+                  <ColHeader label="Peoneta"    col="peoneta"   {...colProps} className="min-w-[110px]" />
+                  <ColHeader label="Obs."       col="obs"       {...colProps} className="min-w-[140px]" />
+                  <ColHeader label="Zona"       col="zona"      {...colProps} className="min-w-[100px]" />
+                  {/* Actions */}
+                  <th className="w-16 px-3 py-2.5 border-b border-stone-200" />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((row, idx) => {
+                  const isSelected = selected.has(row.id);
+                  return (
+                    <tr
+                      key={row.id}
+                      className={clsx(
+                        'border-b border-stone-100 transition-colors',
+                        isSelected ? 'bg-primary-50' : idx % 2 === 0 ? 'bg-white' : 'bg-stone-50/50',
+                        'hover:bg-primary-50/60'
+                      )}
+                    >
+                      {/* Checkbox */}
+                      <td className="px-3 py-2.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleRow(row.id)}
+                          className="w-3.5 h-3.5 rounded border-stone-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                        />
+                      </td>
 
-      {editingRoute && (
-        <Modal open onClose={() => setEditingRoute(null)} title="Editar ruta" description={editingRoute.code} size="md">
-          <RouteForm
-            initial={{
-              name: editingRoute.name,
-              notes: editingRoute.notes ?? '',
-              startTime: editingRoute.startTime ?? '08:00',
-              estimatedDistance: editingRoute.estimatedDistance,
-              estimatedDuration: editingRoute.estimatedDuration,
-            }}
-            onSubmit={handleEdit}
-            onCancel={() => setEditingRoute(null)}
-            submitLabel="Guardar cambios"
-          />
-        </Modal>
+                      {/* Estado */}
+                      <td className="px-3 py-2.5">
+                        <StatusBadge status={row.estado} />
+                      </td>
+
+                      {/* Cliente */}
+                      <td className="px-3 py-2.5">
+                        <span className="text-xs font-semibold text-stone-700">{row.cliente}</span>
+                      </td>
+
+                      {/* Entrega */}
+                      <td className="px-3 py-2.5">
+                        <span className="text-xs text-stone-600">{row.entrega}</span>
+                      </td>
+
+                      {/* Pedido */}
+                      <td className="px-3 py-2.5">
+                        <span className="font-mono text-xs text-stone-700">{row.pedido}</span>
+                      </td>
+
+                      {/* Factura */}
+                      <td className="px-3 py-2.5">
+                        <span className="font-mono text-xs text-stone-500">{row.factura || '—'}</span>
+                      </td>
+
+                      {/* Tipo */}
+                      <td className="px-3 py-2.5 text-center">
+                        <span className="text-xs font-bold text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded">{row.tipo}</span>
+                      </td>
+
+                      {/* Ref */}
+                      <td className="px-3 py-2.5">
+                        <span className="font-mono text-xs text-stone-500">{row.ref}</span>
+                      </td>
+
+                      {/* Bultos */}
+                      <td className="px-3 py-2.5 text-center">
+                        <span className="text-xs font-semibold text-stone-700">{row.bultos}</span>
+                      </td>
+
+                      {/* Rut */}
+                      <td className="px-3 py-2.5">
+                        <span className="font-mono text-xs text-stone-500">{row.rut}</span>
+                      </td>
+
+                      {/* Recepción */}
+                      <td className="px-3 py-2.5">
+                        <span className="text-xs text-stone-600">{row.recepcion || <span className="text-stone-300">—</span>}</span>
+                      </td>
+
+                      {/* Fecha/Hora */}
+                      <td className="px-3 py-2.5">
+                        <span className="text-xs text-stone-500 whitespace-nowrap">{row.fechaHora || <span className="text-stone-300">—</span>}</span>
+                      </td>
+
+                      {/* Chofer */}
+                      <td className="px-3 py-2.5">
+                        {row.chofer ? (
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-5 h-5 bg-primary-100 rounded-full flex items-center justify-center text-[10px] font-bold text-primary-700 flex-shrink-0">
+                              {row.chofer.charAt(0)}
+                            </div>
+                            <span className="text-xs text-stone-700 whitespace-nowrap">{row.chofer}</span>
+                          </div>
+                        ) : <span className="text-stone-300 text-xs">—</span>}
+                      </td>
+
+                      {/* Vehículo */}
+                      <td className="px-3 py-2.5">
+                        {row.vehiculo ? (
+                          <span className="font-mono text-xs font-semibold text-stone-600 bg-stone-100 px-1.5 py-0.5 rounded">
+                            {row.vehiculo}
+                          </span>
+                        ) : <span className="text-stone-300 text-xs">—</span>}
+                      </td>
+
+                      {/* Peoneta */}
+                      <td className="px-3 py-2.5">
+                        <span className="text-xs text-stone-500">{row.peoneta || <span className="text-stone-300">—</span>}</span>
+                      </td>
+
+                      {/* Obs */}
+                      <td className="px-3 py-2.5 max-w-[160px]">
+                        <span className="text-xs text-stone-500 truncate block">{row.obs || <span className="text-stone-300">—</span>}</span>
+                      </td>
+
+                      {/* Zona */}
+                      <td className="px-3 py-2.5">
+                        <span className="text-xs font-medium text-stone-600 bg-stone-100 px-2 py-0.5 rounded-full whitespace-nowrap">
+                          {row.zona}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => setDetailRecord(row)}
+                            className="p-1 rounded text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+                            title="Ver detalle"
+                          >
+                            <Eye size={13} />
+                          </button>
+                          <button
+                            className="p-1 rounded text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+                            title="Editar"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                        </div>
+                        {/* Always visible on hover via row */}
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            onClick={() => setDetailRecord(row)}
+                            className="p-1 rounded text-stone-300 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+                          >
+                            <Eye size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-t border-stone-100 bg-stone-50">
+            <span className="text-xs text-stone-400">
+              Mostrando <strong className="text-stone-600">{filtered.length}</strong> de{' '}
+              <strong className="text-stone-600">{records.length}</strong> entregas
+              {selected.size > 0 && <> · <strong className="text-primary-600">{selected.size}</strong> seleccionadas</>}
+            </span>
+            <div className="flex items-center gap-3 text-xs text-stone-400">
+              <span>Total bultos: <strong className="text-stone-700">{filtered.reduce((s, r) => s + r.bultos, 0)}</strong></span>
+              <span>·</span>
+              <span>
+                Entregados:{' '}
+                <strong className="text-emerald-700">{filtered.filter(r => r.estado === 'entregado').length}</strong>
+              </span>
+            </div>
+          </div>
+        </div>
       )}
 
-      {detailRoute && <RouteDetail route={detailRoute} onClose={() => setDetailRoute(null)} />}
-      {assignDriverRoute && <AssignDriverModal route={assignDriverRoute} onClose={() => setAssignDriverRoute(null)} />}
-      {assignVehicleRoute && <AssignVehicleModal route={assignVehicleRoute} onClose={() => setAssignVehicleRoute(null)} />}
-      {addOrdersRoute && <AddOrdersModal route={addOrdersRoute} onClose={() => setAddOrdersRoute(null)} />}
+      {/* Detail modal */}
+      {detailRecord && (
+        <DeliveryDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} />
+      )}
 
-      <ConfirmModal
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => { if (deleteTarget) { deleteRoute(deleteTarget.id); setDeleteTarget(null); } }}
-        title="Eliminar ruta"
-        message={`¿Seguro que deseas eliminar la ruta "${deleteTarget?.name}"?`}
-        confirmLabel="Eliminar"
-      />
+      {/* New route modal */}
+      <Modal open={showNewRoute} onClose={() => setShowNewRoute(false)} title="Crear nueva ruta" size="md">
+        <RouteForm onSubmit={handleAddRoute} onCancel={() => setShowNewRoute(false)} submitLabel="Crear ruta" />
+      </Modal>
     </div>
   );
 }
+

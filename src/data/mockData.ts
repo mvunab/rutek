@@ -1,6 +1,6 @@
 import type {
   Tenant, User, Client, Order, Route, Vehicle,
-  ServiceHistory, DashboardStats, ChartDataPoint
+  ServiceHistory, DashboardStats, ChartDataPoint, DeliveryRecord, RoutePhoto, Peoneta
 } from '../types';
 
 // ─── Tenant ───────────────────────────────────────────────────────────────────
@@ -473,4 +473,141 @@ export const mockStatusChart: ChartDataPoint[] = [
   { label: 'En tránsito', value: 23 },
   { label: 'Pendientes', value: 15 },
   { label: 'Cancelados', value: 8 },
+];
+
+// ─── Delivery Records ─────────────────────────────────────────────────────────
+export const mockDeliveryRecords: DeliveryRecord[] = [
+  {
+    id: 'del-001', tenantId: 'tenant-001',
+    estado: 'entregado', cliente: 'FALABELLA', entrega: 'FALABELLA (MELIPILLA)',
+    pedido: '5028053303', factura: '5074170596', tipo: 'C', ref: '3322855',
+    bultos: 1, rut: '10.320.338-4', recepcion: 'Ruben Cisternas',
+    fechaHora: '03/04/26 12:45', chofer: 'Ruben Cisternas', vehiculo: 'SFYH69',
+    peoneta: '(Ninguno)', obs: 'Entregado', zona: 'ZONA SUR', routeId: 'route-001',
+  },
+  {
+    id: 'del-002', tenantId: 'tenant-001',
+    estado: 'entregado', cliente: 'FALABELLA', entrega: 'FALABELLA MALL',
+    pedido: '5028061441', factura: '5074182201', tipo: 'C', ref: '3322900',
+    bultos: 3, rut: '10.320.338-4', recepcion: 'Claudia Rojas',
+    fechaHora: '03/04/26 13:20', chofer: 'Ruben Cisternas', vehiculo: 'SFYH69',
+    peoneta: '(Ninguno)', obs: 'Entregado', zona: 'ZONA SUR', routeId: 'route-001',
+  },
+  {
+    id: 'del-003', tenantId: 'tenant-001',
+    estado: 'en_ruta', cliente: 'DISTRIBUIDORA EL SUR', entrega: 'BODEGA CENTRAL EL SUR',
+    pedido: '5028071234', factura: '5074195000', tipo: 'N', ref: '3323100',
+    bultos: 12, rut: '77.123.456-7', recepcion: '',
+    fechaHora: '', chofer: 'Ana Pérez', vehiculo: 'DKWP-78',
+    peoneta: 'Jorge Muñoz', obs: '', zona: 'ZONA NORTE', routeId: 'route-002',
+  },
+  {
+    id: 'del-004', tenantId: 'tenant-001',
+    estado: 'en_ruta', cliente: 'SUPERMERCADOS NORTE', entrega: 'SUP. NORTE VALPARAÍSO',
+    pedido: '5028072891', factura: '5074196300', tipo: 'C', ref: '3323210',
+    bultos: 8, rut: '76.234.567-8', recepcion: '',
+    fechaHora: '', chofer: 'Ana Pérez', vehiculo: 'DKWP-78',
+    peoneta: 'Jorge Muñoz', obs: '', zona: 'ZONA VALPO', routeId: 'route-002',
+  },
+  {
+    id: 'del-005', tenantId: 'tenant-001',
+    estado: 'pendiente', cliente: 'TECNOLOGÍA & MÁS', entrega: 'TECMÁS OFICINA CENTRAL',
+    pedido: '5028080001', factura: '', tipo: 'C', ref: '3323400',
+    bultos: 5, rut: '74.456.789-0', recepcion: '',
+    fechaHora: '', chofer: '', vehiculo: '',
+    peoneta: '', obs: 'Sin despachar', zona: 'ZONA CENTRO', routeId: undefined,
+  },
+  {
+    id: 'del-006', tenantId: 'tenant-001',
+    estado: 'pendiente', cliente: 'FERRETERÍA CENTRAL', entrega: 'BODEGA FERRETERÍA',
+    pedido: '5028082450', factura: '', tipo: 'N', ref: '3323510',
+    bultos: 20, rut: '75.345.678-9', recepcion: '',
+    fechaHora: '', chofer: '', vehiculo: '',
+    peoneta: '', obs: 'Sin despachar', zona: 'ZONA SUR', routeId: undefined,
+  },
+  {
+    id: 'del-007', tenantId: 'tenant-001',
+    estado: 'reprogramado', cliente: 'ALIMENTOS DEL CAMPO', entrega: 'PLANTA LA SERENA',
+    pedido: '5028083001', factura: '5074190002', tipo: 'C', ref: '3323600',
+    bultos: 30, rut: '73.567.890-1', recepcion: '',
+    fechaHora: '', chofer: 'Roberto Soto', vehiculo: 'BJRT-45',
+    peoneta: '(Ninguno)', obs: 'Cliente ausente, reprogramar', zona: 'ZONA NORTE', routeId: 'route-003',
+  },
+  {
+    id: 'del-008', tenantId: 'tenant-001',
+    estado: 'entregado', cliente: 'FALABELLA', entrega: 'FALABELLA PLAZA VESPUCIO',
+    pedido: '5027990012', factura: '5074100112', tipo: 'C', ref: '3321800',
+    bultos: 2, rut: '10.320.338-4', recepcion: 'Maria Torres',
+    fechaHora: '02/04/26 11:10', chofer: 'Roberto Soto', vehiculo: 'BJRT-45',
+    peoneta: '(Ninguno)', obs: 'Entregado', zona: 'ZONA SUR', routeId: 'route-003',
+  },
+  {
+    id: 'del-009', tenantId: 'tenant-001',
+    estado: 'rechazado', cliente: 'DISTRIBUIDORA EL SUR', entrega: 'SUCURSAL MAIPÚ',
+    pedido: '5028050010', factura: '5074155010', tipo: 'N', ref: '3322100',
+    bultos: 6, rut: '77.123.456-7', recepcion: 'Pedro Sáez',
+    fechaHora: '01/04/26 15:30', chofer: 'Roberto Soto', vehiculo: 'BJRT-45',
+    peoneta: '(Ninguno)', obs: 'Rechazado por daños', zona: 'ZONA OESTE', routeId: 'route-003',
+  },
+  {
+    id: 'del-010', tenantId: 'tenant-001',
+    estado: 'parcial', cliente: 'SUPERMERCADOS NORTE', entrega: 'SUP. NORTE QUILPUÉ',
+    pedido: '5028060500', factura: '5074168900', tipo: 'C', ref: '3322700',
+    bultos: 4, rut: '76.234.567-8', recepcion: 'Luis Garrido',
+    fechaHora: '02/04/26 14:00', chofer: 'Ana Pérez', vehiculo: 'DKWP-78',
+    peoneta: 'Jorge Muñoz', obs: 'Entrega parcial (2/4 bultos)', zona: 'ZONA VALPO', routeId: 'route-002',
+  },
+  {
+    id: 'del-011', tenantId: 'tenant-001',
+    estado: 'entregado', cliente: 'TECNOLOGÍA & MÁS', entrega: 'TECMÁS BODEGA NORTE',
+    pedido: '5027985000', factura: '5074089200', tipo: 'C', ref: '3321500',
+    bultos: 7, rut: '74.456.789-0', recepcion: 'Sebastián Vega',
+    fechaHora: '31/03/26 10:45', chofer: 'Roberto Soto', vehiculo: 'BJRT-45',
+    peoneta: '(Ninguno)', obs: 'Entregado', zona: 'ZONA CENTRO',
+  },
+  {
+    id: 'del-012', tenantId: 'tenant-001',
+    estado: 'pendiente', cliente: 'FALABELLA', entrega: 'FALABELLA ARAUCO MAIPÚ',
+    pedido: '5028085000', factura: '', tipo: 'C', ref: '3323700',
+    bultos: 9, rut: '10.320.338-4', recepcion: '',
+    fechaHora: '', chofer: '', vehiculo: '',
+    peoneta: '', obs: 'En preparación', zona: 'ZONA OESTE',
+  },
+];
+
+// ─── Route Photos ─────────────────────────────────────────────────────────────
+const photoUrl = (seed: string, w = 400, h = 300) =>
+  `https://picsum.photos/seed/${seed}/${w}/${h}`;
+
+export const mockRoutePhotos: RoutePhoto[] = [
+  // Ruta RUT-2024-001 — Roberto Soto (BJRT-45)
+  { id: 'ph-001', tenantId: 'tenant-001', routeCode: 'RUT-001', routeId: 'route-001', driverName: 'Roberto Soto', vehiclePlate: 'BJRT-45', fecha: '03/04/26', hora: '09:14', photoUrl: photoUrl('delivery1'), thumbnailUrl: photoUrl('delivery1', 80, 60), type: 'entrega', description: 'Entrega en destino — conforme', clientName: 'Distribuidora El Sur S.A.', orderCode: 'PED-2024-0001' },
+  { id: 'ph-002', tenantId: 'tenant-001', routeCode: 'RUT-001', routeId: 'route-001', driverName: 'Roberto Soto', vehiclePlate: 'BJRT-45', fecha: '03/04/26', hora: '09:18', photoUrl: photoUrl('delivery2'), thumbnailUrl: photoUrl('delivery2', 80, 60), type: 'firma', description: 'Firma de recepción', clientName: 'Distribuidora El Sur S.A.', orderCode: 'PED-2024-0001' },
+  { id: 'ph-003', tenantId: 'tenant-001', routeCode: 'RUT-001', routeId: 'route-001', driverName: 'Roberto Soto', vehiclePlate: 'BJRT-45', fecha: '03/04/26', hora: '11:45', photoUrl: photoUrl('package1'), thumbnailUrl: photoUrl('package1', 80, 60), type: 'entrega', description: 'Paquetes descargados en piso', clientName: 'Tecnología & Más S.A.', orderCode: 'PED-2024-0004' },
+  { id: 'ph-004', tenantId: 'tenant-001', routeCode: 'RUT-001', routeId: 'route-001', driverName: 'Roberto Soto', vehiclePlate: 'BJRT-45', fecha: '03/04/26', hora: '11:52', photoUrl: photoUrl('inspection1'), thumbnailUrl: photoUrl('inspection1', 80, 60), type: 'recepcion', description: 'Inspección en recepción TI', clientName: 'Tecnología & Más S.A.', orderCode: 'PED-2024-0004' },
+
+  // Ruta RUT-2024-002 — Ana Pérez (DKWP-78)
+  { id: 'ph-005', tenantId: 'tenant-001', routeCode: 'RUT-002', routeId: 'route-002', driverName: 'Ana Pérez', vehiclePlate: 'DKWP-78', fecha: '04/04/26', hora: '13:05', photoUrl: photoUrl('delivery3'), thumbnailUrl: photoUrl('delivery3', 80, 60), type: 'entrega', description: 'Entrega supermercado — conforme', clientName: 'Supermercados Norte Ltda.', orderCode: 'PED-2024-0002' },
+  { id: 'ph-006', tenantId: 'tenant-001', routeCode: 'RUT-002', routeId: 'route-002', driverName: 'Ana Pérez', vehiclePlate: 'DKWP-78', fecha: '04/04/26', hora: '13:22', photoUrl: photoUrl('cargo1'), thumbnailUrl: photoUrl('cargo1', 80, 60), type: 'dano', description: 'Bulto con golpe leve — documentado', clientName: 'Supermercados Norte Ltda.', orderCode: 'PED-2024-0006' },
+  { id: 'ph-007', tenantId: 'tenant-001', routeCode: 'RUT-002', routeId: 'route-002', driverName: 'Ana Pérez', vehiclePlate: 'DKWP-78', fecha: '04/04/26', hora: '14:55', photoUrl: photoUrl('warehouse1'), thumbnailUrl: photoUrl('warehouse1', 80, 60), type: 'recepcion', description: 'Descarga en bodega cliente', clientName: 'Supermercados Norte Ltda.', orderCode: 'PED-2024-0006' },
+
+  // Ruta RUT-2024-003 — Roberto Soto (BJRT-45) — completada
+  { id: 'ph-008', tenantId: 'tenant-001', routeCode: 'RUT-003', routeId: 'route-003', driverName: 'Roberto Soto', vehiclePlate: 'BJRT-45', fecha: '10/04/26', hora: '15:48', photoUrl: photoUrl('delivery4'), thumbnailUrl: photoUrl('delivery4', 80, 60), type: 'entrega', description: 'Entrega ferretería — conforme', clientName: 'Ferretería Central SpA', orderCode: 'PED-2024-0003' },
+  { id: 'ph-009', tenantId: 'tenant-001', routeCode: 'RUT-003', routeId: 'route-003', driverName: 'Roberto Soto', vehiclePlate: 'BJRT-45', fecha: '10/04/26', hora: '15:52', photoUrl: photoUrl('signature1'), thumbnailUrl: photoUrl('signature1', 80, 60), type: 'firma', description: 'Firma de conformidad', clientName: 'Ferretería Central SpA', orderCode: 'PED-2024-0003' },
+  { id: 'ph-010', tenantId: 'tenant-001', routeCode: 'RUT-003', routeId: 'route-003', driverName: 'Roberto Soto', vehiclePlate: 'BJRT-45', fecha: '10/04/26', hora: '16:10', photoUrl: photoUrl('truck1'), thumbnailUrl: photoUrl('truck1', 80, 60), type: 'otro', description: 'Vehículo al final de ruta', clientName: '', orderCode: '' },
+  { id: 'ph-011', tenantId: 'tenant-001', routeCode: 'RUT-003', routeId: 'route-003', driverName: 'Roberto Soto', vehiclePlate: 'BJRT-45', fecha: '10/04/26', hora: '16:25', photoUrl: photoUrl('delivery5'), thumbnailUrl: photoUrl('delivery5', 80, 60), type: 'dano', description: 'Daño pre-existente registrado', clientName: 'Ferretería Central SpA', orderCode: 'PED-2024-0003' },
+  { id: 'ph-012', tenantId: 'tenant-001', routeCode: 'RUT-003', routeId: 'route-003', driverName: 'Roberto Soto', vehiclePlate: 'BJRT-45', fecha: '10/04/26', hora: '16:30', photoUrl: photoUrl('damage1'), thumbnailUrl: photoUrl('damage1', 80, 60), type: 'dano', description: 'Foto cierre de ruta — incidencia', clientName: 'Ferretería Central SpA', orderCode: 'PED-2024-0003' },
+];
+
+// ─── Peonetas ─────────────────────────────────────────────────────────────────
+export const mockPeonetas: Peoneta[] = [
+  { id: 'peon-001', tenantId: 'tenant-001', rut: '21432449-0', nombres: 'Sebastián', apellidoPaterno: 'Lara',      apellidoMaterno: 'Lara',      estado: 'Activo',   username: 'Se.Lara',       userId: 'user-p01', phone: '+56912345001', email: 'slara@empresa.cl',      createdAt: '2024-01-10' },
+  { id: 'peon-002', tenantId: 'tenant-001', rut: '1-1',        nombres: '(Ninguno)', apellidoPaterno: '',          apellidoMaterno: '',          estado: 'Activo',   username: 'N.',            userId: undefined,  phone: '',             email: '',                       createdAt: '2024-01-15' },
+  { id: 'peon-003', tenantId: 'tenant-001', rut: '1111111-1',  nombres: 'Juan',      apellidoPaterno: 'Acevedo',   apellidoMaterno: '',          estado: 'Activo',   username: 'Ju.Acevedo',    userId: 'user-p03', phone: '+56912345003', email: 'jacevedo@empresa.cl',    createdAt: '2024-02-01' },
+  { id: 'peon-004', tenantId: 'tenant-001', rut: '10320338-4', nombres: 'Ruben',     apellidoPaterno: 'Cisternas', apellidoMaterno: 'Zamorano',  estado: 'Activo',   username: 'Ru.Cisternas',  userId: 'user-p04', phone: '+56912345004', email: 'rcisternas@empresa.cl',  createdAt: '2024-02-05' },
+  { id: 'peon-005', tenantId: 'tenant-001', rut: '10484228-4', nombres: 'Marcelo',   apellidoPaterno: 'Gonzalez',  apellidoMaterno: 'Salazar',   estado: 'Inactivo', username: 'Ma.Gonzalez',   userId: 'user-p05', phone: '+56912345005', email: 'mgonzalez@empresa.cl',   createdAt: '2024-03-01' },
+  { id: 'peon-006', tenantId: 'tenant-001', rut: '16090968-4', nombres: 'Eduardo',   apellidoPaterno: 'Madariaga', apellidoMaterno: 'Gonzalez',  estado: 'Activo',   username: 'Ed.Madariaga',  userId: 'user-p06', phone: '+56912345006', email: 'emadariaga@empresa.cl',  createdAt: '2024-03-10' },
+  { id: 'peon-007', tenantId: 'tenant-001', rut: '19428879-4', nombres: 'Javier',    apellidoPaterno: 'Pulgar',    apellidoMaterno: 'Vasquez',   estado: 'Activo',   username: 'Ja.Pulgar',     userId: 'user-p07', phone: '+56912345007', email: 'jpulgar@empresa.cl',     createdAt: '2024-04-01' },
+  { id: 'peon-008', tenantId: 'tenant-001', rut: '20402063-9', nombres: 'Gadiel',    apellidoPaterno: 'Cisternas', apellidoMaterno: 'Gutierrez', estado: 'Activo',   username: 'Ga.Cisternas',  userId: 'user-p08', phone: '+56912345008', email: 'gcisternas@empresa.cl',  createdAt: '2024-04-10' },
+  { id: 'peon-009', tenantId: 'tenant-001', rut: '21723106-K', nombres: 'Benjamin',  apellidoPaterno: 'Pulgar',    apellidoMaterno: 'Vasquez',   estado: 'Activo',   username: 'Be.Pulgar',     userId: 'user-p09', phone: '+56912345009', email: 'bpulgar@empresa.cl',     createdAt: '2024-04-15' },
 ];

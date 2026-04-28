@@ -1,0 +1,208 @@
+import { NavLink, useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard, Truck, Package, Map, UserCircle2,
+  Users, Bell, Search, ChevronDown, LogOut, Settings
+} from 'lucide-react';
+import { clsx } from 'clsx';
+import { useState } from 'react';
+import { useAuthStore } from '../../store/useAuthStore';
+import type { UserRole } from '../../types';
+
+interface NavItem {
+  to: string;
+  icon: React.ReactNode;
+  label: string;
+  roles: UserRole[];
+}
+
+const navItems: NavItem[] = [
+  { to: '/dashboard',    icon: <LayoutDashboard size={15} />, label: 'Back Office',         roles: ['admin', 'operator'] },
+  { to: '/rutas',        icon: <Truck size={15} />,           label: 'Admin. de Rutas',     roles: ['admin', 'operator', 'driver'] },
+  { to: '/pedidos',      icon: <Package size={15} />,         label: 'Pedidos',             roles: ['admin', 'operator', 'driver', 'client'] },
+  { to: '/clientes',     icon: <Users size={15} />,           label: 'Personas / Recepción',roles: ['admin', 'operator'] },
+  { to: '/usuarios',     icon: <UserCircle2 size={15} />,     label: 'Usuarios Sistema',    roles: ['admin'] },
+];
+
+const roleLabels: Record<UserRole, string> = {
+  admin: 'Administrador',
+  operator: 'Operador Logístico',
+  driver: 'Repartidor',
+  client: 'Cliente',
+};
+
+const roleDemoAccounts = [
+  { email: 'admin@translogistica.cl',    role: 'admin'    as UserRole, name: 'Carlos Mendoza' },
+  { email: 'operadora@translogistica.cl', role: 'operator' as UserRole, name: 'María González' },
+  { email: 'rsoto@translogistica.cl',    role: 'driver'   as UserRole, name: 'Roberto Soto' },
+  { email: 'pvargas@empresa.cl',         role: 'client'   as UserRole, name: 'Pedro Vargas' },
+];
+
+export function TopNavbar() {
+  const { user, tenant, logout, switchRole } = useAuthStore();
+  const navigate = useNavigate();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const filteredItems = navItems.filter(
+    item => user && item.roles.includes(user.role)
+  );
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  return (
+    <header className="bg-white border-b border-stone-200 shadow-sm flex-shrink-0">
+      {/* Top strip: logo + search + user controls */}
+      <div className="flex items-center gap-4 px-6 h-14 border-b border-stone-100">
+        {/* Logo */}
+        <div className="flex items-center gap-2.5 mr-4">
+          <div className="w-7 h-7 bg-primary-700 rounded-md flex items-center justify-center flex-shrink-0">
+            <Map size={14} className="text-white" />
+          </div>
+          <div className="leading-tight">
+            <p className="text-sm font-bold text-stone-900 tracking-tight">Rutek</p>
+            {tenant && (
+              <p className="text-[10px] text-stone-400 leading-none truncate max-w-[140px]">{tenant.name}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="flex-1 max-w-sm">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-stone-50 border border-stone-200 rounded-lg">
+            <Search size={13} className="text-stone-400 flex-shrink-0" />
+            <input
+              type="text"
+              placeholder="Buscar en el sistema..."
+              className="bg-transparent text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none w-full"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1" />
+
+        {/* Notifications */}
+        <div className="relative">
+          <button
+            onClick={() => { setShowNotifications(!showNotifications); setShowUserMenu(false); }}
+            className="relative p-2 rounded-lg text-stone-500 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+          >
+            <Bell size={17} />
+            <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 bg-primary-500 rounded-full" />
+          </button>
+
+          {showNotifications && (
+            <div className="absolute right-0 top-full mt-1 w-72 bg-white border border-stone-200 rounded-xl shadow-xl z-50">
+              <div className="p-3 border-b border-stone-100 flex items-center justify-between">
+                <p className="text-sm font-semibold text-stone-800">Notificaciones</p>
+                <span className="text-[10px] text-primary-600 font-medium cursor-pointer">Ver todas</span>
+              </div>
+              <div className="p-2">
+                {[
+                  { msg: 'Pedido PED-2024-0001 en camino', time: 'hace 10 min', dot: 'bg-blue-500' },
+                  { msg: 'Ruta RUT-2024-001 iniciada',     time: 'hace 25 min', dot: 'bg-emerald-500' },
+                  { msg: 'Nuevo pedido de Ferretería',      time: 'hace 1 h',   dot: 'bg-amber-500' },
+                ].map((n, i) => (
+                  <div key={i} className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-stone-50 cursor-pointer">
+                    <span className={clsx('h-2 w-2 rounded-full mt-1.5 flex-shrink-0', n.dot)} />
+                    <div>
+                      <p className="text-xs text-stone-700">{n.msg}</p>
+                      <p className="text-[10px] text-stone-400 mt-0.5">{n.time}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* User menu */}
+        <div className="relative">
+          <button
+            onClick={() => { setShowUserMenu(!showUserMenu); setShowNotifications(false); }}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-stone-100 transition-colors"
+          >
+            <div className="w-7 h-7 bg-primary-700 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+              {user?.name.charAt(0)}
+            </div>
+            <div className="text-left hidden md:block">
+              <p className="text-xs font-semibold text-stone-800 leading-tight">{user?.name}</p>
+              <p className="text-[10px] text-stone-400 leading-tight">{user ? roleLabels[user.role] : ''}</p>
+            </div>
+            <ChevronDown size={13} className="text-stone-400" />
+          </button>
+
+          {showUserMenu && (
+            <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-stone-200 rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="px-3 py-2.5 border-b border-stone-100 bg-stone-50">
+                <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">Demo — Cambiar rol</p>
+              </div>
+              <div className="p-1.5">
+                {roleDemoAccounts.map((account) => (
+                  <button
+                    key={account.email}
+                    onClick={() => { switchRole(account.role); setShowUserMenu(false); }}
+                    className={clsx(
+                      'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors',
+                      user?.role === account.role
+                        ? 'bg-primary-50 text-primary-700'
+                        : 'text-stone-700 hover:bg-stone-50'
+                    )}
+                  >
+                    <div className="w-6 h-6 bg-stone-200 rounded-full flex items-center justify-center text-xs font-bold text-stone-600 flex-shrink-0">
+                      {account.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium">{account.name}</p>
+                      <p className="text-[10px] text-stone-400">{roleLabels[account.role]}</p>
+                    </div>
+                    {user?.role === account.role && (
+                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary-500 flex-shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="border-t border-stone-100 p-1.5">
+                <button
+                  onClick={() => navigate('/configuracion')}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-stone-600 hover:bg-stone-50 transition-colors"
+                >
+                  <Settings size={14} />
+                  <span className="text-xs">Configuración</span>
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <LogOut size={14} />
+                  <span className="text-xs">Cerrar sesión</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Nav tabs */}
+      <nav className="flex items-center gap-0.5 px-4 h-11">
+        {filteredItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) => clsx(
+              'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-150 whitespace-nowrap',
+              isActive
+                ? 'bg-primary-700 text-white shadow-sm'
+                : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'
+            )}
+          >
+            {item.icon}
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+    </header>
+  );
+}

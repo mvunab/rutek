@@ -1,0 +1,462 @@
+import { useState, useMemo } from 'react';
+import {
+  Pencil, X, Plus, Search, ChevronUp, ChevronDown,
+  ChevronsUpDown, UserCheck, UserX, Users2
+} from 'lucide-react';
+import { mockPeonetas } from '../../data/mockData';
+import type { Peoneta } from '../../types';
+import { clsx } from 'clsx';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+type SortKey = keyof Pick<Peoneta, 'rut' | 'nombres' | 'apellidoPaterno' | 'apellidoMaterno' | 'estado' | 'username'>;
+type SortDir = 'asc' | 'desc' | 'none';
+
+// ─── Sort Icon ────────────────────────────────────────────────────────────────
+function SortIcon({ col, active, dir }: { col: string; active: boolean; dir: SortDir }) {
+  if (!active || dir === 'none') return <ChevronsUpDown size={12} className="text-stone-300 ml-1" />;
+  return dir === 'asc'
+    ? <ChevronUp size={12} className="text-primary-600 ml-1" />
+    : <ChevronDown size={12} className="text-primary-600 ml-1" />;
+  void col;
+}
+
+// ─── Form Modal ───────────────────────────────────────────────────────────────
+interface PeonetaFormData {
+  rut: string;
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  estado: 'Activo' | 'Inactivo';
+  username: string;
+  phone: string;
+  email: string;
+}
+
+const emptyForm: PeonetaFormData = {
+  rut: '', nombres: '', apellidoPaterno: '', apellidoMaterno: '',
+  estado: 'Activo', username: '', phone: '', email: '',
+};
+
+function PeonetaModal({
+  peoneta,
+  onSave,
+  onClose,
+}: {
+  peoneta: Peoneta | null;
+  onSave: (data: PeonetaFormData) => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState<PeonetaFormData>(
+    peoneta
+      ? { rut: peoneta.rut, nombres: peoneta.nombres, apellidoPaterno: peoneta.apellidoPaterno,
+          apellidoMaterno: peoneta.apellidoMaterno, estado: peoneta.estado,
+          username: peoneta.username, phone: peoneta.phone ?? '', email: peoneta.email ?? '' }
+      : emptyForm
+  );
+
+  const set = (k: keyof PeonetaFormData, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(form);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg border border-stone-200">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100">
+          <h2 className="text-base font-semibold text-stone-800">
+            {peoneta ? 'Editar Peoneta' : 'Nuevo Peoneta'}
+          </h2>
+          <button onClick={onClose} className="p-1.5 hover:bg-stone-100 rounded-lg text-stone-500 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            {/* RUT */}
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-stone-600 mb-1">RUT *</label>
+              <input required value={form.rut} onChange={e => set('rut', e.target.value)}
+                placeholder="12345678-9"
+                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+
+            {/* Nombres */}
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-stone-600 mb-1">Nombres *</label>
+              <input required value={form.nombres} onChange={e => set('nombres', e.target.value)}
+                placeholder="Juan Carlos"
+                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+
+            {/* A.Paterno */}
+            <div>
+              <label className="block text-xs font-medium text-stone-600 mb-1">Apellido Paterno</label>
+              <input value={form.apellidoPaterno} onChange={e => set('apellidoPaterno', e.target.value)}
+                placeholder="González"
+                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+
+            {/* A.Materno */}
+            <div>
+              <label className="block text-xs font-medium text-stone-600 mb-1">Apellido Materno</label>
+              <input value={form.apellidoMaterno} onChange={e => set('apellidoMaterno', e.target.value)}
+                placeholder="Muñoz"
+                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+
+            {/* Username */}
+            <div>
+              <label className="block text-xs font-medium text-stone-600 mb-1">Usuario sistema</label>
+              <input value={form.username} onChange={e => set('username', e.target.value)}
+                placeholder="Ju.Gonzalez"
+                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+
+            {/* Estado */}
+            <div>
+              <label className="block text-xs font-medium text-stone-600 mb-1">Estado</label>
+              <select value={form.estado} onChange={e => set('estado', e.target.value as 'Activo' | 'Inactivo')}
+                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="Activo">Activo</option>
+                <option value="Inactivo">Inactivo</option>
+              </select>
+            </div>
+
+            {/* Teléfono */}
+            <div>
+              <label className="block text-xs font-medium text-stone-600 mb-1">Teléfono</label>
+              <input value={form.phone} onChange={e => set('phone', e.target.value)}
+                placeholder="+56912345678"
+                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-xs font-medium text-stone-600 mb-1">Email</label>
+              <input type="email" value={form.email} onChange={e => set('email', e.target.value)}
+                placeholder="nombre@empresa.cl"
+                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-stone-600 bg-white border border-stone-300 hover:bg-stone-50 transition-colors">
+              Cancelar
+            </button>
+            <button type="submit"
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm">
+              {peoneta ? 'Guardar cambios' : 'Crear peoneta'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Delete Confirm ───────────────────────────────────────────────────────────
+function DeleteConfirm({ peoneta, onConfirm, onClose }: { peoneta: Peoneta; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm border border-stone-200 p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-red-100 rounded-full"><UserX size={20} className="text-red-600" /></div>
+          <div>
+            <h3 className="text-sm font-semibold text-stone-800">Eliminar peoneta</h3>
+            <p className="text-xs text-stone-500 mt-0.5">Esta acción no se puede deshacer</p>
+          </div>
+        </div>
+        <p className="text-sm text-stone-600">
+          ¿Eliminar a <strong>{peoneta.nombres} {peoneta.apellidoPaterno}</strong> ({peoneta.rut})?
+        </p>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-stone-600 bg-white border border-stone-300 hover:bg-stone-50 transition-colors">
+            Cancelar
+          </button>
+          <button onClick={onConfirm}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors shadow-sm">
+            Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+const PAGE_SIZE = 10;
+
+export function PeonetasPage() {
+  const [records, setRecords] = useState<Peoneta[]>(mockPeonetas);
+  const [search, setSearch] = useState('');
+  const [sortCol, setSortCol] = useState<SortKey>('rut');
+  const [sortDir, setSortDir] = useState<SortDir>('none');
+  const [page, setPage] = useState(1);
+  const [modal, setModal] = useState<'create' | 'edit' | null>(null);
+  const [editTarget, setEditTarget] = useState<Peoneta | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Peoneta | null>(null);
+
+  // Sort toggle
+  const handleSort = (col: SortKey) => {
+    if (sortCol !== col) { setSortCol(col); setSortDir('asc'); return; }
+    setSortDir(d => d === 'asc' ? 'desc' : d === 'desc' ? 'none' : 'asc');
+  };
+
+  const filtered = useMemo(() => {
+    let rows = records.filter(p => {
+      if (!search) return true;
+      const t = search.toLowerCase();
+      return (
+        p.rut.toLowerCase().includes(t) ||
+        p.nombres.toLowerCase().includes(t) ||
+        p.apellidoPaterno.toLowerCase().includes(t) ||
+        p.apellidoMaterno.toLowerCase().includes(t) ||
+        p.username.toLowerCase().includes(t)
+      );
+    });
+    if (sortDir !== 'none') {
+      rows = [...rows].sort((a, b) => {
+        const av = (a[sortCol] ?? '').toString().toLowerCase();
+        const bv = (b[sortCol] ?? '').toString().toLowerCase();
+        return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      });
+    }
+    return rows;
+  }, [records, search, sortCol, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Stats
+  const activos   = records.filter(p => p.estado === 'Activo').length;
+  const inactivos = records.filter(p => p.estado === 'Inactivo').length;
+
+  // CRUD handlers
+  const handleSave = (data: PeonetaFormData) => {
+    if (modal === 'edit' && editTarget) {
+      setRecords(r => r.map(p => p.id === editTarget.id ? { ...p, ...data } : p));
+    } else {
+      const newId = `peon-${Date.now()}`;
+      setRecords(r => [...r, { ...data, id: newId, tenantId: 'tenant-001', createdAt: new Date().toISOString().slice(0, 10) }]);
+    }
+    setModal(null); setEditTarget(null);
+  };
+
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+    setRecords(r => r.filter(p => p.id !== deleteTarget.id));
+    setDeleteTarget(null);
+  };
+
+  const openEdit = (p: Peoneta) => { setEditTarget(p); setModal('edit'); };
+
+  // Column header helper
+  const Col = ({ k, label, className }: { k: SortKey; label: string; className?: string }) => (
+    <th
+      onClick={() => handleSort(k)}
+      className={clsx('px-3 py-3 text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap hover:text-stone-700 transition-colors', className)}
+    >
+      <span className="inline-flex items-center">
+        {label}
+        <SortIcon col={k} active={sortCol === k} dir={sortDir} />
+      </span>
+    </th>
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Stats chips */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-stone-200 rounded-lg shadow-sm text-xs text-stone-600">
+          <Users2 size={14} className="text-stone-400" />
+          <span>Total: <strong className="text-stone-800">{records.length}</strong></span>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg text-xs text-emerald-700">
+          <UserCheck size={14} /> Activos: <strong>{activos}</strong>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs text-stone-500">
+          <UserX size={14} /> Inactivos: <strong>{inactivos}</strong>
+        </div>
+        <div className="flex-1" />
+        {/* Search */}
+        <div className="relative">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+          <input
+            type="text"
+            placeholder="Buscar por RUT, nombre, usuario..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            className="pl-8 pr-3 py-2 bg-white border border-stone-300 rounded-lg text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm w-64"
+          />
+        </div>
+        {/* New */}
+        <button
+          onClick={() => { setEditTarget(null); setModal('create'); }}
+          className="flex items-center gap-1.5 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors"
+        >
+          <Plus size={14} /> Nuevo peoneta
+        </button>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px]">
+            <thead>
+              <tr className="border-b border-stone-200 bg-stone-50">
+                {/* Actions col — no sort */}
+                <th className="px-3 py-3 w-16 text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wide" />
+                <Col k="rut"              label="RUT"        className="w-32" />
+                <Col k="nombres"          label="Nombres" />
+                <Col k="apellidoPaterno"  label="A.Paterno" />
+                <Col k="apellidoMaterno"  label="A.Materno" />
+                <Col k="estado"           label="Estado"     className="w-24" />
+                <Col k="username"         label="User"       className="w-32" />
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center text-sm text-stone-400">
+                    No se encontraron peonetas
+                  </td>
+                </tr>
+              ) : paginated.map((p, i) => (
+                <tr
+                  key={p.id}
+                  className={clsx(
+                    'border-b border-stone-100 hover:bg-primary-50/30 transition-colors',
+                    i % 2 === 0 ? 'bg-white' : 'bg-stone-50/40'
+                  )}
+                >
+                  {/* Actions */}
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => openEdit(p)}
+                        className="w-6 h-6 flex items-center justify-center rounded text-stone-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                        title="Editar"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(p)}
+                        className="w-6 h-6 flex items-center justify-center rounded bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
+                        title="Eliminar"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  </td>
+
+                  {/* RUT */}
+                  <td className="px-3 py-2.5">
+                    <span className="font-mono text-xs text-stone-600 font-medium">{p.rut}</span>
+                  </td>
+
+                  {/* Nombres */}
+                  <td className="px-3 py-2.5">
+                    <span className="text-sm text-stone-800">{p.nombres}</span>
+                  </td>
+
+                  {/* A. Paterno */}
+                  <td className="px-3 py-2.5">
+                    <span className="text-sm text-stone-700">{p.apellidoPaterno || '—'}</span>
+                  </td>
+
+                  {/* A. Materno */}
+                  <td className="px-3 py-2.5">
+                    <span className="text-sm text-stone-500">{p.apellidoMaterno || '—'}</span>
+                  </td>
+
+                  {/* Estado */}
+                  <td className="px-3 py-2.5">
+                    <span className={clsx(
+                      'inline-flex items-center gap-1.5 text-xs font-medium',
+                      p.estado === 'Activo' ? 'text-emerald-700' : 'text-stone-400'
+                    )}>
+                      <span className={clsx(
+                        'w-1.5 h-1.5 rounded-full',
+                        p.estado === 'Activo' ? 'bg-emerald-500' : 'bg-stone-300'
+                      )} />
+                      {p.estado}
+                    </span>
+                  </td>
+
+                  {/* User */}
+                  <td className="px-3 py-2.5">
+                    <span className="text-xs text-stone-500 font-mono">{p.username || '—'}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-stone-100 bg-stone-50">
+          <span className="text-xs text-stone-500">
+            Página {page} de {totalPages}
+            {filtered.length !== records.length && (
+              <span className="ml-1.5 text-stone-400">({filtered.length} resultados)</span>
+            )}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-stone-300 bg-white text-stone-600 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Ant
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+              <button
+                key={n}
+                onClick={() => setPage(n)}
+                className={clsx(
+                  'w-7 h-7 text-xs font-semibold rounded-lg transition-colors',
+                  n === page
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'border border-stone-300 bg-white text-stone-600 hover:bg-stone-100'
+                )}
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-stone-300 bg-white text-stone-600 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Sig
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      {(modal === 'create' || modal === 'edit') && (
+        <PeonetaModal
+          peoneta={editTarget}
+          onSave={handleSave}
+          onClose={() => { setModal(null); setEditTarget(null); }}
+        />
+      )}
+      {deleteTarget && (
+        <DeleteConfirm
+          peoneta={deleteTarget}
+          onConfirm={handleDelete}
+          onClose={() => setDeleteTarget(null)}
+        />
+      )}
+    </div>
+  );
+}

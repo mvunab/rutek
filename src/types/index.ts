@@ -174,6 +174,70 @@ export interface ChartDataPoint {
   value2?: number;
 }
 
+// ─── Delivery Records (Admin. de Rutas tabla operacional) ────────────────────
+export type DeliveryStatus = 'entregado' | 'pendiente' | 'en_ruta' | 'reprogramado' | 'rechazado' | 'parcial';
+
+export interface DeliveryRecord {
+  id: string;
+  tenantId: string;
+  selected?: boolean;
+  estado: DeliveryStatus;
+  cliente: string;
+  entrega: string;
+  pedido: string;
+  factura: string;
+  tipo: string;
+  ref: string;
+  bultos: number;
+  rut: string;
+  recepcion: string;
+  fechaHora?: string;
+  chofer: string;
+  vehiculo: string;
+  peoneta: string;
+  obs: string;
+  zona: string;
+  routeId?: string;
+}
+
+// ─── Peoneta (asistente de entrega) ──────────────────────────────────────────
+export interface Peoneta {
+  id: string;
+  tenantId: string;
+  rut: string;
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  estado: 'Activo' | 'Inactivo';
+  /** Nombre de usuario del sistema asociado, ej. "Se.Lara" */
+  username: string;
+  /** ID del User en el sistema (puede estar vacío si no tiene cuenta) */
+  userId?: string;
+  phone?: string;
+  email?: string;
+  createdAt: string;
+}
+
+// ─── Route Photos (Admin. Fotos — inspecciones desde app móvil) ──────────────
+export type PhotoType = 'entrega' | 'recepcion' | 'dano' | 'firma' | 'otro';
+
+export interface RoutePhoto {
+  id: string;
+  tenantId: string;
+  routeCode: string;         // Nº Ruta display (ej. "1992")
+  routeId: string;
+  driverName: string;
+  vehiclePlate: string;
+  fecha: string;             // dd/mm/yy
+  hora: string;
+  photoUrl: string;          // URL de la imagen
+  thumbnailUrl: string;
+  type: PhotoType;
+  description: string;
+  clientName: string;
+  orderCode: string;
+}
+
 // ─── Filters ─────────────────────────────────────────────────────────────────
 export interface OrderFilters {
   status?: OrderStatus | 'all';

@@ -6,6 +6,8 @@ import { ClientsPage } from './pages/clients/ClientsPage';
 import { OrdersPage } from './pages/orders/OrdersPage';
 import { RoutesPage } from './pages/routes/RoutesPage';
 import { UsersPage } from './pages/users/UsersPage';
+import { PhotosPage } from './pages/photos/PhotosPage';
+import { PeonetasPage } from './pages/peonetas/PeonetasPage';
 import { NotFound } from './pages/NotFound';
 
 function App() {
@@ -20,6 +22,8 @@ function App() {
           <Route path="pedidos" element={<OrdersPage />} />
           <Route path="rutas" element={<RoutesPage />} />
           <Route path="usuarios" element={<UsersPage />} />
+          <Route path="fotos" element={<PhotosPage />} />
+          <Route path="peonetas" element={<PeonetasPage />} />
           <Route path="configuracion" element={
             <div className="flex items-center justify-center h-64 text-slate-500">
               <p>Configuración — Próximamente</p>

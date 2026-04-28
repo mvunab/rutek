@@ -1,6 +1,6 @@
 import {
   Package, Truck, Users, Map, TrendingUp, Clock,
-  CheckCircle2, AlertCircle, ArrowRight
+  CheckCircle2, AlertCircle, ArrowRight, Lock
 } from 'lucide-react';
 import {
   AreaChart, Area, PieChart, Pie, Cell,
@@ -12,6 +12,101 @@ import { Button } from '../../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { mockDashboardStats, mockOrdersChart, mockStatusChart, mockOrders, mockRoutes } from '../../data/mockData';
 import { useAuthStore } from '../../store/useAuthStore';
+
+// ─── Back Office Quick Access ─────────────────────────────────────────────────
+interface QuickBtn {
+  label: string;
+  to?: string;
+  color: string;
+  textColor?: string;
+  disabled?: boolean;
+  soon?: boolean;
+}
+
+function QuickButton({ btn, onClick }: { btn: QuickBtn; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={btn.disabled}
+      title={btn.soon ? 'Próximamente' : btn.label}
+      className={`
+        relative w-full py-3 px-4 rounded text-center text-xs font-bold uppercase tracking-wide
+        transition-all duration-150 shadow-sm
+        ${btn.disabled
+          ? 'opacity-60 cursor-not-allowed'
+          : 'hover:brightness-110 hover:shadow-md active:scale-[0.98] cursor-pointer'}
+        ${btn.color} ${btn.textColor ?? 'text-white'}
+      `}
+    >
+      {btn.label}
+      {btn.soon && (
+        <span className="absolute top-1 right-1.5 flex items-center gap-0.5 text-[9px] opacity-70">
+          <Lock size={8} /> pronto
+        </span>
+      )}
+    </button>
+  );
+}
+
+function BackOfficeMenu() {
+  const navigate = useNavigate();
+
+  const operaciones: QuickBtn[] = [
+    { label: 'Administrador de Rutas',  to: '/rutas',    color: 'bg-green-500' },
+    { label: 'Rutas Valorizadas',       disabled: true, soon: true, color: 'bg-sky-400' },
+  ];
+
+  const administracion: QuickBtn[][] = [
+    [
+      { label: 'Mis Repartidores',   to: '/usuarios',  color: 'bg-orange-400' },
+      { label: 'Mis Vehículos',      disabled: true, soon: true, color: 'bg-orange-400' },
+      { label: 'Mis Peonetas',       to: '/peonetas', color: 'bg-orange-400' },
+      { label: 'Personas Recepción', to: '/clientes',  color: 'bg-amber-400' },
+    ],
+    [
+      { label: 'Admin. Valorización', disabled: true, soon: true, color: 'bg-sky-400' },
+      { label: 'Mis Clientes',        to: '/clientes',  color: 'bg-red-400' },
+      { label: 'Admin. Estados',      disabled: true, soon: true, color: 'bg-blue-700' },
+      { label: 'Zonas',               disabled: true, soon: true, color: 'bg-sky-400' },
+    ],
+    [
+      { label: 'Usuarios Sistema', to: '/usuarios', color: 'bg-orange-400' },
+      { label: 'Admin. Fotos',     to: '/fotos',    color: 'bg-blue-700' },
+    ],
+  ];
+
+  const go = (btn: QuickBtn) => {
+    if (!btn.disabled && btn.to) navigate(btn.to);
+  };
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+      {/* Operaciones Sistema */}
+      <div className="px-5 pt-4 pb-3 border-b border-stone-100">
+        <p className="text-sm font-semibold text-stone-600 mb-3">Operaciónes Sistema</p>
+        <div className="grid grid-cols-2 gap-3">
+          {operaciones.map(btn => (
+            <QuickButton key={btn.label} btn={btn} onClick={() => go(btn)} />
+          ))}
+        </div>
+      </div>
+
+      {/* Administración Sistema */}
+      <div className="px-5 pt-4 pb-5">
+        <p className="text-sm font-semibold text-stone-600 mb-3">Administración Sistema</p>
+        <div className="space-y-2">
+          {administracion.map((row, i) => (
+            <div key={i} className="grid gap-2" style={{ gridTemplateColumns: `repeat(${row.length}, 1fr)` }}>
+              {row.map(btn => (
+                <QuickButton key={btn.label} btn={btn} onClick={() => go(btn)} />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const CHART_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ef4444'];
 
@@ -39,6 +134,9 @@ export function Dashboard() {
           <span className="text-xs font-semibold text-emerald-700">Operación activa</span>
         </div>
       </div>
+
+      {/* Back Office Quick Access */}
+      <BackOfficeMenu />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
