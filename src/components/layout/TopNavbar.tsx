@@ -1,10 +1,11 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Truck, Package, Map, UserCircle2,
-  Users, Bell, Search, ChevronDown, LogOut, Settings
+  Users, Bell, Search, ChevronDown, LogOut, Settings,
+  Menu, X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import type { UserRole } from '../../types';
 
@@ -40,8 +41,10 @@ const roleDemoAccounts = [
 export function TopNavbar() {
   const { user, tenant, logout, switchRole } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const filteredItems = navItems.filter(
     item => user && item.roles.includes(user.role)
@@ -52,44 +55,89 @@ export function TopNavbar() {
     navigate('/login');
   };
 
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [mobileMenuOpen]);
+
+  const openMobileMenu = () => {
+    setMobileMenuOpen(true);
+    setShowUserMenu(false);
+    setShowNotifications(false);
+  };
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
   return (
-    <header className="bg-white border-b border-stone-200 shadow-sm flex-shrink-0">
+    <header className="bg-white border-b border-stone-200 shadow-sm flex-shrink-0 relative z-40">
       {/* Top strip: logo + search + user controls */}
-      <div className="flex items-center gap-4 px-6 h-14 border-b border-stone-100">
+      <div className="flex items-center gap-2 sm:gap-4 px-4 sm:px-6 h-14 border-b border-stone-100">
         {/* Logo */}
-        <div className="flex items-center gap-2.5 mr-4">
+        <div className="flex items-center gap-2 sm:gap-2.5 sm:mr-2 min-w-0 flex-shrink-0">
           <div className="w-7 h-7 bg-primary-700 rounded-md flex items-center justify-center flex-shrink-0">
             <Map size={14} className="text-white" />
           </div>
-          <div className="leading-tight">
+          <div className="leading-tight min-w-0">
             <p className="text-sm font-bold text-stone-900 tracking-tight">Rutek</p>
             {tenant && (
-              <p className="text-[10px] text-stone-400 leading-none truncate max-w-[140px]">{tenant.name}</p>
+              <p className="text-[10px] text-stone-400 leading-none truncate max-w-[100px] sm:max-w-[140px]">{tenant.name}</p>
             )}
           </div>
         </div>
 
-        {/* Search */}
-        <div className="flex-1 max-w-sm">
+        {/* Menú móvil */}
+        <button
+          type="button"
+          onClick={() => (mobileMenuOpen ? closeMobileMenu() : openMobileMenu())}
+          className="lg:hidden flex-shrink-0 p-2 rounded-lg text-stone-600 hover:bg-stone-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+          aria-expanded={mobileMenuOpen}
+          aria-controls="mobile-nav"
+          aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+        >
+          {mobileMenuOpen ? <X size={22} aria-hidden /> : <Menu size={22} aria-hidden />}
+        </button>
+
+        {/* Search — oculto en móvil (está en el panel colapsable) */}
+        <div className="hidden lg:block flex-1 max-w-sm">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-stone-50 border border-stone-200 rounded-lg">
-            <Search size={13} className="text-stone-400 flex-shrink-0" />
+            <Search size={13} className="text-stone-400 flex-shrink-0" aria-hidden />
             <input
-              type="text"
-              placeholder="Buscar en el sistema..."
+              type="search"
+              name="q"
+              autoComplete="off"
+              placeholder="Buscar en el sistema…"
               className="bg-transparent text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none w-full"
             />
           </div>
         </div>
 
-        <div className="flex-1" />
+        <div className="hidden lg:block flex-1" />
 
         {/* Notifications */}
-        <div className="relative">
+        <div className="relative ml-auto lg:ml-0">
           <button
-            onClick={() => { setShowNotifications(!showNotifications); setShowUserMenu(false); }}
-            className="relative p-2 rounded-lg text-stone-500 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+            type="button"
+            onClick={() => { setShowNotifications(!showNotifications); setShowUserMenu(false); closeMobileMenu(); }}
+            className="relative p-2 rounded-lg text-stone-500 hover:text-stone-700 hover:bg-stone-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            aria-label="Notificaciones"
           >
-            <Bell size={17} />
+            <Bell size={17} aria-hidden />
             <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 bg-primary-500 rounded-full" />
           </button>
 
@@ -121,8 +169,12 @@ export function TopNavbar() {
         {/* User menu */}
         <div className="relative">
           <button
-            onClick={() => { setShowUserMenu(!showUserMenu); setShowNotifications(false); }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-stone-100 transition-colors"
+            type="button"
+            onClick={() => { setShowUserMenu(!showUserMenu); setShowNotifications(false); closeMobileMenu(); }}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-stone-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            aria-expanded={showUserMenu}
+            aria-haspopup="true"
+            aria-label="Menú de usuario"
           >
             <div className="w-7 h-7 bg-primary-700 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
               {user?.name.charAt(0)}
@@ -131,7 +183,7 @@ export function TopNavbar() {
               <p className="text-xs font-semibold text-stone-800 leading-tight">{user?.name}</p>
               <p className="text-[10px] text-stone-400 leading-tight">{user ? roleLabels[user.role] : ''}</p>
             </div>
-            <ChevronDown size={13} className="text-stone-400" />
+            <ChevronDown size={13} className="text-stone-400 hidden sm:block" aria-hidden />
           </button>
 
           {showUserMenu && (
@@ -185,8 +237,11 @@ export function TopNavbar() {
         </div>
       </div>
 
-      {/* Nav tabs */}
-      <nav className="flex items-center gap-0.5 px-4 h-11">
+      {/* Nav tabs — solo escritorio */}
+      <nav
+        className="hidden lg:flex items-center gap-0.5 px-4 h-11"
+        aria-label="Principal"
+      >
         {filteredItems.map((item) => (
           <NavLink
             key={item.to}
@@ -203,6 +258,59 @@ export function TopNavbar() {
           </NavLink>
         ))}
       </nav>
+
+      {/* Panel móvil colapsable */}
+      {mobileMenuOpen && (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 top-14 z-[45] bg-stone-900/40 lg:hidden"
+            aria-hidden
+            tabIndex={-1}
+            onClick={closeMobileMenu}
+          />
+          <div
+            id="mobile-nav"
+            role="navigation"
+            aria-label="Principal"
+            className="fixed top-14 left-0 right-0 z-50 max-h-[calc(100vh-3.5rem)] lg:hidden bg-white shadow-xl border-t border-stone-200 overflow-y-auto overscroll-y-contain"
+          >
+            <div className="p-4 border-b border-stone-100">
+              <label htmlFor="mobile-search" className="sr-only">Buscar en el sistema</label>
+              <div className="flex items-center gap-2 px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg">
+                <Search size={15} className="text-stone-400 flex-shrink-0" aria-hidden />
+                <input
+                  id="mobile-search"
+                  type="search"
+                  name="q-mobile"
+                  autoComplete="off"
+                  placeholder="Buscar en el sistema…"
+                  className="bg-transparent text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none w-full"
+                />
+              </div>
+            </div>
+            <ul className="p-2">
+              {filteredItems.map((item) => (
+                <li key={item.to}>
+                  <NavLink
+                    to={item.to}
+                    onClick={closeMobileMenu}
+                    className={({ isActive }) => clsx(
+                      'flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-primary-700 text-white'
+                        : 'text-stone-700 hover:bg-stone-100'
+                    )}
+                  >
+                    <span className="flex-shrink-0 opacity-90">{item.icon}</span>
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      )}
     </header>
   );
 }
