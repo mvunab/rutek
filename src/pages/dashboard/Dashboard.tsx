@@ -1,6 +1,9 @@
 import {
   Package, Truck, Users, Map, TrendingUp, Clock,
-  CheckCircle2, AlertCircle, ArrowRight, Lock
+  CheckCircle2, AlertCircle, ArrowRight,
+  Route, DollarSign, UserCheck, Car, UserCog,
+  PersonStanding, Calculator, Building2, ToggleLeft,
+  MapPin, ShieldCheck, Camera, ChevronRight
 } from 'lucide-react';
 import {
   AreaChart, Area, PieChart, Pie, Cell,
@@ -14,94 +17,123 @@ import { mockDashboardStats, mockOrdersChart, mockStatusChart, mockOrders, mockR
 import { useAuthStore } from '../../store/useAuthStore';
 
 // ─── Back Office Quick Access ─────────────────────────────────────────────────
-interface QuickBtn {
+interface MenuItem {
   label: string;
+  description?: string;
+  icon: React.ReactNode;
   to?: string;
-  color: string;
-  textColor?: string;
-  disabled?: boolean;
   soon?: boolean;
-}
-
-function QuickButton({ btn, onClick }: { btn: QuickBtn; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={btn.disabled}
-      title={btn.soon ? 'Próximamente' : btn.label}
-      className={`
-        relative w-full py-3 px-4 rounded text-center text-xs font-bold uppercase tracking-wide
-        transition-all duration-150 shadow-sm
-        ${btn.disabled
-          ? 'opacity-60 cursor-not-allowed'
-          : 'hover:brightness-110 hover:shadow-md active:scale-[0.98] cursor-pointer'}
-        ${btn.color} ${btn.textColor ?? 'text-white'}
-      `}
-    >
-      {btn.label}
-      {btn.soon && (
-        <span className="absolute top-1 right-1.5 flex items-center gap-0.5 text-[9px] opacity-70">
-          <Lock size={8} /> pronto
-        </span>
-      )}
-    </button>
-  );
+  accent: string;   // tailwind bg color for icon bg
+  iconColor: string; // tailwind text color for icon
 }
 
 function BackOfficeMenu() {
   const navigate = useNavigate();
 
-  const operaciones: QuickBtn[] = [
-    { label: 'Administrador de Rutas',  to: '/rutas',    color: 'bg-green-500' },
-    { label: 'Rutas Valorizadas',       disabled: true, soon: true, color: 'bg-sky-400' },
+  const operaciones: MenuItem[] = [
+    {
+      label: 'Administrador de Rutas',
+      description: 'Gestiona y monitorea las rutas del día',
+      icon: <Route size={18} />,
+      to: '/rutas',
+      accent: 'bg-emerald-100',
+      iconColor: 'text-emerald-600',
+    },
+    {
+      label: 'Rutas Valorizadas',
+      description: 'Costos y valorización por ruta',
+      icon: <DollarSign size={18} />,
+      soon: true,
+      accent: 'bg-sky-100',
+      iconColor: 'text-sky-500',
+    },
   ];
 
-  const administracion: QuickBtn[][] = [
-    [
-      { label: 'Mis Repartidores',   to: '/usuarios',  color: 'bg-orange-400' },
-      { label: 'Mis Vehículos',      disabled: true, soon: true, color: 'bg-orange-400' },
-      { label: 'Mis Peonetas',       to: '/peonetas', color: 'bg-orange-400' },
-      { label: 'Personas Recepción', to: '/clientes',  color: 'bg-amber-400' },
-    ],
-    [
-      { label: 'Admin. Valorización', disabled: true, soon: true, color: 'bg-sky-400' },
-      { label: 'Mis Clientes',        to: '/clientes',  color: 'bg-red-400' },
-      { label: 'Admin. Estados',      disabled: true, soon: true, color: 'bg-blue-700' },
-      { label: 'Zonas',               disabled: true, soon: true, color: 'bg-sky-400' },
-    ],
-    [
-      { label: 'Usuarios Sistema', to: '/usuarios', color: 'bg-orange-400' },
-      { label: 'Admin. Fotos',     to: '/fotos',    color: 'bg-blue-700' },
-    ],
+  const administracion: MenuItem[] = [
+    { label: 'Mis Repartidores',   icon: <UserCheck size={15} />,    to: '/usuarios',  accent: 'bg-orange-100', iconColor: 'text-orange-500' },
+    { label: 'Mis Vehículos',      icon: <Car size={15} />,          soon: true,       accent: 'bg-orange-100', iconColor: 'text-orange-400' },
+    { label: 'Mis Peonetas',       icon: <PersonStanding size={15}/>, to: '/peonetas', accent: 'bg-orange-100', iconColor: 'text-orange-500' },
+    { label: 'Personas Recepción', icon: <UserCog size={15} />,      to: '/clientes',  accent: 'bg-amber-100',  iconColor: 'text-amber-600' },
+    { label: 'Admin. Valorización',icon: <Calculator size={15} />,   soon: true,       accent: 'bg-sky-100',    iconColor: 'text-sky-400' },
+    { label: 'Mis Clientes',       icon: <Building2 size={15} />,    to: '/clientes',  accent: 'bg-red-100',    iconColor: 'text-red-500' },
+    { label: 'Admin. Estados',     icon: <ToggleLeft size={15} />,   soon: true,       accent: 'bg-blue-100',   iconColor: 'text-blue-400' },
+    { label: 'Zonas',              icon: <MapPin size={15} />,       soon: true,       accent: 'bg-sky-100',    iconColor: 'text-sky-400' },
+    { label: 'Usuarios Sistema',   icon: <ShieldCheck size={15} />,  to: '/usuarios',  accent: 'bg-violet-100', iconColor: 'text-violet-500' },
+    { label: 'Admin. Fotos',       icon: <Camera size={15} />,       to: '/fotos',     accent: 'bg-blue-100',   iconColor: 'text-blue-600' },
   ];
 
-  const go = (btn: QuickBtn) => {
-    if (!btn.disabled && btn.to) navigate(btn.to);
+  const go = (item: MenuItem) => {
+    if (!item.soon && item.to) navigate(item.to);
   };
 
   return (
     <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
-      {/* Operaciones Sistema */}
-      <div className="px-5 pt-4 pb-3 border-b border-stone-100">
-        <p className="text-sm font-semibold text-stone-600 mb-3">Operaciónes Sistema</p>
-        <div className="grid grid-cols-2 gap-3">
-          {operaciones.map(btn => (
-            <QuickButton key={btn.label} btn={btn} onClick={() => go(btn)} />
-          ))}
-        </div>
+      <div className="px-5 py-3 border-b border-stone-100 flex items-center gap-2">
+        <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Accesos rápidos</span>
       </div>
 
-      {/* Administración Sistema */}
-      <div className="px-5 pt-4 pb-5">
-        <p className="text-sm font-semibold text-stone-600 mb-3">Administración Sistema</p>
-        <div className="space-y-2">
-          {administracion.map((row, i) => (
-            <div key={i} className="grid gap-2" style={{ gridTemplateColumns: `repeat(${row.length}, 1fr)` }}>
-              {row.map(btn => (
-                <QuickButton key={btn.label} btn={btn} onClick={() => go(btn)} />
-              ))}
-            </div>
-          ))}
+      <div className="p-5 space-y-5">
+        {/* Operaciones — destacadas */}
+        <div>
+          <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider mb-2.5">Operaciones</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {operaciones.map(item => (
+              <button
+                key={item.label}
+                onClick={() => go(item)}
+                disabled={item.soon}
+                className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all group
+                  ${item.soon
+                    ? 'border-stone-100 bg-stone-50/60 cursor-not-allowed opacity-60'
+                    : 'border-stone-200 hover:border-primary-200 hover:bg-primary-50/40 hover:shadow-sm cursor-pointer'
+                  }`}
+              >
+                <div className={`flex-shrink-0 p-2 rounded-lg ${item.accent}`}>
+                  <span className={item.iconColor}>{item.icon}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-stone-700 leading-tight">{item.label}</p>
+                  {item.description && (
+                    <p className="text-xs text-stone-400 mt-0.5 truncate">{item.description}</p>
+                  )}
+                </div>
+                {item.soon
+                  ? <span className="flex-shrink-0 text-[10px] font-semibold text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full">Pronto</span>
+                  : <ChevronRight size={14} className="flex-shrink-0 text-stone-300 group-hover:text-primary-400 transition-colors" />
+                }
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Administración — grid compacto */}
+        <div>
+          <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider mb-2.5">Administración</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {administracion.map(item => (
+              <button
+                key={item.label}
+                onClick={() => go(item)}
+                disabled={item.soon}
+                title={item.soon ? 'Próximamente' : item.label}
+                className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-center transition-all group
+                  ${item.soon
+                    ? 'border-stone-100 bg-stone-50/60 cursor-not-allowed opacity-50'
+                    : 'border-stone-200 hover:border-primary-200 hover:bg-primary-50/40 hover:shadow-sm cursor-pointer'
+                  }`}
+              >
+                <div className={`p-2 rounded-lg ${item.accent}`}>
+                  <span className={item.iconColor}>{item.icon}</span>
+                </div>
+                <span className="text-[11px] font-medium text-stone-600 leading-tight line-clamp-2">
+                  {item.label}
+                </span>
+                {item.soon && (
+                  <span className="text-[9px] text-stone-400">Pronto</span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
