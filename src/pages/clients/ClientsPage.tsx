@@ -107,15 +107,15 @@ function ClientForm({ initial = {}, onSubmit, onCancel, submitLabel = 'Guardar' 
           onClick={() => setForm(prev => ({ ...prev, active: !prev.active }))}
           className={clsx(
             'relative w-10 h-5 rounded-full transition-colors',
-            form.active ? 'bg-primary-500' : 'bg-stone-300'
+            form.active ? 'bg-primary-500' : 'bg-stone-300 dark:bg-stone-600'
           )}
         >
           <span className={clsx(
-            'absolute top-0.5 h-4 w-4 bg-white rounded-full shadow transition-transform',
+            'absolute top-0.5 h-4 w-4 bg-white dark:bg-stone-200 rounded-full shadow transition-transform',
             form.active ? 'translate-x-5' : 'translate-x-0.5'
           )} />
         </button>
-        <span className="text-sm text-stone-600">Cliente activo</span>
+        <span className="text-sm text-stone-600 dark:text-stone-300">Cliente activo</span>
       </div>
       <div className="flex justify-end gap-3 pt-2">
         <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
@@ -132,23 +132,23 @@ function ClientHistoryModal({ client, onClose }: { client: Client; onClose: () =
   return (
     <Modal open onClose={onClose} title={`Historial — ${client.companyName}`} description="Historial de servicios del cliente" size="lg">
       {history.length === 0 ? (
-        <p className="text-sm text-stone-400 text-center py-8">Sin historial disponible</p>
+        <p className="text-sm text-stone-400 dark:text-stone-500 text-center py-8">Sin historial disponible</p>
       ) : (
         <div className="space-y-3">
           {history.map((h) => (
-            <div key={h.id} className="flex items-center gap-4 p-4 bg-stone-50 rounded-lg border border-stone-200">
+            <div key={h.id} className="flex items-center gap-4 p-4 bg-stone-50 dark:bg-stone-800/70 rounded-lg border border-stone-200 dark:border-stone-700">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-mono font-semibold text-stone-700">{h.orderCode}</span>
+                  <span className="text-xs font-mono font-semibold text-stone-700 dark:text-stone-200">{h.orderCode}</span>
                   <OrderStatusBadge status={h.status} />
                 </div>
-                <p className="text-xs text-stone-500">{h.description}</p>
+                <p className="text-xs text-stone-500 dark:text-stone-400">{h.description}</p>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-sm font-semibold text-stone-800">
+                <p className="text-sm font-semibold text-stone-800 dark:text-stone-100">
                   {h.totalAmount > 0 ? `$${h.totalAmount.toLocaleString('es-CL')}` : '—'}
                 </p>
-                <p className="text-xs text-stone-400">{h.date}</p>
+                <p className="text-xs text-stone-400 dark:text-stone-500">{h.date}</p>
               </div>
             </div>
           ))}
@@ -195,13 +195,13 @@ export function ClientsPage() {
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" />
           <input
             type="text"
-            placeholder="Buscar por empresa, contacto, email..."
+            placeholder="Buscar por empresa, contacto, email…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-white border border-stone-300 rounded-lg text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent shadow-sm"
+            className="w-full pl-9 pr-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent shadow-sm"
           />
         </div>
         <div className="flex items-center gap-1.5">
@@ -212,8 +212,8 @@ export function ClientsPage() {
               className={clsx(
                 'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
                 filterStatus === s
-                  ? 'bg-primary-50 text-primary-700 border border-primary-200'
-                  : 'text-stone-500 hover:bg-stone-100 hover:text-stone-700'
+                  ? 'bg-primary-50 text-primary-700 border border-primary-200 dark:bg-primary-950/45 dark:text-primary-300 dark:border-primary-800'
+                  : 'text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-700 dark:hover:text-stone-200 border border-transparent'
               )}
             >
               {s === 'all' ? 'Todos' : s === 'active' ? 'Activos' : 'Inactivos'}
@@ -228,13 +228,13 @@ export function ClientsPage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Total clientes', value: clients.length, color: 'text-stone-700', bg: 'bg-white' },
-          { label: 'Activos', value: clients.filter(c => c.active).length, color: 'text-emerald-700', bg: 'bg-emerald-50' },
-          { label: 'Inactivos', value: clients.filter(c => !c.active).length, color: 'text-stone-400', bg: 'bg-white' },
+          { label: 'Total clientes', value: clients.length, color: 'text-stone-700 dark:text-stone-200', box: 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800' },
+          { label: 'Activos', value: clients.filter(c => c.active).length, color: 'text-emerald-700 dark:text-emerald-300', box: 'bg-emerald-50 dark:bg-emerald-950/35 border-emerald-100 dark:border-emerald-900/50' },
+          { label: 'Inactivos', value: clients.filter(c => !c.active).length, color: 'text-stone-500 dark:text-stone-400', box: 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800' },
         ].map((s) => (
-          <div key={s.label} className={`${s.bg} border border-stone-200 rounded-xl p-4 text-center shadow-sm`}>
+          <div key={s.label} className={clsx('border rounded-xl p-4 text-center shadow-sm', s.box)}>
             <p className={clsx('text-2xl font-bold', s.color)}>{s.value}</p>
-            <p className="text-xs text-stone-400 mt-0.5">{s.label}</p>
+            <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
@@ -250,15 +250,15 @@ export function ClientsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((client) => (
-            <div key={client.id} className="bg-white border border-stone-200 rounded-xl p-5 hover:border-stone-300 hover:shadow-md transition-all shadow-sm group">
+            <div key={client.id} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-5 hover:border-stone-300 dark:hover:border-stone-600 hover:shadow-md transition-all shadow-sm group">
               <div className="flex items-start justify-between gap-2 mb-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 bg-primary-50 border border-primary-100 rounded-xl flex items-center justify-center text-primary-600 font-bold text-sm flex-shrink-0">
+                  <div className="w-10 h-10 bg-primary-50 dark:bg-primary-950/50 border border-primary-100 dark:border-primary-800 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400 font-bold text-sm flex-shrink-0">
                     {client.companyName.charAt(0)}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-stone-800 truncate">{client.companyName}</p>
-                    <p className="text-xs text-stone-400 truncate">{client.contactName}</p>
+                    <p className="text-sm font-semibold text-stone-800 dark:text-stone-100 truncate">{client.companyName}</p>
+                    <p className="text-xs text-stone-400 dark:text-stone-500 truncate">{client.contactName}</p>
                   </div>
                 </div>
                 <Badge variant={client.active ? 'success' : 'slate'}>
@@ -268,29 +268,29 @@ export function ClientsPage() {
               </div>
 
               <div className="space-y-1.5 mb-4">
-                <div className="flex items-center gap-2 text-xs text-stone-500">
-                  <Mail size={12} className="text-stone-400 flex-shrink-0" />
+                <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+                  <Mail size={12} className="text-stone-400 dark:text-stone-500 flex-shrink-0" />
                   <span className="truncate">{client.email}</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-stone-500">
-                  <Phone size={12} className="text-stone-400 flex-shrink-0" />
+                <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+                  <Phone size={12} className="text-stone-400 dark:text-stone-500 flex-shrink-0" />
                   <span>{client.phone}</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-stone-500">
-                  <MapPin size={12} className="text-stone-400 flex-shrink-0" />
+                <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+                  <MapPin size={12} className="text-stone-400 dark:text-stone-500 flex-shrink-0" />
                   <span className="truncate">{client.city}, {client.region}</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1 pt-3 border-t border-stone-100">
-                <span className="text-[10px] text-stone-400 font-mono">RUT: {client.rut}</span>
+              <div className="flex items-center gap-1 pt-3 border-t border-stone-100 dark:border-stone-800">
+                <span className="text-[10px] text-stone-400 dark:text-stone-500 font-mono">RUT: {client.rut}</span>
                 <div className="flex-1" />
                 <Button
                   variant="ghost"
                   size="xs"
                   onClick={() => setHistoryClient(client)}
                   icon={<History size={13} />}
-                  className="text-stone-400 hover:text-stone-700"
+                  className="text-stone-400 dark:text-stone-500 hover:text-stone-700 dark:hover:text-stone-200"
                 >
                   Historial
                 </Button>
@@ -300,7 +300,7 @@ export function ClientsPage() {
                   size="xs"
                   onClick={() => setDeleteTarget(client)}
                   icon={<Trash2 size={13} />}
-                  className="text-stone-400 hover:text-red-600"
+                  className="text-stone-400 dark:text-stone-500 hover:text-red-600 dark:hover:text-red-400"
                 />
               </div>
             </div>

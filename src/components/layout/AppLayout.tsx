@@ -1,7 +1,6 @@
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { TopNavbar } from './TopNavbar';
 import { useAuthStore } from '../../store/useAuthStore';
-import { useEffect, useState } from 'react';
 
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   '/dashboard':      { title: 'Dashboard',              subtitle: 'Resumen operacional en tiempo real' },
@@ -11,19 +10,12 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   '/usuarios':       { title: 'Usuarios Sistema',       subtitle: 'Gestiona los usuarios de la plataforma' },
   '/fotos':          { title: 'Admin. Fotos',           subtitle: 'Fotografías de inspección y entrega desde la app móvil' },
   '/peonetas':       { title: 'Mis Peonetas',           subtitle: 'Asistentes de entrega asignables a rutas' },
-  '/configuracion':  { title: 'Configuración',          subtitle: 'Ajustes del tenant y la plataforma' },
+  '/configuracion':  { title: 'Configuración',          subtitle: 'Tema de la interfaz y datos de la empresa' },
 };
 
 export function AppLayout() {
   const { isAuthenticated } = useAuthStore();
   const location = useLocation();
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    setVisible(false);
-    const t = setTimeout(() => setVisible(true), 50);
-    return () => clearTimeout(t);
-  }, [location.pathname]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -32,24 +24,26 @@ export function AppLayout() {
   const pageInfo = pageTitles[location.pathname] ?? { title: 'Rutek' };
 
   return (
-    <div className="flex flex-col h-screen bg-stone-50 overflow-hidden">
+    <div className="flex flex-col h-screen bg-stone-50 dark:bg-stone-950 overflow-hidden">
       <TopNavbar />
 
-      {/* Page title bar */}
-      <div className="bg-white border-b border-stone-100 px-6 py-3 flex-shrink-0">
-        <h1 className="text-base font-semibold text-stone-900">{pageInfo.title}</h1>
-        {pageInfo.subtitle && (
-          <p className="text-xs text-stone-400 mt-0.5">{pageInfo.subtitle}</p>
-        )}
-      </div>
-
-      <main
-        className={`flex-1 overflow-y-auto p-6 transition-opacity duration-200 ${
-          visible ? 'opacity-100' : 'opacity-0'
-        }`}
+      {/* Título + contenido: misma animación al cambiar de ruta */}
+      <div
+        key={location.pathname}
+        className="flex flex-col flex-1 min-h-0 animate-page-enter motion-reduce:animate-none"
       >
-        <Outlet />
-      </main>
+        {/* Page title bar */}
+        <div className="bg-white dark:bg-stone-900 border-b border-stone-100 dark:border-stone-800 px-6 py-3 flex-shrink-0">
+          <h1 className="text-base font-semibold text-stone-900 dark:text-stone-100">{pageInfo.title}</h1>
+          {pageInfo.subtitle && (
+            <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">{pageInfo.subtitle}</p>
+          )}
+        </div>
+
+        <main className="flex-1 overflow-y-auto p-6 min-h-0 bg-stone-50 dark:bg-stone-950">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

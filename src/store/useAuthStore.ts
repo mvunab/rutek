@@ -10,6 +10,7 @@ interface AuthStore {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   switchRole: (role: UserRole) => void;
+  updateTenant: (patch: Partial<Tenant>) => void;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -38,6 +39,12 @@ export const useAuthStore = create<AuthStore>()(
         if (targetUser && user) {
           set({ user: targetUser });
         }
+      },
+
+      updateTenant: (patch) => {
+        const { tenant } = get();
+        if (!tenant) return;
+        set({ tenant: { ...tenant, ...patch } });
       },
     }),
     {

@@ -41,19 +41,20 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-stone-900/40 dark:bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
       <div className={clsx(
         'relative w-full bg-white border border-stone-200 rounded-2xl shadow-2xl',
+        'dark:bg-stone-900 dark:border-stone-700',
         'flex flex-col max-h-[90vh]',
         sizeClasses[size]
       )}>
         {(title || description) && (
-          <div className="flex items-start justify-between gap-4 p-6 border-b border-stone-100">
+          <div className="flex items-start justify-between gap-4 p-6 border-b border-stone-100 dark:border-stone-800">
             <div>
-              {title && <h2 className="text-lg font-semibold text-stone-900">{title}</h2>}
-              {description && <p className="text-sm text-stone-500 mt-1">{description}</p>}
+              {title && <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">{title}</h2>}
+              {description && <p className="text-sm text-stone-500 dark:text-stone-400 mt-1">{description}</p>}
             </div>
             <Button variant="ghost" size="sm" onClick={onClose} icon={<X size={16} />} className="flex-shrink-0 -mt-1 -mr-2" />
           </div>
@@ -62,7 +63,7 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
           {children}
         </div>
         {footer && (
-          <div className="border-t border-stone-100 px-6 py-4 flex justify-end gap-3">
+          <div className="border-t border-stone-100 dark:border-stone-800 px-6 py-4 flex justify-end gap-3">
             {footer}
           </div>
         )}
@@ -110,7 +111,7 @@ export function ConfirmModal({
         </>
       }
     >
-      <p className="text-sm text-stone-600">{message}</p>
+      <p className="text-sm text-stone-600 dark:text-stone-300">{message}</p>
     </Modal>
   );
 }

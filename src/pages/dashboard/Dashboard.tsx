@@ -67,9 +67,9 @@ function BackOfficeMenu() {
   };
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
-      <div className="px-5 py-3 border-b border-stone-100 flex items-center gap-2">
-        <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Accesos rápidos</span>
+    <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-sm overflow-hidden">
+      <div className="px-5 py-3 border-b border-stone-100 dark:border-stone-800 flex items-center gap-2">
+        <span className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">Accesos rápidos</span>
       </div>
 
       <div className="p-5 space-y-5">
@@ -84,22 +84,22 @@ function BackOfficeMenu() {
                 disabled={item.soon}
                 className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all group
                   ${item.soon
-                    ? 'border-stone-100 bg-stone-50/60 cursor-not-allowed opacity-60'
-                    : 'border-stone-200 hover:border-primary-200 hover:bg-primary-50/40 hover:shadow-sm cursor-pointer'
+                    ? 'border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/40 cursor-not-allowed opacity-60'
+                    : 'border-stone-200 dark:border-stone-700 hover:border-primary-200 dark:hover:border-primary-600 hover:bg-primary-50/40 dark:hover:bg-primary-950/30 hover:shadow-sm cursor-pointer'
                   }`}
               >
                 <div className={`flex-shrink-0 p-2 rounded-lg ${item.accent}`}>
                   <span className={item.iconColor}>{item.icon}</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-stone-700 leading-tight">{item.label}</p>
+                  <p className="text-sm font-semibold text-stone-700 dark:text-stone-200 leading-tight">{item.label}</p>
                   {item.description && (
-                    <p className="text-xs text-stone-400 mt-0.5 truncate">{item.description}</p>
+                    <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5 truncate">{item.description}</p>
                   )}
                 </div>
                 {item.soon
-                  ? <span className="flex-shrink-0 text-[10px] font-semibold text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full">Pronto</span>
-                  : <ChevronRight size={14} className="flex-shrink-0 text-stone-300 group-hover:text-primary-400 transition-colors" />
+                  ? <span className="flex-shrink-0 text-[10px] font-semibold text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded-full">Pronto</span>
+                  : <ChevronRight size={14} className="flex-shrink-0 text-stone-300 dark:text-stone-600 group-hover:text-primary-400 transition-colors" />
                 }
               </button>
             ))}
@@ -118,18 +118,18 @@ function BackOfficeMenu() {
                 title={item.soon ? 'Próximamente' : item.label}
                 className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-center transition-all group
                   ${item.soon
-                    ? 'border-stone-100 bg-stone-50/60 cursor-not-allowed opacity-50'
-                    : 'border-stone-200 hover:border-primary-200 hover:bg-primary-50/40 hover:shadow-sm cursor-pointer'
+                    ? 'border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/40 cursor-not-allowed opacity-50'
+                    : 'border-stone-200 dark:border-stone-700 hover:border-primary-200 dark:hover:border-primary-600 hover:bg-primary-50/40 dark:hover:bg-primary-950/30 hover:shadow-sm cursor-pointer'
                   }`}
               >
                 <div className={`p-2 rounded-lg ${item.accent}`}>
                   <span className={item.iconColor}>{item.icon}</span>
                 </div>
-                <span className="text-[11px] font-medium text-stone-600 leading-tight line-clamp-2">
+                <span className="text-[11px] font-medium text-stone-600 dark:text-stone-300 leading-tight line-clamp-2">
                   {item.label}
                 </span>
                 {item.soon && (
-                  <span className="text-[9px] text-stone-400">Pronto</span>
+                  <span className="text-[9px] text-stone-400 dark:text-stone-500">Pronto</span>
                 )}
               </button>
             ))}
@@ -154,16 +154,16 @@ export function Dashboard() {
       {/* Welcome */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-stone-900">
+          <h2 className="text-xl font-bold text-stone-900 dark:text-stone-100">
             Buen día, {user?.name.split(' ')[0]} 👋
           </h2>
-          <p className="text-sm text-stone-500 mt-0.5">
+          <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
             Aquí tienes el resumen operacional de hoy
           </p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-lg">
           <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-semibold text-emerald-700">Operación activa</span>
+          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Operación activa</span>
         </div>
       </div>
 
@@ -208,13 +208,13 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Orders chart */}
-        <div className="lg:col-span-2 bg-white border border-stone-200 rounded-xl p-5 shadow-sm">
+        <div className="lg:col-span-2 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-sm font-semibold text-stone-800">Pedidos de la semana</h3>
-              <p className="text-xs text-stone-400 mt-0.5">Creados vs entregados</p>
+              <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Pedidos de la semana</h3>
+              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Creados vs entregados</p>
             </div>
-            <div className="flex items-center gap-4 text-xs text-stone-500">
+            <div className="flex items-center gap-4 text-xs text-stone-500 dark:text-stone-400">
               <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-primary-500 rounded inline-block" /> Creados</span>
               <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-emerald-500 rounded inline-block" /> Entregados</span>
             </div>
@@ -246,9 +246,9 @@ export function Dashboard() {
         </div>
 
         {/* Pie chart */}
-        <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-stone-800 mb-1">Estado de pedidos</h3>
-          <p className="text-xs text-stone-400 mb-4">Distribución actual</p>
+        <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-1">Estado de pedidos</h3>
+          <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">Distribución actual</p>
           <ResponsiveContainer width="100%" height={140}>
             <PieChart>
               <Pie
@@ -274,9 +274,9 @@ export function Dashboard() {
               <div key={i} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS[i] }} />
-                  <span className="text-xs text-stone-500">{item.label}</span>
+                  <span className="text-xs text-stone-500 dark:text-stone-400">{item.label}</span>
                 </div>
-                <span className="text-xs font-semibold text-stone-700">{item.value}</span>
+                <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">{item.value}</span>
               </div>
             ))}
           </div>
@@ -285,54 +285,54 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Recent Orders */}
-        <div className="bg-white border border-stone-200 rounded-xl shadow-sm">
-          <div className="flex items-center justify-between p-5 border-b border-stone-100">
+        <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-sm">
+          <div className="flex items-center justify-between p-5 border-b border-stone-100 dark:border-stone-800">
             <div>
-              <h3 className="text-sm font-semibold text-stone-800">Pedidos recientes</h3>
-              <p className="text-xs text-stone-400 mt-0.5">Últimas actualizaciones</p>
+              <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Pedidos recientes</h3>
+              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Últimas actualizaciones</p>
             </div>
             <Button variant="ghost" size="xs" onClick={() => navigate('/pedidos')} icon={<ArrowRight size={12} />} iconPosition="right">
               Ver todos
             </Button>
           </div>
-          <div className="divide-y divide-stone-50">
+          <div className="divide-y divide-stone-50 dark:divide-stone-800">
             {recentOrders.map((order) => (
-              <div key={order.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-stone-50 transition-colors">
+              <div key={order.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-mono font-semibold text-stone-700">{order.code}</span>
+                    <span className="text-xs font-mono font-semibold text-stone-700 dark:text-stone-200">{order.code}</span>
                     <OrderStatusBadge status={order.status} />
                   </div>
-                  <p className="text-xs text-stone-400 truncate">{order.clientName}</p>
+                  <p className="text-xs text-stone-400 dark:text-stone-500 truncate">{order.clientName}</p>
                 </div>
-                <p className="text-xs text-stone-400 flex-shrink-0">{order.estimatedDelivery}</p>
+                <p className="text-xs text-stone-400 dark:text-stone-500 flex-shrink-0">{order.estimatedDelivery}</p>
               </div>
             ))}
           </div>
         </div>
 
         {/* Active Routes */}
-        <div className="bg-white border border-stone-200 rounded-xl shadow-sm">
-          <div className="flex items-center justify-between p-5 border-b border-stone-100">
+        <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-sm">
+          <div className="flex items-center justify-between p-5 border-b border-stone-100 dark:border-stone-800">
             <div>
-              <h3 className="text-sm font-semibold text-stone-800">Rutas activas</h3>
-              <p className="text-xs text-stone-400 mt-0.5">Operación en tiempo real</p>
+              <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Rutas activas</h3>
+              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Operación en tiempo real</p>
             </div>
             <Button variant="ghost" size="xs" onClick={() => navigate('/rutas')} icon={<ArrowRight size={12} />} iconPosition="right">
               Ver todas
             </Button>
           </div>
-          <div className="divide-y divide-stone-50">
+          <div className="divide-y divide-stone-50 dark:divide-stone-800">
             {activeRoutes.map((route) => (
-              <div key={route.id} className="px-5 py-3.5 hover:bg-stone-50 transition-colors">
+              <div key={route.id} className="px-5 py-3.5 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors">
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-semibold text-stone-700">{route.code}</span>
+                    <span className="text-xs font-mono font-semibold text-stone-700 dark:text-stone-200">{route.code}</span>
                     <RouteStatusBadge status={route.status} />
                   </div>
-                  <span className="text-xs text-stone-400">{route.orderIds.length} pedidos</span>
+                  <span className="text-xs text-stone-400 dark:text-stone-500">{route.orderIds.length} pedidos</span>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-stone-400">
+                <div className="flex items-center gap-4 text-xs text-stone-400 dark:text-stone-500">
                   <span className="flex items-center gap-1">
                     <Truck size={11} />
                     {route.driverName ?? 'Sin asignar'}
@@ -347,7 +347,7 @@ export function Dashboard() {
                   </span>
                 </div>
                 {route.status === 'active' && (
-                  <div className="mt-2.5 w-full bg-stone-100 rounded-full h-1">
+                  <div className="mt-2.5 w-full bg-stone-100 dark:bg-stone-800 rounded-full h-1">
                     <div
                       className="bg-primary-500 h-1 rounded-full transition-all"
                       style={{
@@ -359,7 +359,7 @@ export function Dashboard() {
               </div>
             ))}
             {activeRoutes.length === 0 && (
-              <div className="p-8 text-center text-sm text-stone-400">No hay rutas activas</div>
+              <div className="p-8 text-center text-sm text-stone-400 dark:text-stone-500">No hay rutas activas</div>
             )}
           </div>
         </div>
@@ -373,11 +373,11 @@ export function Dashboard() {
           { label: 'Efectividad', value: `${stats.deliveryRate}%`, icon: <TrendingUp size={16} />, color: 'text-violet-600', bg: 'bg-violet-50' },
           { label: 'Tiempo prom.', value: `${stats.avgDeliveryTime}d`, icon: <Clock size={16} />, color: 'text-amber-600', bg: 'bg-amber-50' },
         ].map((item) => (
-          <div key={item.label} className="bg-white border border-stone-200 rounded-xl p-4 flex items-center gap-3 shadow-sm">
-            <div className={`p-2 rounded-lg ${item.bg} ${item.color}`}>{item.icon}</div>
+          <div key={item.label} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-4 flex items-center gap-3 shadow-sm">
+            <div className={`p-2 rounded-lg ${item.bg} dark:opacity-90 ${item.color}`}>{item.icon}</div>
             <div>
-              <p className="text-xl font-bold text-stone-900">{item.value}</p>
-              <p className="text-xs text-stone-400">{item.label}</p>
+              <p className="text-xl font-bold text-stone-900 dark:text-stone-100">{item.value}</p>
+              <p className="text-xs text-stone-400 dark:text-stone-500">{item.label}</p>
             </div>
           </div>
         ))}

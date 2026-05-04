@@ -105,7 +105,7 @@ function OrderForm({ initial = {}, onSubmit, onCancel, submitLabel = 'Guardar' }
   return (
     <div className="space-y-5">
       <div>
-        <h4 className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Información general</h4>
+        <h4 className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">Información general</h4>
         <div className="grid grid-cols-2 gap-3">
           <Select label="Cliente" value={form.clientId} onChange={setField('clientId')} options={clientOptions} error={errors.clientId} containerClassName="col-span-2" />
           <Select label="Prioridad" value={form.priority} onChange={setField('priority')} options={priorityOptions} />
@@ -114,7 +114,7 @@ function OrderForm({ initial = {}, onSubmit, onCancel, submitLabel = 'Guardar' }
       </div>
 
       <div>
-        <h4 className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Origen</h4>
+        <h4 className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">Origen</h4>
         <div className="grid grid-cols-2 gap-3">
           <Input label="Dirección" value={form.originStreet} onChange={setField('originStreet')} containerClassName="col-span-2" />
           <Input label="Ciudad" value={form.originCity} onChange={setField('originCity')} />
@@ -122,7 +122,7 @@ function OrderForm({ initial = {}, onSubmit, onCancel, submitLabel = 'Guardar' }
       </div>
 
       <div>
-        <h4 className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Destino</h4>
+        <h4 className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">Destino</h4>
         <div className="grid grid-cols-2 gap-3">
           <Input label="Dirección" placeholder="Calle y número" value={form.destStreet} onChange={setField('destStreet')} error={errors.destStreet} containerClassName="col-span-2" />
           <Input label="Ciudad" placeholder="Santiago" value={form.destCity} onChange={setField('destCity')} error={errors.destCity} />
@@ -132,42 +132,47 @@ function OrderForm({ initial = {}, onSubmit, onCancel, submitLabel = 'Guardar' }
 
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-xs font-semibold text-stone-400 uppercase tracking-wide">Artículos</h4>
+          <h4 className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide">Artículos</h4>
           <Button variant="ghost" size="xs" onClick={addItem} icon={<Plus size={12} />}>Agregar</Button>
         </div>
         <div className="space-y-2">
           {form.items.map((item, index) => (
-            <div key={item.id} className="grid grid-cols-12 gap-2 items-end p-3 bg-stone-50 rounded-lg border border-stone-200">
+            <div key={item.id} className="grid grid-cols-12 gap-2 items-end p-3 bg-stone-50 dark:bg-stone-800/60 rounded-lg border border-stone-200 dark:border-stone-700">
               <div className="col-span-4">
-                <label className="text-xs text-stone-500 mb-1 block">Descripción</label>
+                <label className="text-xs text-stone-500 dark:text-stone-400 mb-1 block">Descripción</label>
                 <input
                   value={item.description}
                   onChange={(e) => updateItem(index, 'description', e.target.value)}
                   placeholder="Ej: Cajas de conservas"
-                  className="w-full bg-white border border-stone-300 rounded-md px-2 py-1.5 text-xs text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  className="w-full bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-xs text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
                 />
               </div>
               <div className="col-span-2">
-                <label className="text-xs text-stone-500 mb-1 block">Cantidad</label>
-                <input type="number" min={1} value={item.quantity} onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))} className="w-full bg-white border border-stone-300 rounded-md px-2 py-1.5 text-xs text-stone-800 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <label className="text-xs text-stone-500 dark:text-stone-400 mb-1 block">Cantidad</label>
+                <input type="number" min={1} value={item.quantity} onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))} className="w-full bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-xs text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-1 focus:ring-primary-500" />
               </div>
               <div className="col-span-2">
-                <label className="text-xs text-stone-500 mb-1 block">Peso (kg)</label>
-                <input type="number" min={0.1} step={0.1} value={item.weight} onChange={(e) => updateItem(index, 'weight', Number(e.target.value))} className="w-full bg-white border border-stone-300 rounded-md px-2 py-1.5 text-xs text-stone-800 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <label className="text-xs text-stone-500 dark:text-stone-400 mb-1 block">Peso (kg)</label>
+                <input type="number" min={0.1} step={0.1} value={item.weight} onChange={(e) => updateItem(index, 'weight', Number(e.target.value))} className="w-full bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-xs text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-1 focus:ring-primary-500" />
               </div>
               <div className="col-span-2">
-                <label className="text-xs text-stone-500 mb-1 block">Frágil</label>
+                <label className="text-xs text-stone-500 dark:text-stone-400 mb-1 block">Frágil</label>
                 <button
                   type="button"
                   onClick={() => updateItem(index, 'fragile', !item.fragile)}
-                  className={clsx('w-full py-1.5 rounded-md text-xs font-medium border transition-colors', item.fragile ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-white text-stone-500 border-stone-300')}
+                  className={clsx(
+                    'w-full py-1.5 rounded-md text-xs font-medium border transition-colors',
+                    item.fragile
+                      ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800'
+                      : 'bg-white text-stone-500 border-stone-300 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-600'
+                  )}
                 >
                   {item.fragile ? 'Sí' : 'No'}
                 </button>
               </div>
               <div className="col-span-2 flex justify-end">
                 {form.items.length > 1 && (
-                  <button onClick={() => removeItem(index)} className="p-1.5 text-stone-400 hover:text-red-500 transition-colors">
+                  <button onClick={() => removeItem(index)} className="p-1.5 text-stone-400 dark:text-stone-500 hover:text-red-500 dark:hover:text-red-400 transition-colors">
                     <X size={14} />
                   </button>
                 )}
@@ -194,63 +199,63 @@ function OrderDetail({ order, onClose }: { order: Order; onClose: () => void }) 
         <div className="flex items-center gap-3">
           <OrderStatusBadge status={order.status} />
           <PriorityBadge priority={order.priority} />
-          <span className="text-xs text-stone-400">Creado: {order.createdAt}</span>
+          <span className="text-xs text-stone-400 dark:text-stone-500">Creado: {order.createdAt}</span>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
-            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Origen</p>
-            <p className="text-sm text-stone-800">{order.origin.street}</p>
-            <p className="text-xs text-stone-400">{order.origin.city}, {order.origin.region}</p>
+          <div className="bg-stone-50 dark:bg-stone-800/70 rounded-lg p-4 border border-stone-200 dark:border-stone-700">
+            <p className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">Origen</p>
+            <p className="text-sm text-stone-800 dark:text-stone-100">{order.origin.street}</p>
+            <p className="text-xs text-stone-400 dark:text-stone-500">{order.origin.city}, {order.origin.region}</p>
           </div>
-          <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
-            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Destino</p>
-            <p className="text-sm text-stone-800">{order.destination.street}</p>
-            <p className="text-xs text-stone-400">{order.destination.city}, {order.destination.region}</p>
+          <div className="bg-stone-50 dark:bg-stone-800/70 rounded-lg p-4 border border-stone-200 dark:border-stone-700">
+            <p className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">Destino</p>
+            <p className="text-sm text-stone-800 dark:text-stone-100">{order.destination.street}</p>
+            <p className="text-xs text-stone-400 dark:text-stone-500">{order.destination.city}, {order.destination.region}</p>
           </div>
         </div>
 
         <div>
-          <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Cliente</p>
-          <p className="text-sm text-stone-800">{order.clientName}</p>
+          <p className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">Cliente</p>
+          <p className="text-sm text-stone-800 dark:text-stone-100">{order.clientName}</p>
         </div>
 
         <div>
-          <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Artículos ({order.items.length})</p>
+          <p className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">Artículos ({order.items.length})</p>
           <div className="space-y-2">
             {order.items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between py-2 border-b border-stone-100 last:border-0">
+              <div key={item.id} className="flex items-center justify-between py-2 border-b border-stone-100 dark:border-stone-800 last:border-0">
                 <div>
-                  <p className="text-sm text-stone-800">{item.description}</p>
-                  <p className="text-xs text-stone-400">{item.quantity} unidades · {item.weight}kg c/u</p>
+                  <p className="text-sm text-stone-800 dark:text-stone-100">{item.description}</p>
+                  <p className="text-xs text-stone-400 dark:text-stone-500">{item.quantity} unidades · {item.weight}kg c/u</p>
                 </div>
-                {item.fragile && <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">Frágil</span>}
+                {item.fragile && <span className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">Frágil</span>}
               </div>
             ))}
           </div>
-          <div className="flex gap-4 mt-3 pt-3 border-t border-stone-100">
-            <div className="flex items-center gap-2 text-xs text-stone-500">
+          <div className="flex gap-4 mt-3 pt-3 border-t border-stone-100 dark:border-stone-800">
+            <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
               <Weight size={13} />
-              <span className="font-semibold text-stone-700">{order.totalWeight} kg</span> total
+              <span className="font-semibold text-stone-700 dark:text-stone-200">{order.totalWeight} kg</span> total
             </div>
           </div>
         </div>
 
         {order.notes && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <p className="text-xs font-medium text-amber-700 mb-1">Notas</p>
-            <p className="text-xs text-stone-700">{order.notes}</p>
+          <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-lg p-3">
+            <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">Notas</p>
+            <p className="text-xs text-stone-700 dark:text-stone-300">{order.notes}</p>
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="text-center p-3 bg-stone-50 rounded-lg border border-stone-200">
-            <p className="text-xs text-stone-400">Entrega estimada</p>
-            <p className="text-sm font-semibold text-stone-800">{order.estimatedDelivery}</p>
+          <div className="text-center p-3 bg-stone-50 dark:bg-stone-800/70 rounded-lg border border-stone-200 dark:border-stone-700">
+            <p className="text-xs text-stone-400 dark:text-stone-500">Entrega estimada</p>
+            <p className="text-sm font-semibold text-stone-800 dark:text-stone-100">{order.estimatedDelivery}</p>
           </div>
-          <div className="text-center p-3 bg-stone-50 rounded-lg border border-stone-200">
-            <p className="text-xs text-stone-400">Entrega real</p>
-            <p className="text-sm font-semibold text-stone-800">{order.actualDelivery ?? '—'}</p>
+          <div className="text-center p-3 bg-stone-50 dark:bg-stone-800/70 rounded-lg border border-stone-200 dark:border-stone-700">
+            <p className="text-xs text-stone-400 dark:text-stone-500">Entrega real</p>
+            <p className="text-sm font-semibold text-stone-800 dark:text-stone-100">{order.actualDelivery ?? '—'}</p>
           </div>
         </div>
       </div>
@@ -274,20 +279,20 @@ function AssignRouteModal({ order, onClose }: { order: Order; onClose: () => voi
   return (
     <Modal open onClose={onClose} title="Asignar a ruta" description={`Pedido ${order.code}`} size="md">
       {availableRoutes.length === 0 ? (
-        <p className="text-sm text-stone-400 text-center py-6">No hay rutas disponibles para asignar</p>
+        <p className="text-sm text-stone-400 dark:text-stone-500 text-center py-6">No hay rutas disponibles para asignar</p>
       ) : (
         <div className="space-y-2">
           {availableRoutes.map((route) => (
             <button
               key={route.id}
               onClick={() => handleAssign(route.id)}
-              className="w-full flex items-center justify-between p-4 bg-stone-50 hover:bg-primary-50 border border-stone-200 hover:border-primary-200 rounded-lg transition-all text-left"
+              className="w-full flex items-center justify-between p-4 bg-stone-50 dark:bg-stone-800/70 hover:bg-primary-50 dark:hover:bg-primary-950/40 border border-stone-200 dark:border-stone-700 hover:border-primary-200 dark:hover:border-primary-800 rounded-lg transition-all text-left"
             >
               <div>
-                <p className="text-sm font-semibold text-stone-800">{route.name}</p>
-                <p className="text-xs text-stone-400 mt-0.5">{route.code} · {route.orderIds.length} pedidos · {route.estimatedDistance}km</p>
+                <p className="text-sm font-semibold text-stone-800 dark:text-stone-100">{route.name}</p>
+                <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">{route.code} · {route.orderIds.length} pedidos · {route.estimatedDistance}km</p>
               </div>
-              <span className="text-xs text-primary-600 font-medium">Asignar →</span>
+              <span className="text-xs text-primary-600 dark:text-primary-400 font-medium">Asignar →</span>
             </button>
           ))}
         </div>
@@ -382,13 +387,13 @@ export function OrdersPage() {
       <div className="flex flex-col gap-3">
         <div className="flex gap-3">
           <div className="relative flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" />
             <input
               type="text"
-              placeholder="Buscar por código, cliente o ciudad..."
+              placeholder="Buscar por código, cliente o ciudad…"
               value={filters.search ?? ''}
               onChange={(e) => setFilters({ search: e.target.value })}
-              className="w-full pl-9 pr-3 py-2 bg-white border border-stone-300 rounded-lg text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
+              className="w-full pl-9 pr-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
             />
           </div>
           <Button variant="secondary" onClick={() => setShowFilters(!showFilters)} icon={<Filter size={15} />}>
@@ -403,7 +408,7 @@ export function OrdersPage() {
         </div>
 
         {showFilters && (
-          <div className="flex items-center gap-3 p-4 bg-white border border-stone-200 rounded-xl shadow-sm">
+          <div className="flex items-center gap-3 p-4 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-xl shadow-sm">
             <Select
               value={filters.status ?? 'all'}
               onChange={(e) => setFilters({ status: e.target.value as OrderStatus | 'all' })}
@@ -423,8 +428,8 @@ export function OrdersPage() {
         )}
       </div>
 
-      <div className="flex items-center gap-4 text-sm text-stone-500">
-        <span className="font-semibold text-stone-800">{filteredOrders.length}</span> pedidos
+      <div className="flex items-center gap-4 text-sm text-stone-500 dark:text-stone-400">
+        <span className="font-semibold text-stone-800 dark:text-stone-200">{filteredOrders.length}</span> pedidos
         {filters.status !== 'all' && <span>· filtrado por estado</span>}
       </div>
 
@@ -436,34 +441,34 @@ export function OrdersPage() {
           action={{ label: 'Crear pedido', onClick: () => setShowForm(true), icon: <Plus size={14} /> }}
         />
       ) : (
-        <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl overflow-hidden shadow-sm">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Código</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Cliente</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Destino</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Estado</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Prioridad</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Entrega</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wide">Acciones</th>
+              <tr className="border-b border-stone-100 dark:border-stone-800 bg-stone-50 dark:bg-stone-800/90">
+                <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">Código</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">Cliente</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">Destino</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">Estado</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">Prioridad</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">Entrega</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-50">
+            <tbody className="divide-y divide-stone-50 dark:divide-stone-800">
               {filteredOrders.map((order) => {
                 const nextStatus = statusFlow[order.status];
                 const nextLabel = nextStatusLabel[order.status];
                 return (
-                  <tr key={order.id} className="hover:bg-stone-50/70 transition-colors">
+                  <tr key={order.id} className="hover:bg-stone-50/70 dark:hover:bg-stone-800/50 transition-colors">
                     <td className="px-5 py-3.5">
-                      <span className="font-mono text-xs font-semibold text-stone-700">{order.code}</span>
+                      <span className="font-mono text-xs font-semibold text-stone-700 dark:text-stone-200">{order.code}</span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <p className="text-sm text-stone-700 truncate max-w-[160px]">{order.clientName}</p>
+                      <p className="text-sm text-stone-700 dark:text-stone-200 truncate max-w-[160px]">{order.clientName}</p>
                     </td>
                     <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-1.5 text-xs text-stone-500">
-                        <MapPin size={11} className="text-stone-400" />
+                      <div className="flex items-center gap-1.5 text-xs text-stone-500 dark:text-stone-400">
+                        <MapPin size={11} className="text-stone-400 dark:text-stone-500" />
                         <span className="truncate max-w-[140px]">{order.destination.city}</span>
                       </div>
                     </td>
@@ -474,7 +479,7 @@ export function OrdersPage() {
                       <PriorityBadge priority={order.priority} />
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-xs text-stone-500">{order.estimatedDelivery}</span>
+                      <span className="text-xs text-stone-500 dark:text-stone-400">{order.estimatedDelivery}</span>
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-end gap-1">
@@ -483,7 +488,7 @@ export function OrdersPage() {
                             variant="ghost"
                             size="xs"
                             onClick={() => updateOrderStatus(order.id, nextStatus)}
-                            className="text-primary-600 hover:text-primary-700 text-[11px]"
+                            className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-[11px]"
                           >
                             {nextLabel}
                           </Button>

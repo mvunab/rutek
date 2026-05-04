@@ -22,8 +22,9 @@ export function Card({ children, className, padding = 'md', hover, onClick }: Ca
       onClick={onClick}
       className={clsx(
         'bg-white border border-stone-200 rounded-xl shadow-sm',
+        'dark:bg-stone-900 dark:border-stone-800',
         paddingClasses[padding],
-        hover && 'hover:border-stone-300 hover:shadow-md transition-all duration-150 cursor-pointer',
+        hover && 'hover:border-stone-300 hover:shadow-md dark:hover:border-stone-600 transition-all duration-150 cursor-pointer',
         onClick && 'cursor-pointer',
         className
       )}
@@ -43,11 +44,11 @@ interface StatCardProps {
 }
 
 const colorClasses = {
-  blue: { bg: 'bg-blue-50', text: 'text-blue-600', ring: 'ring-1 ring-blue-100' },
-  emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', ring: 'ring-1 ring-emerald-100' },
-  amber: { bg: 'bg-amber-50', text: 'text-amber-600', ring: 'ring-1 ring-amber-100' },
-  violet: { bg: 'bg-violet-50', text: 'text-violet-600', ring: 'ring-1 ring-violet-100' },
-  red: { bg: 'bg-red-50', text: 'text-red-600', ring: 'ring-1 ring-red-100' },
+  blue: { bg: 'bg-blue-50 dark:bg-blue-950/40', text: 'text-blue-600 dark:text-blue-400', ring: 'ring-1 ring-blue-100 dark:ring-blue-900/60' },
+  emerald: { bg: 'bg-emerald-50 dark:bg-emerald-950/40', text: 'text-emerald-600 dark:text-emerald-400', ring: 'ring-1 ring-emerald-100 dark:ring-emerald-900/60' },
+  amber: { bg: 'bg-amber-50 dark:bg-amber-950/40', text: 'text-amber-600 dark:text-amber-400', ring: 'ring-1 ring-amber-100 dark:ring-amber-900/60' },
+  violet: { bg: 'bg-violet-50 dark:bg-violet-950/40', text: 'text-violet-600 dark:text-violet-400', ring: 'ring-1 ring-violet-100 dark:ring-violet-900/60' },
+  red: { bg: 'bg-red-50 dark:bg-red-950/40', text: 'text-red-600 dark:text-red-400', ring: 'ring-1 ring-red-100 dark:ring-red-900/60' },
 };
 
 export function StatCard({ title, value, subtitle, icon, trend, color = 'blue' }: StatCardProps) {
@@ -56,9 +57,9 @@ export function StatCard({ title, value, subtitle, icon, trend, color = 'blue' }
     <Card>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm text-stone-500 font-medium">{title}</p>
-          <p className="mt-2 text-3xl font-bold text-stone-900">{value}</p>
-          {subtitle && <p className="mt-1 text-sm text-stone-400">{subtitle}</p>}
+          <p className="text-sm text-stone-500 dark:text-stone-400 font-medium">{title}</p>
+          <p className="mt-2 text-3xl font-bold text-stone-900 dark:text-stone-100">{value}</p>
+          {subtitle && <p className="mt-1 text-sm text-stone-400 dark:text-stone-500">{subtitle}</p>}
           {trend && (
             <div className="mt-3 flex items-center gap-1">
               <span className={clsx(
@@ -67,7 +68,7 @@ export function StatCard({ title, value, subtitle, icon, trend, color = 'blue' }
               )}>
                 {trend.value >= 0 ? '+' : ''}{trend.value}%
               </span>
-              <span className="text-xs text-stone-400">{trend.label}</span>
+              <span className="text-xs text-stone-400 dark:text-stone-500">{trend.label}</span>
             </div>
           )}
         </div>

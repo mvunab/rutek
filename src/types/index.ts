@@ -7,6 +7,13 @@ export interface Tenant {
   logo?: string;
   createdAt: string;
   active: boolean;
+  /** Datos de contacto / fiscales editables en Configuración */
+  legalName?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  region?: string;
 }
 
 // ─── Auth / Users ─────────────────────────────────────────────────────────────

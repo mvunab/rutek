@@ -15,11 +15,11 @@ interface EmptyStateProps {
 export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="p-4 bg-stone-100 rounded-2xl text-stone-400 mb-4">
+      <div className="p-4 bg-stone-100 dark:bg-stone-800 rounded-2xl text-stone-400 dark:text-stone-500 mb-4">
         {icon}
       </div>
-      <h3 className="text-base font-semibold text-stone-700 mb-1">{title}</h3>
-      {description && <p className="text-sm text-stone-400 max-w-sm mb-6">{description}</p>}
+      <h3 className="text-base font-semibold text-stone-700 dark:text-stone-200 mb-1">{title}</h3>
+      {description && <p className="text-sm text-stone-400 dark:text-stone-500 max-w-sm mb-6">{description}</p>}
       {action && (
         <Button onClick={action.onClick} icon={action.icon} size="sm">
           {action.label}

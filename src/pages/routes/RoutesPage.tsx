@@ -21,12 +21,12 @@ const statusConfig: Record<DeliveryStatus, {
   dot: string;
   icon: React.ReactNode;
 }> = {
-  entregado:    { label: 'Entregado',    bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500', icon: <CheckCircle2 size={12} /> },
-  en_ruta:      { label: 'En Ruta',      bg: 'bg-blue-100',    text: 'text-blue-800',    dot: 'bg-blue-500',    icon: <Truck size={12} /> },
-  pendiente:    { label: 'Pendiente',    bg: 'bg-stone-100',   text: 'text-stone-600',   dot: 'bg-stone-400',   icon: <Circle size={12} /> },
-  reprogramado: { label: 'Reprogramado', bg: 'bg-amber-100',   text: 'text-amber-800',   dot: 'bg-amber-500',   icon: <RotateCcw size={12} /> },
-  rechazado:    { label: 'Rechazado',    bg: 'bg-red-100',     text: 'text-red-800',     dot: 'bg-red-500',     icon: <XCircle size={12} /> },
-  parcial:      { label: 'Parcial',      bg: 'bg-violet-100',  text: 'text-violet-800',  dot: 'bg-violet-500',  icon: <Clock size={12} /> },
+  entregado:    { label: 'Entregado',    bg: 'bg-emerald-100 dark:bg-emerald-950/55', text: 'text-emerald-800 dark:text-emerald-200', dot: 'bg-emerald-500', icon: <CheckCircle2 size={12} /> },
+  en_ruta:      { label: 'En Ruta',      bg: 'bg-blue-100 dark:bg-blue-950/55',       text: 'text-blue-800 dark:text-blue-200',       dot: 'bg-blue-500',    icon: <Truck size={12} /> },
+  pendiente:    { label: 'Pendiente',    bg: 'bg-stone-100 dark:bg-stone-800',        text: 'text-stone-600 dark:text-stone-300',     dot: 'bg-stone-400',   icon: <Circle size={12} /> },
+  reprogramado: { label: 'Reprogramado', bg: 'bg-amber-100 dark:bg-amber-950/55',      text: 'text-amber-800 dark:text-amber-200',     dot: 'bg-amber-500',   icon: <RotateCcw size={12} /> },
+  rechazado:    { label: 'Rechazado',    bg: 'bg-red-100 dark:bg-red-950/55',          text: 'text-red-800 dark:text-red-200',         dot: 'bg-red-500',     icon: <XCircle size={12} /> },
+  parcial:      { label: 'Parcial',      bg: 'bg-violet-100 dark:bg-violet-950/55',     text: 'text-violet-800 dark:text-violet-200',   dot: 'bg-violet-500',  icon: <Clock size={12} /> },
 };
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
@@ -47,9 +47,9 @@ function StatusBadge({ status }: { status: DeliveryStatus }) {
 type SortDir = 'asc' | 'desc' | null;
 
 function SortIcon({ dir }: { dir: SortDir }) {
-  if (dir === 'asc')  return <ChevronUp size={12} className="text-primary-600" />;
-  if (dir === 'desc') return <ChevronDown size={12} className="text-primary-600" />;
-  return <ChevronsUpDown size={12} className="text-stone-300 group-hover:text-stone-400" />;
+  if (dir === 'asc')  return <ChevronUp size={12} className="text-primary-600 dark:text-primary-400" />;
+  if (dir === 'desc') return <ChevronDown size={12} className="text-primary-600 dark:text-primary-400" />;
+  return <ChevronsUpDown size={12} className="text-stone-300 dark:text-stone-600 group-hover:text-stone-400 dark:group-hover:text-stone-500" />;
 }
 
 // ─── Column header ────────────────────────────────────────────────────────────
@@ -67,8 +67,8 @@ function ColHeader({
     <th
       onClick={() => onSort(col)}
       className={clsx(
-        'group px-3 py-2.5 text-left text-xs font-semibold text-stone-500 uppercase tracking-wide',
-        'cursor-pointer select-none hover:text-stone-700 whitespace-nowrap border-b border-stone-200',
+        'group px-3 py-2.5 text-left text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide',
+        'cursor-pointer select-none hover:text-stone-700 dark:hover:text-stone-200 whitespace-nowrap border-b border-stone-200 dark:border-stone-700',
         className
       )}
     >
@@ -125,7 +125,7 @@ function DeliveryDetailModal({ record, onClose }: { record: DeliveryRecord; onCl
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <StatusBadge status={record.estado} />
-          <span className="text-xs text-stone-400">Zona: <strong className="text-stone-600">{record.zona}</strong></span>
+          <span className="text-xs text-stone-400 dark:text-stone-500">Zona: <strong className="text-stone-600 dark:text-stone-300">{record.zona}</strong></span>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -139,9 +139,9 @@ function DeliveryDetailModal({ record, onClose }: { record: DeliveryRecord; onCl
             ['Bultos',     String(record.bultos)],
             ['RUT',        record.rut],
           ].map(([k, v]) => (
-            <div key={k} className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">
-              <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">{k}</p>
-              <p className="text-sm font-medium text-stone-800 mt-0.5">{v}</p>
+            <div key={k} className="bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2">
+              <p className="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide">{k}</p>
+              <p className="text-sm font-medium text-stone-800 dark:text-stone-100 mt-0.5">{v}</p>
             </div>
           ))}
         </div>
@@ -152,27 +152,27 @@ function DeliveryDetailModal({ record, onClose }: { record: DeliveryRecord; onCl
             ['Vehículo',   record.vehiculo || '—'],
             ['Peoneta',    record.peoneta || '—'],
           ].map(([k, v]) => (
-            <div key={k} className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">
-              <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">{k}</p>
-              <p className="text-sm font-medium text-stone-800 mt-0.5">{v}</p>
+            <div key={k} className="bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2">
+              <p className="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide">{k}</p>
+              <p className="text-sm font-medium text-stone-800 dark:text-stone-100 mt-0.5">{v}</p>
             </div>
           ))}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">
-            <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Recepción</p>
-            <p className="text-sm font-medium text-stone-800 mt-0.5">{record.recepcion || '—'}</p>
+          <div className="bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2">
+            <p className="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide">Recepción</p>
+            <p className="text-sm font-medium text-stone-800 dark:text-stone-100 mt-0.5">{record.recepcion || '—'}</p>
           </div>
-          <div className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">
-            <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Fecha / Hora</p>
-            <p className="text-sm font-medium text-stone-800 mt-0.5">{record.fechaHora || '—'}</p>
+          <div className="bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2">
+            <p className="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide">Fecha / Hora</p>
+            <p className="text-sm font-medium text-stone-800 dark:text-stone-100 mt-0.5">{record.fechaHora || '—'}</p>
           </div>
         </div>
 
         {record.obs && (
-          <div className={clsx('border rounded-lg px-3 py-2', cfg.bg, 'border-stone-200')}>
-            <p className="text-[10px] font-semibold text-stone-500 uppercase tracking-wide">Observaciones</p>
+          <div className={clsx('border rounded-lg px-3 py-2', cfg.bg, 'border-stone-200 dark:border-stone-700')}>
+            <p className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">Observaciones</p>
             <p className={clsx('text-sm font-medium mt-0.5', cfg.text)}>{record.obs}</p>
           </div>
         )}
@@ -295,14 +295,14 @@ export function RoutesPage() {
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all',
                 active
                   ? clsx(cfg.bg, cfg.text, 'border-transparent shadow-sm')
-                  : 'bg-white border-stone-200 text-stone-500 hover:border-stone-300 hover:text-stone-700'
+                  : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-600 text-stone-500 dark:text-stone-400 hover:border-stone-300 dark:hover:border-stone-500 hover:text-stone-700 dark:hover:text-stone-200'
               )}
             >
               <span className={clsx('h-1.5 w-1.5 rounded-full', cfg.dot)} />
               {cfg.label}
               <span className={clsx(
                 'ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold',
-                active ? 'bg-white/60' : 'bg-stone-100 text-stone-500'
+                active ? 'bg-white/60 dark:bg-black/25 dark:text-inherit' : 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400'
               )}>
                 {counts[s] ?? 0}
               </span>
@@ -310,8 +310,8 @@ export function RoutesPage() {
           );
         })}
         <div className="flex-1" />
-        <span className="text-xs text-stone-400">
-          {selected.size > 0 && <span className="font-semibold text-stone-700 mr-1">{selected.size} seleccionados ·</span>}
+        <span className="text-xs text-stone-400 dark:text-stone-500">
+          {selected.size > 0 && <span className="font-semibold text-stone-700 dark:text-stone-300 mr-1">{selected.size} seleccionados ·</span>}
           {filtered.length} de {records.length} registros
         </span>
       </div>
@@ -319,13 +319,13 @@ export function RoutesPage() {
       {/* Toolbar */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" />
           <input
             type="text"
-            placeholder="Buscar pedido, cliente, chofer..."
+            placeholder="Buscar pedido, cliente, chofer…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-2 bg-white border border-stone-300 rounded-lg text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
+            className="w-full pl-8 pr-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
           />
         </div>
 
@@ -356,7 +356,7 @@ export function RoutesPage() {
 
       {/* Expanded filters */}
       {showFilters && (
-        <div className="flex items-center gap-3 p-3 bg-white border border-stone-200 rounded-xl shadow-sm">
+        <div className="flex items-center gap-3 p-3 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-xl shadow-sm">
           <Select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value as DeliveryStatus | 'all')}
@@ -383,18 +383,18 @@ export function RoutesPage() {
           description="No se encontraron entregas con los filtros aplicados"
         />
       ) : (
-        <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse min-w-[1200px]">
-              <thead className="bg-stone-50">
+              <thead className="bg-stone-50 dark:bg-stone-800/90">
                 <tr>
                   {/* Checkbox */}
-                  <th className="w-10 px-3 py-2.5 border-b border-stone-200">
+                  <th className="w-10 px-3 py-2.5 border-b border-stone-200 dark:border-stone-700">
                     <input
                       type="checkbox"
                       checked={allSelected}
                       onChange={toggleAll}
-                      className="w-3.5 h-3.5 rounded border-stone-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      className="w-3.5 h-3.5 rounded border-stone-300 dark:border-stone-600 dark:bg-stone-900 text-primary-600 focus:ring-primary-500 cursor-pointer"
                     />
                   </th>
                   <ColHeader label="Estado"     col="estado"    {...colProps} className="min-w-[120px]" />
@@ -414,7 +414,7 @@ export function RoutesPage() {
                   <ColHeader label="Obs."       col="obs"       {...colProps} className="min-w-[140px]" />
                   <ColHeader label="Zona"       col="zona"      {...colProps} className="min-w-[100px]" />
                   {/* Actions */}
-                  <th className="w-16 px-3 py-2.5 border-b border-stone-200" />
+                  <th className="w-16 px-3 py-2.5 border-b border-stone-200 dark:border-stone-700" />
                 </tr>
               </thead>
               <tbody>
@@ -424,9 +424,13 @@ export function RoutesPage() {
                     <tr
                       key={row.id}
                       className={clsx(
-                        'border-b border-stone-100 transition-colors',
-                        isSelected ? 'bg-primary-50' : idx % 2 === 0 ? 'bg-white' : 'bg-stone-50/50',
-                        'hover:bg-primary-50/60'
+                        'group border-b border-stone-100 dark:border-stone-800 transition-colors',
+                        isSelected
+                          ? 'bg-primary-50 dark:bg-primary-950/35'
+                          : idx % 2 === 0
+                            ? 'bg-white dark:bg-stone-900'
+                            : 'bg-stone-50/50 dark:bg-stone-900/70',
+                        'hover:bg-primary-50/60 dark:hover:bg-primary-950/25'
                       )}
                     >
                       {/* Checkbox */}
@@ -435,7 +439,7 @@ export function RoutesPage() {
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleRow(row.id)}
-                          className="w-3.5 h-3.5 rounded border-stone-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                          className="w-3.5 h-3.5 rounded border-stone-300 dark:border-stone-600 dark:bg-stone-900 text-primary-600 focus:ring-primary-500 cursor-pointer"
                         />
                       </td>
 
@@ -446,88 +450,88 @@ export function RoutesPage() {
 
                       {/* Cliente */}
                       <td className="px-3 py-2.5">
-                        <span className="text-xs font-semibold text-stone-700">{row.cliente}</span>
+                        <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">{row.cliente}</span>
                       </td>
 
                       {/* Entrega */}
                       <td className="px-3 py-2.5">
-                        <span className="text-xs text-stone-600">{row.entrega}</span>
+                        <span className="text-xs text-stone-600 dark:text-stone-300">{row.entrega}</span>
                       </td>
 
                       {/* Pedido */}
                       <td className="px-3 py-2.5">
-                        <span className="font-mono text-xs text-stone-700">{row.pedido}</span>
+                        <span className="font-mono text-xs text-stone-700 dark:text-stone-200">{row.pedido}</span>
                       </td>
 
                       {/* Factura */}
                       <td className="px-3 py-2.5">
-                        <span className="font-mono text-xs text-stone-500">{row.factura || '—'}</span>
+                        <span className="font-mono text-xs text-stone-500 dark:text-stone-400">{row.factura || '—'}</span>
                       </td>
 
                       {/* Tipo */}
                       <td className="px-3 py-2.5 text-center">
-                        <span className="text-xs font-bold text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded">{row.tipo}</span>
+                        <span className="text-xs font-bold text-stone-500 dark:text-stone-400 bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded">{row.tipo}</span>
                       </td>
 
                       {/* Ref */}
                       <td className="px-3 py-2.5">
-                        <span className="font-mono text-xs text-stone-500">{row.ref}</span>
+                        <span className="font-mono text-xs text-stone-500 dark:text-stone-400">{row.ref}</span>
                       </td>
 
                       {/* Bultos */}
                       <td className="px-3 py-2.5 text-center">
-                        <span className="text-xs font-semibold text-stone-700">{row.bultos}</span>
+                        <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">{row.bultos}</span>
                       </td>
 
                       {/* Rut */}
                       <td className="px-3 py-2.5">
-                        <span className="font-mono text-xs text-stone-500">{row.rut}</span>
+                        <span className="font-mono text-xs text-stone-500 dark:text-stone-400">{row.rut}</span>
                       </td>
 
                       {/* Recepción */}
                       <td className="px-3 py-2.5">
-                        <span className="text-xs text-stone-600">{row.recepcion || <span className="text-stone-300">—</span>}</span>
+                        <span className="text-xs text-stone-600 dark:text-stone-300">{row.recepcion || <span className="text-stone-300 dark:text-stone-600">—</span>}</span>
                       </td>
 
                       {/* Fecha/Hora */}
                       <td className="px-3 py-2.5">
-                        <span className="text-xs text-stone-500 whitespace-nowrap">{row.fechaHora || <span className="text-stone-300">—</span>}</span>
+                        <span className="text-xs text-stone-500 dark:text-stone-400 whitespace-nowrap">{row.fechaHora || <span className="text-stone-300 dark:text-stone-600">—</span>}</span>
                       </td>
 
                       {/* Chofer */}
                       <td className="px-3 py-2.5">
                         {row.chofer ? (
                           <div className="flex items-center gap-1.5">
-                            <div className="w-5 h-5 bg-primary-100 rounded-full flex items-center justify-center text-[10px] font-bold text-primary-700 flex-shrink-0">
+                            <div className="w-5 h-5 bg-primary-100 dark:bg-primary-900/80 rounded-full flex items-center justify-center text-[10px] font-bold text-primary-700 dark:text-primary-300 flex-shrink-0">
                               {row.chofer.charAt(0)}
                             </div>
-                            <span className="text-xs text-stone-700 whitespace-nowrap">{row.chofer}</span>
+                            <span className="text-xs text-stone-700 dark:text-stone-200 whitespace-nowrap">{row.chofer}</span>
                           </div>
-                        ) : <span className="text-stone-300 text-xs">—</span>}
+                        ) : <span className="text-stone-300 dark:text-stone-600 text-xs">—</span>}
                       </td>
 
                       {/* Vehículo */}
                       <td className="px-3 py-2.5">
                         {row.vehiculo ? (
-                          <span className="font-mono text-xs font-semibold text-stone-600 bg-stone-100 px-1.5 py-0.5 rounded">
+                          <span className="font-mono text-xs font-semibold text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded">
                             {row.vehiculo}
                           </span>
-                        ) : <span className="text-stone-300 text-xs">—</span>}
+                        ) : <span className="text-stone-300 dark:text-stone-600 text-xs">—</span>}
                       </td>
 
                       {/* Peoneta */}
                       <td className="px-3 py-2.5">
-                        <span className="text-xs text-stone-500">{row.peoneta || <span className="text-stone-300">—</span>}</span>
+                        <span className="text-xs text-stone-500 dark:text-stone-400">{row.peoneta || <span className="text-stone-300 dark:text-stone-600">—</span>}</span>
                       </td>
 
                       {/* Obs */}
                       <td className="px-3 py-2.5 max-w-[160px]">
-                        <span className="text-xs text-stone-500 truncate block">{row.obs || <span className="text-stone-300">—</span>}</span>
+                        <span className="text-xs text-stone-500 dark:text-stone-400 truncate block">{row.obs || <span className="text-stone-300 dark:text-stone-600">—</span>}</span>
                       </td>
 
                       {/* Zona */}
                       <td className="px-3 py-2.5">
-                        <span className="text-xs font-medium text-stone-600 bg-stone-100 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        <span className="text-xs font-medium text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 px-2 py-0.5 rounded-full whitespace-nowrap">
                           {row.zona}
                         </span>
                       </td>
@@ -537,13 +541,13 @@ export function RoutesPage() {
                         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => setDetailRecord(row)}
-                            className="p-1 rounded text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+                            className="p-1 rounded text-stone-400 dark:text-stone-500 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
                             title="Ver detalle"
                           >
                             <Eye size={13} />
                           </button>
                           <button
-                            className="p-1 rounded text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+                            className="p-1 rounded text-stone-400 dark:text-stone-500 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
                             title="Editar"
                           >
                             <Edit2 size={13} />
@@ -553,7 +557,7 @@ export function RoutesPage() {
                         <div className="flex items-center gap-0.5">
                           <button
                             onClick={() => setDetailRecord(row)}
-                            className="p-1 rounded text-stone-300 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+                            className="p-1 rounded text-stone-300 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
                           >
                             <Eye size={13} />
                           </button>
@@ -567,18 +571,18 @@ export function RoutesPage() {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between px-4 py-2.5 border-t border-stone-100 bg-stone-50">
-            <span className="text-xs text-stone-400">
-              Mostrando <strong className="text-stone-600">{filtered.length}</strong> de{' '}
-              <strong className="text-stone-600">{records.length}</strong> entregas
-              {selected.size > 0 && <> · <strong className="text-primary-600">{selected.size}</strong> seleccionadas</>}
+          <div className="flex items-center justify-between px-4 py-2.5 border-t border-stone-100 dark:border-stone-800 bg-stone-50 dark:bg-stone-800/80">
+            <span className="text-xs text-stone-400 dark:text-stone-500">
+              Mostrando <strong className="text-stone-600 dark:text-stone-300">{filtered.length}</strong> de{' '}
+              <strong className="text-stone-600 dark:text-stone-300">{records.length}</strong> entregas
+              {selected.size > 0 && <> · <strong className="text-primary-600 dark:text-primary-400">{selected.size}</strong> seleccionadas</>}
             </span>
-            <div className="flex items-center gap-3 text-xs text-stone-400">
-              <span>Total bultos: <strong className="text-stone-700">{filtered.reduce((s, r) => s + r.bultos, 0)}</strong></span>
+            <div className="flex items-center gap-3 text-xs text-stone-400 dark:text-stone-500">
+              <span>Total bultos: <strong className="text-stone-700 dark:text-stone-200">{filtered.reduce((s, r) => s + r.bultos, 0)}</strong></span>
               <span>·</span>
               <span>
                 Entregados:{' '}
-                <strong className="text-emerald-700">{filtered.filter(r => r.estado === 'entregado').length}</strong>
+                <strong className="text-emerald-700 dark:text-emerald-400">{filtered.filter(r => r.estado === 'entregado').length}</strong>
               </span>
             </div>
           </div>

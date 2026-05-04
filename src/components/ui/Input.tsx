@@ -25,7 +25,7 @@ export function Input({
   return (
     <div className={clsx('flex flex-col gap-1.5', containerClassName)}>
       {label && (
-        <label htmlFor={inputId} className="text-sm font-medium text-stone-700">
+        <label htmlFor={inputId} className="text-sm font-medium text-stone-700 dark:text-stone-300">
           {label}
         </label>
       )}
@@ -39,9 +39,10 @@ export function Input({
           id={inputId}
           className={clsx(
             'w-full bg-stone-50 border rounded-lg px-3 py-2 text-sm text-stone-900',
+            'dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-500',
             'placeholder:text-stone-400 transition-all duration-150',
             'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-            error ? 'border-red-400' : 'border-stone-300',
+            error ? 'border-red-400 dark:border-red-500' : 'border-stone-300 dark:border-stone-600',
             leftIcon && 'pl-9',
             rightIcon && 'pr-9',
             className
@@ -54,8 +55,8 @@ export function Input({
           </div>
         )}
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      {hint && !error && <p className="text-xs text-stone-400">{hint}</p>}
+      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {hint && !error && <p className="text-xs text-stone-400 dark:text-stone-500">{hint}</p>}
     </div>
   );
 }
@@ -82,7 +83,7 @@ export function Select({
   return (
     <div className={clsx('flex flex-col gap-1.5', containerClassName)}>
       {label && (
-        <label htmlFor={selectId} className="text-sm font-medium text-stone-700">
+        <label htmlFor={selectId} className="text-sm font-medium text-stone-700 dark:text-stone-300">
           {label}
         </label>
       )}
@@ -90,9 +91,10 @@ export function Select({
         id={selectId}
         className={clsx(
           'w-full bg-stone-50 border rounded-lg px-3 py-2 text-sm text-stone-900',
+          'dark:bg-stone-900 dark:text-stone-100 dark:border-stone-600',
           'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
           'transition-all duration-150 cursor-pointer',
-          error ? 'border-red-400' : 'border-stone-300',
+          error ? 'border-red-400 dark:border-red-500' : 'border-stone-300',
           className
         )}
         {...props}
@@ -103,8 +105,8 @@ export function Select({
           </option>
         ))}
       </select>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      {hint && !error && <p className="text-xs text-stone-400">{hint}</p>}
+      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {hint && !error && <p className="text-xs text-stone-400 dark:text-stone-500">{hint}</p>}
     </div>
   );
 }
@@ -129,7 +131,7 @@ export function Textarea({
   return (
     <div className={clsx('flex flex-col gap-1.5', containerClassName)}>
       {label && (
-        <label htmlFor={areaId} className="text-sm font-medium text-stone-700">
+        <label htmlFor={areaId} className="text-sm font-medium text-stone-700 dark:text-stone-300">
           {label}
         </label>
       )}
@@ -137,15 +139,16 @@ export function Textarea({
         id={areaId}
         className={clsx(
           'w-full bg-stone-50 border rounded-lg px-3 py-2 text-sm text-stone-900',
+          'dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-500',
           'placeholder:text-stone-400 resize-none transition-all duration-150',
           'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-          error ? 'border-red-400' : 'border-stone-300',
+          error ? 'border-red-400 dark:border-red-500' : 'border-stone-300 dark:border-stone-600',
           className
         )}
         {...props}
       />
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      {hint && !error && <p className="text-xs text-stone-400">{hint}</p>}
+      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {hint && !error && <p className="text-xs text-stone-400 dark:text-stone-500">{hint}</p>}
     </div>
   );
 }

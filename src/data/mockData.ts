@@ -11,6 +11,12 @@ export const mockTenant: Tenant = {
   plan: 'professional',
   createdAt: '2024-01-15',
   active: true,
+  legalName: 'Transportes y Logística TransLogística SpA',
+  email: 'contacto@translogistica.cl',
+  phone: '+56 2 2345 6789',
+  address: 'Av. Libertador 1234, oficina 502',
+  city: 'Santiago',
+  region: 'Metropolitana',
 };
 
 // ─── Users ────────────────────────────────────────────────────────────────────
