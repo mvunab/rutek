@@ -20,7 +20,7 @@ const navItems: NavItem[] = [
   { to: '/dashboard',    icon: <LayoutDashboard size={15} />, label: 'Back Office',         roles: ['admin', 'operator'] },
   { to: '/rutas',        icon: <Truck size={15} />,           label: 'Admin. de Rutas',     roles: ['admin', 'operator', 'driver'] },
   { to: '/pedidos',      icon: <Package size={15} />,         label: 'Pedidos',             roles: ['admin', 'operator', 'driver', 'client'] },
-  { to: '/clientes',     icon: <Users size={15} />,           label: 'Personas / Recepción',roles: ['admin', 'operator'] },
+  { to: '/clientes',     icon: <Users size={15} />,           label: 'Clientes',            roles: ['admin', 'operator'] },
   { to: '/usuarios',     icon: <UserCircle2 size={15} />,     label: 'Usuarios Sistema',    roles: ['admin'] },
 ];
 

@@ -1,9 +1,9 @@
 import {
   Package, Truck, Users, Map, TrendingUp, Clock,
   CheckCircle2, AlertCircle, ArrowRight,
-  Route, DollarSign, UserCheck, Car, UserCog,
-  PersonStanding, Calculator, Building2, ToggleLeft,
-  MapPin, ShieldCheck, Camera, ChevronRight
+  Route, UserCheck,
+  PersonStanding, Building2,
+  ShieldCheck, Camera, ChevronRight
 } from 'lucide-react';
 import {
   AreaChart, Area, PieChart, Pie, Cell,
@@ -39,25 +39,12 @@ function BackOfficeMenu() {
       accent: 'bg-emerald-100',
       iconColor: 'text-emerald-600',
     },
-    {
-      label: 'Rutas Valorizadas',
-      description: 'Costos y valorización por ruta',
-      icon: <DollarSign size={18} />,
-      soon: true,
-      accent: 'bg-sky-100',
-      iconColor: 'text-sky-500',
-    },
   ];
 
   const administracion: MenuItem[] = [
-    { label: 'Mis Repartidores',   icon: <UserCheck size={15} />,    to: '/usuarios',  accent: 'bg-orange-100', iconColor: 'text-orange-500' },
-    { label: 'Mis Vehículos',      icon: <Car size={15} />,          soon: true,       accent: 'bg-orange-100', iconColor: 'text-orange-400' },
-    { label: 'Mis Peonetas',       icon: <PersonStanding size={15}/>, to: '/peonetas', accent: 'bg-orange-100', iconColor: 'text-orange-500' },
-    { label: 'Personas Recepción', icon: <UserCog size={15} />,      to: '/clientes',  accent: 'bg-amber-100',  iconColor: 'text-amber-600' },
-    { label: 'Admin. Valorización',icon: <Calculator size={15} />,   soon: true,       accent: 'bg-sky-100',    iconColor: 'text-sky-400' },
-    { label: 'Mis Clientes',       icon: <Building2 size={15} />,    to: '/clientes',  accent: 'bg-red-100',    iconColor: 'text-red-500' },
-    { label: 'Admin. Estados',     icon: <ToggleLeft size={15} />,   soon: true,       accent: 'bg-blue-100',   iconColor: 'text-blue-400' },
-    { label: 'Zonas',              icon: <MapPin size={15} />,       soon: true,       accent: 'bg-sky-100',    iconColor: 'text-sky-400' },
+    { label: 'Repartidores',       icon: <UserCheck size={15} />,     to: '/usuarios',  accent: 'bg-orange-100', iconColor: 'text-orange-500' },
+    { label: 'Peonetas',           icon: <PersonStanding size={15}/>, to: '/peonetas', accent: 'bg-orange-100', iconColor: 'text-orange-500' },
+    { label: 'Clientes',           icon: <Building2 size={15} />,      to: '/clientes',  accent: 'bg-red-100',    iconColor: 'text-red-500' },
     { label: 'Usuarios Sistema',   icon: <ShieldCheck size={15} />,  to: '/usuarios',  accent: 'bg-violet-100', iconColor: 'text-violet-500' },
     { label: 'Admin. Fotos',       icon: <Camera size={15} />,       to: '/fotos',     accent: 'bg-blue-100',   iconColor: 'text-blue-600' },
   ];

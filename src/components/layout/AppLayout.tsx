@@ -4,12 +4,12 @@ import { useAuthStore } from '../../store/useAuthStore';
 
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   '/dashboard':      { title: 'Dashboard',              subtitle: 'Resumen operacional en tiempo real' },
-  '/clientes':       { title: 'Personas / Recepción',   subtitle: 'Administra y consulta tu cartera de clientes' },
+  '/clientes':       { title: 'Clientes',               subtitle: 'Administra y consulta tu cartera de clientes' },
   '/pedidos':        { title: 'Gestión de Pedidos',     subtitle: 'Crea, modifica y rastrea pedidos' },
   '/rutas':          { title: 'Admin. de Rutas',        subtitle: 'Planifica y monitorea rutas de distribución' },
   '/usuarios':       { title: 'Usuarios Sistema',       subtitle: 'Gestiona los usuarios de la plataforma' },
   '/fotos':          { title: 'Admin. Fotos',           subtitle: 'Fotografías de inspección y entrega desde la app móvil' },
-  '/peonetas':       { title: 'Mis Peonetas',           subtitle: 'Asistentes de entrega asignables a rutas' },
+  '/peonetas':       { title: 'Peonetas',               subtitle: 'Asistentes de entrega asignables a rutas' },
   '/configuracion':  { title: 'Configuración',          subtitle: 'Tema de la interfaz y datos de la empresa' },
 };
 

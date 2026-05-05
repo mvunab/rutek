@@ -125,7 +125,6 @@ function DeliveryDetailModal({ record, onClose }: { record: DeliveryRecord; onCl
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <StatusBadge status={record.estado} />
-          <span className="text-xs text-stone-400 dark:text-stone-500">Zona: <strong className="text-stone-600 dark:text-stone-300">{record.zona}</strong></span>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -192,10 +191,10 @@ export function RoutesPage() {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<DeliveryStatus | 'all'>('all');
-  const [filterZona, setFilterZona] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [detailRecord, setDetailRecord] = useState<DeliveryRecord | null>(null);
   const [showNewRoute, setShowNewRoute] = useState(false);
+  const [showStatusManager, setShowStatusManager] = useState(false);
 
   // Sort handler
   const handleSort = (col: keyof DeliveryRecord) => {
@@ -209,12 +208,9 @@ export function RoutesPage() {
   };
 
   // Derived data
-  const zonas = useMemo(() => ['all', ...Array.from(new Set(records.map(r => r.zona)))], [records]);
-
   const filtered = useMemo(() => {
     let data = records.filter(r => {
       if (filterStatus !== 'all' && r.estado !== filterStatus) return false;
-      if (filterZona !== 'all' && r.zona !== filterZona) return false;
       if (search) {
         const t = search.toLowerCase();
         return (
@@ -223,8 +219,7 @@ export function RoutesPage() {
           r.pedido.includes(t) ||
           r.factura.includes(t) ||
           r.chofer.toLowerCase().includes(t) ||
-          r.vehiculo.toLowerCase().includes(t) ||
-          r.zona.toLowerCase().includes(t)
+          r.vehiculo.toLowerCase().includes(t)
         );
       }
       return true;
@@ -239,7 +234,7 @@ export function RoutesPage() {
       });
     }
     return data;
-  }, [records, filterStatus, filterZona, search, sortCol, sortDir]);
+  }, [records, filterStatus, search, sortCol, sortDir]);
 
   // Selection
   const allSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id));
@@ -276,8 +271,6 @@ export function RoutesPage() {
     ...statuses.map(s => ({ value: s, label: statusConfig[s].label })),
   ];
 
-  const zonaOptions = zonas.map(z => ({ value: z, label: z === 'all' ? 'Todas las zonas' : z }));
-
   const colProps = { sortCol, sortDir, onSort: handleSort };
 
   return (
@@ -309,6 +302,15 @@ export function RoutesPage() {
             </button>
           );
         })}
+        <button
+          type="button"
+          onClick={() => setShowStatusManager(true)}
+          className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-500 dark:text-stone-400 hover:border-stone-300 dark:hover:border-stone-500 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+          title="Gestionar estados"
+          aria-label="Gestionar estados"
+        >
+          <Plus size={14} />
+        </button>
         <div className="flex-1" />
         <span className="text-xs text-stone-400 dark:text-stone-500">
           {selected.size > 0 && <span className="font-semibold text-stone-700 dark:text-stone-300 mr-1">{selected.size} seleccionados ·</span>}
@@ -336,7 +338,6 @@ export function RoutesPage() {
           icon={<SlidersHorizontal size={14} />}
         >
           Filtros
-          {(filterZona !== 'all') && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-primary-500" />}
         </Button>
 
         <Button variant="secondary" size="sm" icon={<RefreshCw size={14} />}>
@@ -363,13 +364,7 @@ export function RoutesPage() {
             options={statusOptions}
             containerClassName="w-44"
           />
-          <Select
-            value={filterZona}
-            onChange={e => setFilterZona(e.target.value)}
-            options={zonaOptions}
-            containerClassName="w-40"
-          />
-          <Button variant="ghost" size="sm" onClick={() => { setFilterStatus('all'); setFilterZona('all'); setShowFilters(false); }}>
+          <Button variant="ghost" size="sm" onClick={() => { setFilterStatus('all'); setShowFilters(false); }}>
             Limpiar
           </Button>
         </div>
@@ -412,7 +407,6 @@ export function RoutesPage() {
                   <ColHeader label="Vehículo"   col="vehiculo"  {...colProps} className="min-w-[90px]" />
                   <ColHeader label="Peoneta"    col="peoneta"   {...colProps} className="min-w-[110px]" />
                   <ColHeader label="Obs."       col="obs"       {...colProps} className="min-w-[140px]" />
-                  <ColHeader label="Zona"       col="zona"      {...colProps} className="min-w-[100px]" />
                   {/* Actions */}
                   <th className="w-16 px-3 py-2.5 border-b border-stone-200 dark:border-stone-700" />
                 </tr>
@@ -529,13 +523,6 @@ export function RoutesPage() {
                         <span className="text-xs text-stone-500 dark:text-stone-400 truncate block">{row.obs || <span className="text-stone-300 dark:text-stone-600">—</span>}</span>
                       </td>
 
-                      {/* Zona */}
-                      <td className="px-3 py-2.5">
-                        <span className="text-xs font-medium text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-                          {row.zona}
-                        </span>
-                      </td>
-
                       {/* Actions */}
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -597,6 +584,31 @@ export function RoutesPage() {
       {/* New route modal */}
       <Modal open={showNewRoute} onClose={() => setShowNewRoute(false)} title="Crear nueva ruta" size="md">
         <RouteForm onSubmit={handleAddRoute} onCancel={() => setShowNewRoute(false)} submitLabel="Crear ruta" />
+      </Modal>
+
+      {/* Status manager modal */}
+      <Modal
+        open={showStatusManager}
+        onClose={() => setShowStatusManager(false)}
+        title="Gestión de estados"
+        description="Administra los estados operativos desde Administrador de Rutas"
+        size="md"
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-stone-600 dark:text-stone-300">
+            Próximamente podrás crear y configurar nuevos estados desde esta vista.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {statuses.map((status) => (
+              <StatusBadge key={status} status={status} />
+            ))}
+          </div>
+          <div className="flex justify-end pt-2">
+            <Button variant="ghost" onClick={() => setShowStatusManager(false)}>
+              Cerrar
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
