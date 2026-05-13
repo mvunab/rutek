@@ -1,19 +1,22 @@
 import { create } from 'zustand';
 import type { Order, OrderFilters, OrderStatus } from '../types';
-import { mockOrders } from '../data/mockData';
+import { api, isNetworkError } from '../lib/api';
 
 interface OrderStore {
   orders: Order[];
   selectedOrder: Order | null;
   filters: OrderFilters;
+  loading: boolean;
+  loaded: boolean;
+  fetchOrders: () => Promise<void>;
   setFilters: (filters: Partial<OrderFilters>) => void;
   resetFilters: () => void;
   selectOrder: (order: Order | null) => void;
-  addOrder: (order: Omit<Order, 'id' | 'code' | 'createdAt' | 'updatedAt' | 'tenantId'>) => void;
-  updateOrder: (id: string, data: Partial<Order>) => void;
-  updateOrderStatus: (id: string, status: OrderStatus) => void;
-  assignToRoute: (orderId: string, routeId: string) => void;
-  deleteOrder: (id: string) => void;
+  addOrder: (order: Omit<Order, 'id' | 'code' | 'createdAt' | 'updatedAt' | 'tenantId'>) => Promise<void>;
+  updateOrder: (id: string, data: Partial<Order>) => Promise<void>;
+  updateOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
+  assignToRoute: (orderId: string, routeId: string) => Promise<void>;
+  deleteOrder: (id: string) => Promise<void>;
   getFilteredOrders: () => Order[];
 }
 
@@ -24,9 +27,28 @@ const defaultFilters: OrderFilters = {
 };
 
 export const useOrderStore = create<OrderStore>((set, get) => ({
-  orders: mockOrders,
+  orders: [],
   selectedOrder: null,
   filters: defaultFilters,
+  loading: false,
+  loaded: false,
+
+  fetchOrders: async () => {
+    set({ loading: true });
+    try {
+      const data = await api.get<Order[]>('/orders');
+      set({ orders: Array.isArray(data) ? data : [], loaded: true });
+    } catch (err) {
+      if (isNetworkError(err)) {
+        set({ orders: [] });
+        return;
+      }
+      // Endpoint no disponible o error → lista vacía
+      set({ orders: [], loaded: true });
+    } finally {
+      set({ loading: false });
+    }
+  },
 
   setFilters: (filters) =>
     set((state) => ({ filters: { ...state.filters, ...filters } })),
@@ -35,47 +57,51 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
 
   selectOrder: (order) => set({ selectedOrder: order }),
 
-  addOrder: (data) => {
-    const count = get().orders.length + 1;
-    const code = `PED-2024-${String(count).padStart(4, '0')}`;
-    const newOrder: Order = {
-      ...data,
-      id: `order-${Date.now()}`,
-      code,
-      tenantId: 'tenant-001',
-      createdAt: new Date().toISOString().split('T')[0],
-      updatedAt: new Date().toISOString().split('T')[0],
-    };
-    set((state) => ({ orders: [newOrder, ...state.orders] }));
+  addOrder: async (data) => {
+    try {
+      const created = await api.post<Order>('/orders', data);
+      set((state) => ({ orders: [created, ...state.orders] }));
+    } catch (err) {
+      if (isNetworkError(err)) return;
+      throw err;
+    }
   },
 
-  updateOrder: (id, data) => {
-    set((state) => ({
-      orders: state.orders.map((o) =>
-        o.id === id ? { ...o, ...data, updatedAt: new Date().toISOString().split('T')[0] } : o
-      ),
-      selectedOrder: state.selectedOrder?.id === id
-        ? { ...state.selectedOrder, ...data }
-        : state.selectedOrder,
-    }));
+  updateOrder: async (id, data) => {
+    try {
+      const updated = await api.patch<Order>(`/orders/${id}`, data);
+      set((state) => ({
+        orders: state.orders.map((o) => (o.id === id ? updated : o)),
+        selectedOrder: state.selectedOrder?.id === id ? updated : state.selectedOrder,
+      }));
+    } catch (err) {
+      if (isNetworkError(err)) return;
+      throw err;
+    }
   },
 
-  updateOrderStatus: (id, status) => {
-    get().updateOrder(id, {
+  updateOrderStatus: async (id, status) => {
+    await get().updateOrder(id, {
       status,
       ...(status === 'delivered' ? { actualDelivery: new Date().toISOString().split('T')[0] } : {}),
     });
   },
 
-  assignToRoute: (orderId, routeId) => {
-    get().updateOrder(orderId, { routeId, status: 'confirmed' });
+  assignToRoute: async (orderId, routeId) => {
+    await get().updateOrder(orderId, { routeId, status: 'confirmed' });
   },
 
-  deleteOrder: (id) => {
-    set((state) => ({
-      orders: state.orders.filter((o) => o.id !== id),
-      selectedOrder: state.selectedOrder?.id === id ? null : state.selectedOrder,
-    }));
+  deleteOrder: async (id) => {
+    try {
+      await api.del(`/orders/${id}`);
+      set((state) => ({
+        orders: state.orders.filter((o) => o.id !== id),
+        selectedOrder: state.selectedOrder?.id === id ? null : state.selectedOrder,
+      }));
+    } catch (err) {
+      if (isNetworkError(err)) return;
+      throw err;
+    }
   },
 
   getFilteredOrders: () => {

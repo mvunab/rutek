@@ -1,53 +1,98 @@
 import { create } from 'zustand';
 import type { Client, ServiceHistory } from '../types';
-import { mockClients, mockServiceHistory } from '../data/mockData';
+import { api } from '../lib/api';
+import type { DbClient } from '../types/api';
+
+function toClient(r: DbClient): Client {
+  return {
+    id: r.id,
+    tenantId: r.tenant_id,
+    companyName: r.company_name,
+    contactName: r.contact_name,
+    email: r.email,
+    phone: r.phone,
+    rut: r.rut,
+    address: r.address,
+    city: r.city,
+    region: r.region,
+    active: r.active,
+    notes: r.notes ?? undefined,
+    createdAt: r.created_at,
+  };
+}
 
 interface ClientStore {
   clients: Client[];
-  selectedClient: Client | null;
   serviceHistory: ServiceHistory[];
+  selectedClient: Client | null;
   searchTerm: string;
+  loading: boolean;
+  fetchClients: () => Promise<void>;
   setSearchTerm: (term: string) => void;
   selectClient: (client: Client | null) => void;
-  addClient: (client: Omit<Client, 'id' | 'createdAt' | 'tenantId'>) => void;
-  updateClient: (id: string, data: Partial<Client>) => void;
-  deleteClient: (id: string) => void;
+  addClient: (data: Omit<Client, 'id' | 'createdAt' | 'tenantId'>) => Promise<void>;
+  updateClient: (id: string, data: Partial<Client>) => Promise<void>;
+  deleteClient: (id: string) => Promise<void>;
   getClientHistory: (clientId: string) => ServiceHistory[];
 }
 
 export const useClientStore = create<ClientStore>((set, get) => ({
-  clients: mockClients,
+  clients: [],
+  serviceHistory: [],
   selectedClient: null,
-  serviceHistory: mockServiceHistory,
   searchTerm: '',
+  loading: false,
+
+  fetchClients: async () => {
+    set({ loading: true });
+    try {
+      const data = await api.get<DbClient[]>('/clients');
+      set({ clients: data.map(toClient) });
+    } finally {
+      set({ loading: false });
+    }
+  },
 
   setSearchTerm: (term) => set({ searchTerm: term }),
 
   selectClient: (client) => set({ selectedClient: client }),
 
-  addClient: (data) => {
-    const newClient: Client = {
-      ...data,
-      id: `client-${Date.now()}`,
-      tenantId: 'tenant-001',
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    set((state) => ({ clients: [...state.clients, newClient] }));
+  addClient: async (data) => {
+    const inserted = await api.post<DbClient>('/clients', {
+      company_name: data.companyName,
+      contact_name: data.contactName,
+      email: data.email,
+      phone: data.phone,
+      rut: data.rut,
+      address: data.address,
+      city: data.city,
+      region: data.region,
+      active: data.active,
+      notes: data.notes,
+    });
+    set((s) => ({ clients: [...s.clients, toClient(inserted)] }));
   },
 
-  updateClient: (id, data) => {
-    set((state) => ({
-      clients: state.clients.map((c) => (c.id === id ? { ...c, ...data } : c)),
-      selectedClient: state.selectedClient?.id === id
-        ? { ...state.selectedClient, ...data }
-        : state.selectedClient,
+  updateClient: async (id, data) => {
+    const updated = await api.patch<DbClient>(`/clients/${id}`, {
+      ...(data.companyName && { company_name: data.companyName }),
+      ...(data.contactName && { contact_name: data.contactName }),
+      ...(data.email !== undefined && { email: data.email }),
+      ...(data.phone !== undefined && { phone: data.phone }),
+      ...(data.notes !== undefined && { notes: data.notes }),
+      ...(data.active !== undefined && { active: data.active }),
+    });
+    set((s) => ({
+      clients: s.clients.map((c) => (c.id === id ? toClient(updated) : c)),
+      selectedClient: s.selectedClient?.id === id ? toClient(updated) : s.selectedClient,
     }));
   },
 
-  deleteClient: (id) => {
-    set((state) => ({
-      clients: state.clients.filter((c) => c.id !== id),
-      selectedClient: state.selectedClient?.id === id ? null : state.selectedClient,
+  deleteClient: async (id) => {
+    await api.del(`/clients/${id}`);
+    set((s) => ({
+      clients: s.clients.filter((c) => c.id !== id),
+      selectedClient: s.selectedClient?.id === id ? null : s.selectedClient,
     }));
   },
 

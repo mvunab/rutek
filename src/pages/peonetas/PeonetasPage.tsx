@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import {
   Pencil, X, Plus, Search, ChevronUp, ChevronDown,
   ChevronsUpDown, UserCheck, UserX, Users2
 } from 'lucide-react';
-import { mockPeonetas } from '../../data/mockData';
+import { usePeonetaStore } from '../../store/usePeonetaStore';
 import type { Peoneta } from '../../types';
 import { clsx } from 'clsx';
 
@@ -12,12 +12,42 @@ type SortKey = keyof Pick<Peoneta, 'rut' | 'nombres' | 'apellidoPaterno' | 'apel
 type SortDir = 'asc' | 'desc' | 'none';
 
 // ─── Sort Icon ────────────────────────────────────────────────────────────────
-function SortIcon({ col, active, dir }: { col: string; active: boolean; dir: SortDir }) {
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active || dir === 'none') return <ChevronsUpDown size={12} className="text-stone-300 dark:text-stone-600 ml-1" />;
   return dir === 'asc'
     ? <ChevronUp size={12} className="text-primary-600 ml-1" />
     : <ChevronDown size={12} className="text-primary-600 ml-1" />;
-  void col;
+}
+
+// ─── Sortable Column Header ───────────────────────────────────────────────────
+interface ColProps {
+  colKey: SortKey;
+  label: string;
+  className?: string;
+  sortCol: SortKey;
+  sortDir: SortDir;
+  onSort: (k: SortKey) => void;
+}
+
+function Col({ colKey, label, className, sortCol, sortDir, onSort }: ColProps) {
+  return (
+    <th
+      scope="col"
+      className={clsx(
+        'p-3 text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wide whitespace-nowrap',
+        className,
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(colKey)}
+        className="inline-flex items-center cursor-pointer select-none hover:text-stone-700 transition-colors"
+      >
+        {label}
+        <SortIcon active={sortCol === colKey} dir={sortDir} />
+      </button>
+    </th>
+  );
 }
 
 // ─── Form Modal ───────────────────────────────────────────────────────────────
@@ -54,6 +84,9 @@ function PeonetaModal({
       : emptyForm
   );
 
+  const formId = useId();
+  const fieldId = (k: keyof PeonetaFormData) => `${formId}-${k}`;
+
   const set = (k: keyof PeonetaFormData, v: string) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -79,49 +112,49 @@ function PeonetaModal({
           <div className="grid grid-cols-2 gap-4">
             {/* RUT */}
             <div className="col-span-2">
-              <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">RUT *</label>
-              <input required value={form.rut} onChange={e => set('rut', e.target.value)}
+              <label htmlFor={fieldId('rut')} className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">RUT *</label>
+              <input id={fieldId('rut')} name="rut" required autoComplete="off" spellCheck={false} value={form.rut} onChange={e => set('rut', e.target.value)}
                 placeholder="12345678-9"
-                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" />
             </div>
 
             {/* Nombres */}
             <div className="col-span-2">
-              <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Nombres *</label>
-              <input required value={form.nombres} onChange={e => set('nombres', e.target.value)}
+              <label htmlFor={fieldId('nombres')} className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Nombres *</label>
+              <input id={fieldId('nombres')} name="nombres" autoComplete="given-name" required value={form.nombres} onChange={e => set('nombres', e.target.value)}
                 placeholder="Juan Carlos"
-                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" />
             </div>
 
             {/* A.Paterno */}
             <div>
-              <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Apellido Paterno</label>
-              <input value={form.apellidoPaterno} onChange={e => set('apellidoPaterno', e.target.value)}
+              <label htmlFor={fieldId('apellidoPaterno')} className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Apellido Paterno</label>
+              <input id={fieldId('apellidoPaterno')} name="apellidoPaterno" autoComplete="family-name" value={form.apellidoPaterno} onChange={e => set('apellidoPaterno', e.target.value)}
                 placeholder="González"
-                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" />
             </div>
 
             {/* A.Materno */}
             <div>
-              <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Apellido Materno</label>
-              <input value={form.apellidoMaterno} onChange={e => set('apellidoMaterno', e.target.value)}
+              <label htmlFor={fieldId('apellidoMaterno')} className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Apellido Materno</label>
+              <input id={fieldId('apellidoMaterno')} name="apellidoMaterno" autoComplete="off" value={form.apellidoMaterno} onChange={e => set('apellidoMaterno', e.target.value)}
                 placeholder="Muñoz"
-                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" />
             </div>
 
             {/* Username */}
             <div>
-              <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Usuario sistema</label>
-              <input value={form.username} onChange={e => set('username', e.target.value)}
+              <label htmlFor={fieldId('username')} className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Usuario sistema</label>
+              <input id={fieldId('username')} name="username" autoComplete="username" spellCheck={false} value={form.username} onChange={e => set('username', e.target.value)}
                 placeholder="Ju.Gonzalez"
-                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" />
             </div>
 
             {/* Estado */}
             <div>
-              <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Estado</label>
-              <select value={form.estado} onChange={e => set('estado', e.target.value as 'Activo' | 'Inactivo')}
-                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <label htmlFor={fieldId('estado')} className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Estado</label>
+              <select id={fieldId('estado')} name="estado" value={form.estado} onChange={e => set('estado', e.target.value as 'Activo' | 'Inactivo')}
+                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
                 <option value="Activo">Activo</option>
                 <option value="Inactivo">Inactivo</option>
               </select>
@@ -129,18 +162,18 @@ function PeonetaModal({
 
             {/* Teléfono */}
             <div>
-              <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Teléfono</label>
-              <input value={form.phone} onChange={e => set('phone', e.target.value)}
+              <label htmlFor={fieldId('phone')} className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Teléfono</label>
+              <input id={fieldId('phone')} name="phone" type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={e => set('phone', e.target.value)}
                 placeholder="+56912345678"
-                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" />
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Email</label>
-              <input type="email" value={form.email} onChange={e => set('email', e.target.value)}
+              <label htmlFor={fieldId('email')} className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1">Email</label>
+              <input id={fieldId('email')} name="email" type="email" inputMode="email" autoComplete="email" spellCheck={false} value={form.email} onChange={e => set('email', e.target.value)}
                 placeholder="nombre@empresa.cl"
-                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" />
             </div>
           </div>
 
@@ -195,7 +228,7 @@ function DeleteConfirm({ peoneta, onConfirm, onClose }: { peoneta: Peoneta; onCo
 const PAGE_SIZE = 10;
 
 export function PeonetasPage() {
-  const [records, setRecords] = useState<Peoneta[]>(mockPeonetas);
+  const { peonetas, fetchPeonetas, createPeoneta, updatePeoneta, deletePeoneta } = usePeonetaStore();
   const [search, setSearch] = useState('');
   const [sortCol, setSortCol] = useState<SortKey>('rut');
   const [sortDir, setSortDir] = useState<SortDir>('none');
@@ -204,6 +237,10 @@ export function PeonetasPage() {
   const [editTarget, setEditTarget] = useState<Peoneta | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Peoneta | null>(null);
 
+  useEffect(() => {
+    void fetchPeonetas();
+  }, [fetchPeonetas]);
+
   // Sort toggle
   const handleSort = (col: SortKey) => {
     if (sortCol !== col) { setSortCol(col); setSortDir('asc'); return; }
@@ -211,7 +248,7 @@ export function PeonetasPage() {
   };
 
   const filtered = useMemo(() => {
-    let rows = records.filter(p => {
+    let rows = peonetas.filter(p => {
       if (!search) return true;
       const t = search.toLowerCase();
       return (
@@ -223,53 +260,39 @@ export function PeonetasPage() {
       );
     });
     if (sortDir !== 'none') {
-      rows = [...rows].sort((a, b) => {
+      rows = rows.toSorted((a, b) => {
         const av = (a[sortCol] ?? '').toString().toLowerCase();
         const bv = (b[sortCol] ?? '').toString().toLowerCase();
         return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
       });
     }
     return rows;
-  }, [records, search, sortCol, sortDir]);
+  }, [peonetas, search, sortCol, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // Stats
-  const activos   = records.filter(p => p.estado === 'Activo').length;
-  const inactivos = records.filter(p => p.estado === 'Inactivo').length;
+  const activos   = peonetas.filter(p => p.estado === 'Activo').length;
+  const inactivos = peonetas.filter(p => p.estado === 'Inactivo').length;
 
   // CRUD handlers
-  const handleSave = (data: PeonetaFormData) => {
+  const handleSave = async (data: PeonetaFormData) => {
     if (modal === 'edit' && editTarget) {
-      setRecords(r => r.map(p => p.id === editTarget.id ? { ...p, ...data } : p));
+      await updatePeoneta(editTarget.id, data);
     } else {
-      const newId = `peon-${Date.now()}`;
-      setRecords(r => [...r, { ...data, id: newId, tenantId: 'tenant-001', createdAt: new Date().toISOString().slice(0, 10) }]);
+      await createPeoneta(data);
     }
     setModal(null); setEditTarget(null);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
-    setRecords(r => r.filter(p => p.id !== deleteTarget.id));
+    await deletePeoneta(deleteTarget.id);
     setDeleteTarget(null);
   };
 
   const openEdit = (p: Peoneta) => { setEditTarget(p); setModal('edit'); };
-
-  // Column header helper
-  const Col = ({ k, label, className }: { k: SortKey; label: string; className?: string }) => (
-    <th
-      onClick={() => handleSort(k)}
-      className={clsx('px-3 py-3 text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap hover:text-stone-700 transition-colors', className)}
-    >
-      <span className="inline-flex items-center">
-        {label}
-        <SortIcon col={k} active={sortCol === k} dir={sortDir} />
-      </span>
-    </th>
-  );
 
   return (
     <div className="space-y-4">
@@ -277,7 +300,7 @@ export function PeonetasPage() {
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-lg shadow-sm text-xs text-stone-600 dark:text-stone-300">
           <Users2 size={14} className="text-stone-400 dark:text-stone-500" />
-          <span>Total: <strong className="text-stone-800 dark:text-stone-100">{records.length}</strong></span>
+          <span>Total: <strong className="text-stone-800 dark:text-stone-100">{peonetas.length}</strong></span>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 rounded-lg text-xs text-emerald-700 dark:text-emerald-400">
           <UserCheck size={14} /> Activos: <strong>{activos}</strong>
@@ -314,12 +337,12 @@ export function PeonetasPage() {
               <tr className="border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/90">
                 {/* Actions col — no sort */}
                 <th className="px-3 py-3 w-16 text-left text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide" />
-                <Col k="rut"              label="RUT"        className="w-32" />
-                <Col k="nombres"          label="Nombres" />
-                <Col k="apellidoPaterno"  label="A.Paterno" />
-                <Col k="apellidoMaterno"  label="A.Materno" />
-                <Col k="estado"           label="Estado"     className="w-24" />
-                <Col k="username"         label="User"       className="w-32" />
+                <Col colKey="rut"              label="RUT"        className="w-32" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                <Col colKey="nombres"          label="Nombres"                  sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                <Col colKey="apellidoPaterno"  label="A.Paterno"                sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                <Col colKey="apellidoMaterno"  label="A.Materno"                sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                <Col colKey="estado"           label="Estado"     className="w-24" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                <Col colKey="username"         label="User"       className="w-32" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
               </tr>
             </thead>
             <tbody>
@@ -342,14 +365,14 @@ export function PeonetasPage() {
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => openEdit(p)}
-                        className="w-6 h-6 flex items-center justify-center rounded text-stone-400 dark:text-stone-500 hover:text-primary-600 dark:hover:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors"
+                        className="size-6 flex items-center justify-center rounded text-stone-400 dark:text-stone-500 hover:text-primary-600 dark:hover:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors"
                         title="Editar"
                       >
                         <Pencil size={12} />
                       </button>
                       <button
                         onClick={() => setDeleteTarget(p)}
-                        className="w-6 h-6 flex items-center justify-center rounded bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
+                        className="size-6 flex items-center justify-center rounded bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
                         title="Eliminar"
                       >
                         <X size={12} />
@@ -405,7 +428,7 @@ export function PeonetasPage() {
         <div className="flex items-center justify-between px-4 py-3 border-t border-stone-100 dark:border-stone-800 bg-stone-50 dark:bg-stone-800/80">
           <span className="text-xs text-stone-500 dark:text-stone-400">
             Página {page} de {totalPages}
-            {filtered.length !== records.length && (
+            {filtered.length !== peonetas.length && (
               <span className="ml-1.5 text-stone-400 dark:text-stone-500">({filtered.length} resultados)</span>
             )}
           </span>

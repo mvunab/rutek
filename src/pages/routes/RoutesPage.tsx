@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Plus, Search, ChevronUp, ChevronDown, ChevronsUpDown,
   CheckCircle2, Circle, Truck, Clock, RotateCcw, XCircle,
@@ -9,7 +9,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useRouteStore } from '../../store/useRouteStore';
-import { mockDeliveryRecords } from '../../data/mockData';
+import { useDeliveryStore } from '../../store/useDeliveryStore';
 import type { DeliveryRecord, DeliveryStatus } from '../../types';
 import { clsx } from 'clsx';
 
@@ -132,7 +132,7 @@ function DeliveryDetailModal({ record, onClose }: { record: DeliveryRecord; onCl
             ['Cliente',    record.cliente],
             ['Entrega',    record.entrega],
             ['Pedido',     record.pedido],
-            ['Factura',    record.factura || '—'],
+            ['Factura',    record.factura || '–'],
             ['Tipo',       record.tipo],
             ['Referencia', record.ref],
             ['Bultos',     String(record.bultos)],
@@ -147,9 +147,9 @@ function DeliveryDetailModal({ record, onClose }: { record: DeliveryRecord; onCl
 
         <div className="grid grid-cols-3 gap-3">
           {[
-            ['Chofer',     record.chofer || '—'],
-            ['Vehículo',   record.vehiculo || '—'],
-            ['Peoneta',    record.peoneta || '—'],
+            ['Chofer',     record.chofer || '–'],
+            ['Vehículo',   record.vehiculo || '–'],
+            ['Peoneta',    record.peoneta || '–'],
           ].map(([k, v]) => (
             <div key={k} className="bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2">
               <p className="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide">{k}</p>
@@ -161,11 +161,11 @@ function DeliveryDetailModal({ record, onClose }: { record: DeliveryRecord; onCl
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2">
             <p className="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide">Recepción</p>
-            <p className="text-sm font-medium text-stone-800 dark:text-stone-100 mt-0.5">{record.recepcion || '—'}</p>
+            <p className="text-sm font-medium text-stone-800 dark:text-stone-100 mt-0.5">{record.recepcion || '–'}</p>
           </div>
           <div className="bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2">
             <p className="text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide">Fecha / Hora</p>
-            <p className="text-sm font-medium text-stone-800 dark:text-stone-100 mt-0.5">{record.fechaHora || '—'}</p>
+            <p className="text-sm font-medium text-stone-800 dark:text-stone-100 mt-0.5">{record.fechaHora || '–'}</p>
           </div>
         </div>
 
@@ -182,10 +182,14 @@ function DeliveryDetailModal({ record, onClose }: { record: DeliveryRecord; onCl
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export function RoutesPage() {
-  const { addRoute } = useRouteStore();
+  const { addRoute, fetchRoutes } = useRouteStore();
+  const { records, loaded: deliveriesLoaded, fetchRecords } = useDeliveryStore();
 
-  // Table state
-  const [records] = useState<DeliveryRecord[]>(mockDeliveryRecords);
+  useEffect(() => {
+    void fetchRecords();
+    void fetchRoutes();
+  }, [fetchRecords, fetchRoutes]);
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sortCol, setSortCol] = useState<keyof DeliveryRecord | null>('estado');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -226,7 +230,7 @@ export function RoutesPage() {
     });
 
     if (sortCol && sortDir) {
-      data = [...data].sort((a, b) => {
+      data = data.toSorted((a, b) => {
         const av = a[sortCol] ?? '';
         const bv = b[sortCol] ?? '';
         const cmp = String(av).localeCompare(String(bv), 'es', { numeric: true });
@@ -305,7 +309,7 @@ export function RoutesPage() {
         <button
           type="button"
           onClick={() => setShowStatusManager(true)}
-          className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-500 dark:text-stone-400 hover:border-stone-300 dark:hover:border-stone-500 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+          className="inline-flex items-center justify-center size-8 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-500 dark:text-stone-400 hover:border-stone-300 dark:hover:border-stone-500 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
           title="Gestionar estados"
           aria-label="Gestionar estados"
         >
@@ -374,8 +378,12 @@ export function RoutesPage() {
       {filtered.length === 0 ? (
         <EmptyState
           icon={<Map size={32} />}
-          title="Sin registros"
-          description="No se encontraron entregas con los filtros aplicados"
+          title={deliveriesLoaded && records.length === 0 ? 'Sin entregas registradas' : 'Sin registros'}
+          description={
+            deliveriesLoaded && records.length === 0
+              ? 'Aún no hay entregas para mostrar. Cuando se generen entregas, aparecerán aquí.'
+              : 'No se encontraron entregas con los filtros aplicados.'
+          }
         />
       ) : (
         <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-sm overflow-hidden">
@@ -389,7 +397,7 @@ export function RoutesPage() {
                       type="checkbox"
                       checked={allSelected}
                       onChange={toggleAll}
-                      className="w-3.5 h-3.5 rounded border-stone-300 dark:border-stone-600 dark:bg-stone-900 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      className="size-3.5 rounded border-stone-300 dark:border-stone-600 dark:bg-stone-900 text-primary-600 focus:ring-primary-500 cursor-pointer"
                     />
                   </th>
                   <ColHeader label="Estado"     col="estado"    {...colProps} className="min-w-[120px]" />
@@ -433,7 +441,7 @@ export function RoutesPage() {
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleRow(row.id)}
-                          className="w-3.5 h-3.5 rounded border-stone-300 dark:border-stone-600 dark:bg-stone-900 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                          className="size-3.5 rounded border-stone-300 dark:border-stone-600 dark:bg-stone-900 text-primary-600 focus:ring-primary-500 cursor-pointer"
                         />
                       </td>
 
@@ -459,7 +467,7 @@ export function RoutesPage() {
 
                       {/* Factura */}
                       <td className="px-3 py-2.5">
-                        <span className="font-mono text-xs text-stone-500 dark:text-stone-400">{row.factura || '—'}</span>
+                        <span className="font-mono text-xs text-stone-500 dark:text-stone-400">{row.factura || '–'}</span>
                       </td>
 
                       {/* Tipo */}
@@ -484,24 +492,24 @@ export function RoutesPage() {
 
                       {/* Recepción */}
                       <td className="px-3 py-2.5">
-                        <span className="text-xs text-stone-600 dark:text-stone-300">{row.recepcion || <span className="text-stone-300 dark:text-stone-600">—</span>}</span>
+                        <span className="text-xs text-stone-600 dark:text-stone-300">{row.recepcion || <span className="text-stone-300 dark:text-stone-600">–</span>}</span>
                       </td>
 
                       {/* Fecha/Hora */}
                       <td className="px-3 py-2.5">
-                        <span className="text-xs text-stone-500 dark:text-stone-400 whitespace-nowrap">{row.fechaHora || <span className="text-stone-300 dark:text-stone-600">—</span>}</span>
+                        <span className="text-xs text-stone-500 dark:text-stone-400 whitespace-nowrap">{row.fechaHora || <span className="text-stone-300 dark:text-stone-600">–</span>}</span>
                       </td>
 
                       {/* Chofer */}
                       <td className="px-3 py-2.5">
                         {row.chofer ? (
                           <div className="flex items-center gap-1.5">
-                            <div className="w-5 h-5 bg-primary-100 dark:bg-primary-900/80 rounded-full flex items-center justify-center text-[10px] font-bold text-primary-700 dark:text-primary-300 flex-shrink-0">
+                            <div aria-hidden="true" className="size-5 bg-primary-100 dark:bg-primary-900/80 rounded-full flex items-center justify-center text-[10px] font-semibold text-primary-700 dark:text-primary-300 flex-shrink-0">
                               {row.chofer.charAt(0)}
                             </div>
                             <span className="text-xs text-stone-700 dark:text-stone-200 whitespace-nowrap">{row.chofer}</span>
                           </div>
-                        ) : <span className="text-stone-300 dark:text-stone-600 text-xs">—</span>}
+                        ) : <span className="text-stone-300 dark:text-stone-600 text-xs">–</span>}
                       </td>
 
                       {/* Vehículo */}
@@ -510,17 +518,17 @@ export function RoutesPage() {
                           <span className="font-mono text-xs font-semibold text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded">
                             {row.vehiculo}
                           </span>
-                        ) : <span className="text-stone-300 dark:text-stone-600 text-xs">—</span>}
+                        ) : <span className="text-stone-300 dark:text-stone-600 text-xs">–</span>}
                       </td>
 
                       {/* Peoneta */}
                       <td className="px-3 py-2.5">
-                        <span className="text-xs text-stone-500 dark:text-stone-400">{row.peoneta || <span className="text-stone-300 dark:text-stone-600">—</span>}</span>
+                        <span className="text-xs text-stone-500 dark:text-stone-400">{row.peoneta || <span className="text-stone-300 dark:text-stone-600">–</span>}</span>
                       </td>
 
                       {/* Obs */}
                       <td className="px-3 py-2.5 max-w-[160px]">
-                        <span className="text-xs text-stone-500 dark:text-stone-400 truncate block">{row.obs || <span className="text-stone-300 dark:text-stone-600">—</span>}</span>
+                        <span className="text-xs text-stone-500 dark:text-stone-400 truncate block">{row.obs || <span className="text-stone-300 dark:text-stone-600">–</span>}</span>
                       </td>
 
                       {/* Actions */}

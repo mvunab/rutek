@@ -1,11 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Shield, Truck, Users, Building2 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
-import { mockUsers } from '../../data/mockData';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { useUserStore } from '../../store/useUserStore';
 import type { UserRole } from '../../types';
 import { clsx } from 'clsx';
 
 const roleConfig: Record<UserRole, { label: string; color: string; card: string; icon: React.ReactNode; description: string }> = {
+  super_admin: {
+    label: 'Super Admin',
+    color: 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/45 dark:text-red-300 dark:border-red-800',
+    card: 'bg-red-50 border-red-200 dark:bg-red-950/50 dark:border-red-800',
+    icon: <Shield size={14} />,
+    description: 'Acceso total al sistema multi-tenant',
+  },
   admin: {
     label: 'Administrador',
     color: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/45 dark:text-blue-300 dark:border-blue-800',
@@ -39,8 +47,13 @@ const roleConfig: Record<UserRole, { label: string; color: string; card: string;
 export function UsersPage() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
+  const { users, loaded, loading, fetchUsers } = useUserStore();
 
-  const filtered = mockUsers.filter((u) => {
+  useEffect(() => {
+    void fetchUsers();
+  }, [fetchUsers]);
+
+  const filtered = users.filter((u) => {
     if (roleFilter !== 'all' && u.role !== roleFilter) return false;
     const term = search.toLowerCase();
     return u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term);
@@ -81,38 +94,51 @@ export function UsersPage() {
       {/* Role summary cards */}
       <div className="grid grid-cols-4 gap-3">
         {(Object.entries(roleConfig) as [UserRole, typeof roleConfig[UserRole]][]).map(([role, config]) => {
-          const count = mockUsers.filter(u => u.role === role).length;
+          const count = users.filter(u => u.role === role).length;
           return (
-            <div
+            <button
               key={role}
+              type="button"
+              aria-pressed={roleFilter === role}
               onClick={() => setRoleFilter(roleFilter === role ? 'all' : role)}
               className={clsx(
-                'p-4 rounded-xl border text-center cursor-pointer transition-[box-shadow,border-color,background-color] shadow-sm hover:shadow-md',
+                'p-4 rounded-xl border text-center cursor-pointer transition-[box-shadow,border-color,background-color] shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
                 roleFilter === role ? config.card : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-600'
               )}
             >
-              <div className={clsx(
+              <span className={clsx(
                 'flex items-center justify-center gap-1.5 mb-2',
                 roleFilter === role ? 'text-stone-700 dark:text-stone-100' : 'text-stone-600 dark:text-stone-400'
               )}>
                 {config.icon}
                 <span className="text-xs font-semibold">{config.label}</span>
-              </div>
-              <p className="text-2xl font-bold text-stone-900 dark:text-stone-100">{count}</p>
+              </span>
+              <p className="text-2xl font-semibold text-stone-900 dark:text-stone-100 tabular-nums">{count}</p>
               <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-0.5">{config.description}</p>
-            </div>
+            </button>
           );
         })}
       </div>
 
       {/* Users grid */}
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={<Users size={32} />}
+          title={loaded ? 'Sin usuarios para mostrar' : loading ? 'Cargando usuarios…' : 'Sin usuarios'}
+          description={
+            loaded && users.length === 0
+              ? 'Aún no hay usuarios registrados en el sistema.'
+              : 'No se encontraron usuarios con los filtros aplicados.'
+          }
+        />
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.map((user) => {
           const config = roleConfig[user.role];
           return (
             <div key={user.id} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-5 hover:border-stone-300 dark:hover:border-stone-600 hover:shadow-md transition-all shadow-sm">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-11 h-11 bg-primary-100 dark:bg-primary-950/50 rounded-xl flex items-center justify-center text-primary-700 dark:text-primary-400 font-bold text-sm">
+                <div aria-hidden="true" className="size-11 bg-primary-100 dark:bg-primary-950/50 rounded-xl flex items-center justify-center text-primary-700 dark:text-primary-400 font-semibold text-sm">
                   {user.name.charAt(0)}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -138,6 +164,7 @@ export function UsersPage() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }

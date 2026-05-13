@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Search, Phone, Mail, MapPin, History, Edit2, Trash2, Building2, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -56,7 +56,9 @@ interface ClientFormProps {
   submitLabel?: string;
 }
 
-function ClientForm({ initial = {}, onSubmit, onCancel, submitLabel = 'Guardar' }: ClientFormProps) {
+const EMPTY_INITIAL: Partial<ClientFormData> = {};
+
+function ClientForm({ initial = EMPTY_INITIAL, onSubmit, onCancel, submitLabel = 'Guardar' }: ClientFormProps) {
   const [form, setForm] = useState<ClientFormData>({ ...emptyForm, ...initial });
   const [errors, setErrors] = useState<Partial<ClientFormData>>({});
 
@@ -159,8 +161,13 @@ function ClientHistoryModal({ client, onClose }: { client: Client; onClose: () =
 }
 
 export function ClientsPage() {
-  const { clients, searchTerm, setSearchTerm, addClient, updateClient, deleteClient } = useClientStore();
+  const { clients, searchTerm, setSearchTerm, addClient, updateClient, deleteClient, fetchClients } = useClientStore();
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    void fetchClients();
+  }, [fetchClients]);
+
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [historyClient, setHistoryClient] = useState<Client | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Client | null>(null);
@@ -253,7 +260,7 @@ export function ClientsPage() {
             <div key={client.id} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-5 hover:border-stone-300 dark:hover:border-stone-600 hover:shadow-md transition-all shadow-sm group">
               <div className="flex items-start justify-between gap-2 mb-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 bg-primary-50 dark:bg-primary-950/50 border border-primary-100 dark:border-primary-800 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400 font-bold text-sm flex-shrink-0">
+                  <div aria-hidden="true" className="size-10 bg-primary-50 dark:bg-primary-950/50 border border-primary-100 dark:border-primary-800 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400 font-semibold text-sm flex-shrink-0">
                     {client.companyName.charAt(0)}
                   </div>
                   <div className="min-w-0">

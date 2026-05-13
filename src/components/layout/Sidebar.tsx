@@ -1,7 +1,8 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Package, Map, Truck, LogOut,
-  ChevronLeft, ChevronRight, Settings, UserCircle, Building2
+  ChevronLeft, ChevronRight, Settings, UserCircle, Building2,
+  Shield, Globe
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useState } from 'react';
@@ -21,6 +22,12 @@ const navItems: NavItem[] = [
   { to: '/pedidos', icon: <Package size={18} />, label: 'Pedidos', roles: ['admin', 'operator', 'driver', 'client'] },
   { to: '/rutas', icon: <Map size={18} />, label: 'Rutas', roles: ['admin', 'operator', 'driver'] },
   { to: '/usuarios', icon: <UserCircle size={18} />, label: 'Usuarios', roles: ['admin'] },
+];
+
+const superAdminNavItems = [
+  { to: '/super-admin', icon: <Globe size={18} />, label: 'Dashboard Global' },
+  { to: '/super-admin/tenants', icon: <Building2 size={18} />, label: 'Tenants' },
+  { to: '/super-admin/users', icon: <Shield size={18} />, label: 'Usuarios Globales' },
 ];
 
 export function Sidebar() {
@@ -45,12 +52,12 @@ export function Sidebar() {
       {/* Header */}
       <div className="flex items-center h-16 px-4 border-b border-stone-100">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-            <Truck size={16} className="text-white" />
+          <div className="size-8 bg-primary-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
+            <Truck size={16} className="text-white" aria-hidden="true" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-sm font-bold text-stone-900 truncate">Rutek</p>
+              <p className="text-sm font-semibold text-stone-900 truncate">Rutek</p>
               <p className="text-xs text-stone-400 truncate">Logística SaaS</p>
             </div>
           )}
@@ -104,6 +111,41 @@ export function Sidebar() {
         ))}
       </nav>
 
+      {/* Super Admin Nav */}
+      {user?.role === 'super_admin' && (
+        <>
+          <div className="px-4 py-2 border-t border-stone-100">
+            <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">Super Admin</p>
+          </div>
+          <nav className="py-1 px-2 space-y-0.5 overflow-y-auto">
+            {superAdminNavItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => clsx(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group',
+                  isActive
+                    ? 'bg-violet-50 text-violet-700 border border-violet-100'
+                    : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
+                )}
+              >
+                {({ isActive }) => (
+                  <>
+                    <span className={clsx(
+                      'flex-shrink-0 transition-colors',
+                      isActive ? 'text-violet-600' : 'text-stone-400 group-hover:text-stone-600'
+                    )}>
+                      {item.icon}
+                    </span>
+                    {!collapsed && <span className="truncate">{item.label}</span>}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </nav>
+        </>
+      )}
+
       {/* Footer */}
       <div className="border-t border-stone-100 p-3 space-y-0.5">
         {!collapsed && user && (
@@ -126,7 +168,7 @@ export function Sidebar() {
         </NavLink>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-500 hover:bg-red-50 hover:text-red-600 transition-all duration-150"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
         >
           <LogOut size={18} className="flex-shrink-0" />
           {!collapsed && 'Cerrar sesión'}

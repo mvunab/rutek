@@ -1,21 +1,24 @@
 import { create } from 'zustand';
 import type { Route, RouteFilters, RouteStatus } from '../types';
-import { mockRoutes } from '../data/mockData';
+import { api, isNetworkError } from '../lib/api';
 
 interface RouteStore {
   routes: Route[];
   selectedRoute: Route | null;
   filters: RouteFilters;
+  loading: boolean;
+  loaded: boolean;
+  fetchRoutes: () => Promise<void>;
   setFilters: (filters: Partial<RouteFilters>) => void;
   resetFilters: () => void;
   selectRoute: (route: Route | null) => void;
-  addRoute: (route: Omit<Route, 'id' | 'code' | 'createdAt' | 'tenantId'>) => void;
-  updateRoute: (id: string, data: Partial<Route>) => void;
-  updateRouteStatus: (id: string, status: RouteStatus) => void;
-  assignDriver: (routeId: string, driverId: string, driverName: string) => void;
-  assignVehicle: (routeId: string, vehicleId: string, vehiclePlate: string) => void;
-  addOrderToRoute: (routeId: string, orderId: string) => void;
-  deleteRoute: (id: string) => void;
+  addRoute: (route: Omit<Route, 'id' | 'code' | 'createdAt' | 'tenantId'>) => Promise<void>;
+  updateRoute: (id: string, data: Partial<Route>) => Promise<void>;
+  updateRouteStatus: (id: string, status: RouteStatus) => Promise<void>;
+  assignDriver: (routeId: string, driverId: string, driverName: string) => Promise<void>;
+  assignVehicle: (routeId: string, vehicleId: string, vehiclePlate: string) => Promise<void>;
+  addOrderToRoute: (routeId: string, orderId: string) => Promise<void>;
+  deleteRoute: (id: string) => Promise<void>;
   getFilteredRoutes: () => Route[];
 }
 
@@ -25,9 +28,27 @@ const defaultFilters: RouteFilters = {
 };
 
 export const useRouteStore = create<RouteStore>((set, get) => ({
-  routes: mockRoutes,
+  routes: [],
   selectedRoute: null,
   filters: defaultFilters,
+  loading: false,
+  loaded: false,
+
+  fetchRoutes: async () => {
+    set({ loading: true });
+    try {
+      const data = await api.get<Route[]>('/routes');
+      set({ routes: Array.isArray(data) ? data : [], loaded: true });
+    } catch (err) {
+      if (isNetworkError(err)) {
+        set({ routes: [] });
+        return;
+      }
+      set({ routes: [], loaded: true });
+    } finally {
+      set({ loading: false });
+    }
+  },
 
   setFilters: (filters) =>
     set((state) => ({ filters: { ...state.filters, ...filters } })),
@@ -36,58 +57,61 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
 
   selectRoute: (route) => set({ selectedRoute: route }),
 
-  addRoute: (data) => {
-    const count = get().routes.length + 1;
-    const code = `RUT-2024-${String(count).padStart(3, '0')}`;
-    const newRoute: Route = {
-      ...data,
-      id: `route-${Date.now()}`,
-      code,
-      tenantId: 'tenant-001',
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    set((state) => ({ routes: [newRoute, ...state.routes] }));
+  addRoute: async (data) => {
+    try {
+      const created = await api.post<Route>('/routes', data);
+      set((state) => ({ routes: [created, ...state.routes] }));
+    } catch (err) {
+      if (isNetworkError(err)) return;
+      throw err;
+    }
   },
 
-  updateRoute: (id, data) => {
-    set((state) => ({
-      routes: state.routes.map((r) => (r.id === id ? { ...r, ...data } : r)),
-      selectedRoute: state.selectedRoute?.id === id
-        ? { ...state.selectedRoute, ...data }
-        : state.selectedRoute,
-    }));
+  updateRoute: async (id, data) => {
+    try {
+      const updated = await api.patch<Route>(`/routes/${id}`, data);
+      set((state) => ({
+        routes: state.routes.map((r) => (r.id === id ? updated : r)),
+        selectedRoute: state.selectedRoute?.id === id ? updated : state.selectedRoute,
+      }));
+    } catch (err) {
+      if (isNetworkError(err)) return;
+      throw err;
+    }
   },
 
-  updateRouteStatus: (id, status) => {
+  updateRouteStatus: async (id, status) => {
     const updates: Partial<Route> = { status };
     if (status === 'active') updates.startTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
     if (status === 'completed') updates.endTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-    get().updateRoute(id, updates);
+    await get().updateRoute(id, updates);
   },
 
-  assignDriver: (routeId, driverId, driverName) => {
-    get().updateRoute(routeId, { driverId, driverName });
+  assignDriver: async (routeId, driverId, driverName) => {
+    await get().updateRoute(routeId, { driverId, driverName });
   },
 
-  assignVehicle: (routeId, vehicleId, vehiclePlate) => {
-    get().updateRoute(routeId, { vehicleId, vehiclePlate });
+  assignVehicle: async (routeId, vehicleId, vehiclePlate) => {
+    await get().updateRoute(routeId, { vehicleId, vehiclePlate });
   },
 
-  addOrderToRoute: (routeId, orderId) => {
-    set((state) => ({
-      routes: state.routes.map((r) =>
-        r.id === routeId
-          ? { ...r, orderIds: [...r.orderIds, orderId] }
-          : r
-      ),
-    }));
+  addOrderToRoute: async (routeId, orderId) => {
+    const current = get().routes.find((r) => r.id === routeId);
+    if (!current) return;
+    await get().updateRoute(routeId, { orderIds: [...current.orderIds, orderId] });
   },
 
-  deleteRoute: (id) => {
-    set((state) => ({
-      routes: state.routes.filter((r) => r.id !== id),
-      selectedRoute: state.selectedRoute?.id === id ? null : state.selectedRoute,
-    }));
+  deleteRoute: async (id) => {
+    try {
+      await api.del(`/routes/${id}`);
+      set((state) => ({
+        routes: state.routes.filter((r) => r.id !== id),
+        selectedRoute: state.selectedRoute?.id === id ? null : state.selectedRoute,
+      }));
+    } catch (err) {
+      if (isNetworkError(err)) return;
+      throw err;
+    }
   },
 
   getFilteredRoutes: () => {

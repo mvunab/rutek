@@ -1,49 +1,233 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Activity } from 'lucide-react';
 import { AppLayout } from './components/layout/AppLayout';
 import { AnimatedPage } from './components/layout/AnimatedPage';
-import { LoginPage } from './pages/auth/LoginPage';
-import { Dashboard } from './pages/dashboard/Dashboard';
-import { ClientsPage } from './pages/clients/ClientsPage';
-import { OrdersPage } from './pages/orders/OrdersPage';
-import { RoutesPage } from './pages/routes/RoutesPage';
-import { UsersPage } from './pages/users/UsersPage';
-import { PhotosPage } from './pages/photos/PhotosPage';
-import { PeonetasPage } from './pages/peonetas/PeonetasPage';
-import { SettingsPage } from './pages/settings/SettingsPage';
-import { NotFound } from './pages/NotFound';
+import { useAuthStore } from './store/useAuthStore';
+import { BackendGuard } from './components/system/BackendGuard';
+
+const LoginPage = lazy(() =>
+  import('./pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })),
+);
+const Dashboard = lazy(() =>
+  import('./pages/dashboard/Dashboard').then((m) => ({ default: m.Dashboard })),
+);
+const ClientsPage = lazy(() =>
+  import('./pages/clients/ClientsPage').then((m) => ({
+    default: m.ClientsPage,
+  })),
+);
+const OrdersPage = lazy(() =>
+  import('./pages/orders/OrdersPage').then((m) => ({ default: m.OrdersPage })),
+);
+const RoutesPage = lazy(() =>
+  import('./pages/routes/RoutesPage').then((m) => ({ default: m.RoutesPage })),
+);
+const UsersPage = lazy(() =>
+  import('./pages/users/UsersPage').then((m) => ({ default: m.UsersPage })),
+);
+const PhotosPage = lazy(() =>
+  import('./pages/photos/PhotosPage').then((m) => ({ default: m.PhotosPage })),
+);
+const PeonetasPage = lazy(() =>
+  import('./pages/peonetas/PeonetasPage').then((m) => ({
+    default: m.PeonetasPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import('./pages/settings/SettingsPage').then((m) => ({
+    default: m.SettingsPage,
+  })),
+);
+const SuperAdminDashboard = lazy(() =>
+  import('./pages/super-admin/SuperAdminDashboard').then((m) => ({
+    default: m.SuperAdminDashboard,
+  })),
+);
+const TenantsPage = lazy(() =>
+  import('./pages/super-admin/TenantsPage').then((m) => ({
+    default: m.TenantsPage,
+  })),
+);
+const TenantDetailPage = lazy(() =>
+  import('./pages/super-admin/TenantDetailPage').then((m) => ({
+    default: m.TenantDetailPage,
+  })),
+);
+const AdminUsersPage = lazy(() =>
+  import('./pages/super-admin/AdminUsersPage').then((m) => ({
+    default: m.AdminUsersPage,
+  })),
+);
+const NotFound = lazy(() =>
+  import('./pages/NotFound').then((m) => ({ default: m.NotFound })),
+);
+
+function PageFallback() {
+  return (
+    <div
+      className="min-h-[60vh] flex items-center justify-center"
+      role="status"
+      aria-live="polite"
+      aria-label="Cargando página"
+    >
+      <Activity
+        size={28}
+        className="text-stone-400 dark:text-stone-500 animate-spin"
+        aria-hidden="true"
+      />
+    </div>
+  );
+}
+
+function ProtectedRoute({
+  children,
+  requireSuperAdmin = false,
+}: {
+  children: React.ReactNode;
+  requireSuperAdmin?: boolean;
+}) {
+  const { isAuthenticated, isSuperAdmin, loading } = useAuthStore();
+
+  if (loading) {
+    return <PageFallback />;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (requireSuperAdmin && !isSuperAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+}
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route
-          path="/login"
-          element={
-            <AnimatedPage className="min-h-screen">
-              <LoginPage />
-            </AnimatedPage>
-          }
-        />
-        <Route path="/" element={<AppLayout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="clientes" element={<ClientsPage />} />
-          <Route path="pedidos" element={<OrdersPage />} />
-          <Route path="rutas" element={<RoutesPage />} />
-          <Route path="usuarios" element={<UsersPage />} />
-          <Route path="fotos" element={<PhotosPage />} />
-          <Route path="peonetas" element={<PeonetasPage />} />
-          <Route path="configuracion" element={<SettingsPage />} />
-        </Route>
-        <Route
-          path="*"
-          element={
-            <AnimatedPage className="min-h-screen">
-              <NotFound />
-            </AnimatedPage>
-          }
-        />
-      </Routes>
+      <BackendGuard>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route
+              path="/login"
+              element={
+                <AnimatedPage className="min-h-screen">
+                  <LoginPage />
+                </AnimatedPage>
+              }
+            />
+            <Route path="/" element={<AppLayout />}>
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route
+                path="dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="clientes"
+                element={
+                  <ProtectedRoute>
+                    <ClientsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="pedidos"
+                element={
+                  <ProtectedRoute>
+                    <OrdersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="rutas"
+                element={
+                  <ProtectedRoute>
+                    <RoutesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="usuarios"
+                element={
+                  <ProtectedRoute>
+                    <UsersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="fotos"
+                element={
+                  <ProtectedRoute>
+                    <PhotosPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="peonetas"
+                element={
+                  <ProtectedRoute>
+                    <PeonetasPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="configuracion"
+                element={
+                  <ProtectedRoute>
+                    <SettingsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="super-admin"
+                element={
+                  <ProtectedRoute requireSuperAdmin>
+                    <SuperAdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="super-admin/tenants"
+                element={
+                  <ProtectedRoute requireSuperAdmin>
+                    <TenantsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="super-admin/tenants/:id"
+                element={
+                  <ProtectedRoute requireSuperAdmin>
+                    <TenantDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="super-admin/users"
+                element={
+                  <ProtectedRoute requireSuperAdmin>
+                    <AdminUsersPage />
+                  </ProtectedRoute>
+                }
+              />
+            </Route>
+            <Route
+              path="*"
+              element={
+                <AnimatedPage className="min-h-screen">
+                  <NotFound />
+                </AnimatedPage>
+              }
+            />
+          </Routes>
+        </Suspense>
+      </BackendGuard>
     </BrowserRouter>
   );
 }

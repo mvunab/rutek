@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Plus, Search, Filter, Package, MapPin, Weight,
   Edit2, Trash2, Eye, Link2, X
@@ -47,7 +47,9 @@ interface OrderFormProps {
   submitLabel?: string;
 }
 
-function OrderForm({ initial = {}, onSubmit, onCancel, submitLabel = 'Guardar' }: OrderFormProps) {
+const EMPTY_INITIAL: Partial<OrderFormData> = {};
+
+function OrderForm({ initial = EMPTY_INITIAL, onSubmit, onCancel, submitLabel = 'Guardar' }: OrderFormProps) {
   const [form, setForm] = useState<OrderFormData>({ ...emptyForm, ...initial });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { clients } = useClientStore();
@@ -90,10 +92,13 @@ function OrderForm({ initial = {}, onSubmit, onCancel, submitLabel = 'Guardar' }
     onSubmit(form);
   };
 
-  const clientOptions = [
-    { value: '', label: 'Seleccionar cliente...' },
-    ...clients.filter(c => c.active).map(c => ({ value: c.id, label: c.companyName })),
-  ];
+  const clientOptions = clients.reduce<{ value: string; label: string }[]>(
+    (acc, c) => {
+      if (c.active) acc.push({ value: c.id, label: c.companyName });
+      return acc;
+    },
+    [{ value: '', label: 'Seleccionar cliente…' }],
+  );
 
   const priorityOptions = [
     { value: 'low', label: 'Baja' },
@@ -139,26 +144,29 @@ function OrderForm({ initial = {}, onSubmit, onCancel, submitLabel = 'Guardar' }
           {form.items.map((item, index) => (
             <div key={item.id} className="grid grid-cols-12 gap-2 items-end p-3 bg-stone-50 dark:bg-stone-800/60 rounded-lg border border-stone-200 dark:border-stone-700">
               <div className="col-span-4">
-                <label className="text-xs text-stone-500 dark:text-stone-400 mb-1 block">Descripción</label>
+                <label htmlFor={`item-${item.id}-description`} className="text-xs text-stone-500 dark:text-stone-400 mb-1 block">Descripción</label>
                 <input
+                  id={`item-${item.id}-description`}
                   value={item.description}
                   onChange={(e) => updateItem(index, 'description', e.target.value)}
                   placeholder="Ej: Cajas de conservas"
-                  className="w-full bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-xs text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  className="w-full bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-xs text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500"
                 />
               </div>
               <div className="col-span-2">
-                <label className="text-xs text-stone-500 dark:text-stone-400 mb-1 block">Cantidad</label>
-                <input type="number" min={1} value={item.quantity} onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))} className="w-full bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-xs text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <label htmlFor={`item-${item.id}-quantity`} className="text-xs text-stone-500 dark:text-stone-400 mb-1 block">Cantidad</label>
+                <input id={`item-${item.id}-quantity`} type="number" inputMode="numeric" min={1} value={item.quantity} onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))} className="w-full bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-xs text-stone-800 dark:text-stone-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 tabular-nums" />
               </div>
               <div className="col-span-2">
-                <label className="text-xs text-stone-500 dark:text-stone-400 mb-1 block">Peso (kg)</label>
-                <input type="number" min={0.1} step={0.1} value={item.weight} onChange={(e) => updateItem(index, 'weight', Number(e.target.value))} className="w-full bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-xs text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <label htmlFor={`item-${item.id}-weight`} className="text-xs text-stone-500 dark:text-stone-400 mb-1 block">Peso (kg)</label>
+                <input id={`item-${item.id}-weight`} type="number" inputMode="decimal" min={0.1} step={0.1} value={item.weight} onChange={(e) => updateItem(index, 'weight', Number(e.target.value))} className="w-full bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-md px-2 py-1.5 text-xs text-stone-800 dark:text-stone-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 tabular-nums" />
               </div>
               <div className="col-span-2">
-                <label className="text-xs text-stone-500 dark:text-stone-400 mb-1 block">Frágil</label>
+                <span id={`item-${item.id}-fragile-label`} className="text-xs text-stone-500 dark:text-stone-400 mb-1 block">Frágil</span>
                 <button
                   type="button"
+                  aria-labelledby={`item-${item.id}-fragile-label`}
+                  aria-pressed={item.fragile}
                   onClick={() => updateItem(index, 'fragile', !item.fragile)}
                   className={clsx(
                     'w-full py-1.5 rounded-md text-xs font-medium border transition-colors',
@@ -317,8 +325,15 @@ const nextStatusLabel: Partial<Record<OrderStatus, string>> = {
 };
 
 export function OrdersPage() {
-  const { getFilteredOrders, filters, setFilters, addOrder, updateOrder, updateOrderStatus, deleteOrder } = useOrderStore();
-  const { clients } = useClientStore();
+  const { getFilteredOrders, filters, setFilters, addOrder, updateOrder, updateOrderStatus, deleteOrder, fetchOrders } = useOrderStore();
+  const { clients, fetchClients } = useClientStore();
+  const { fetchRoutes } = useRouteStore();
+
+  useEffect(() => {
+    void fetchOrders();
+    void fetchClients();
+    void fetchRoutes();
+  }, [fetchOrders, fetchClients, fetchRoutes]);
 
   const [showForm, setShowForm] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -399,7 +414,7 @@ export function OrdersPage() {
           <Button variant="secondary" onClick={() => setShowFilters(!showFilters)} icon={<Filter size={15} />}>
             Filtros
             {(filters.status !== 'all' || filters.priority !== 'all') && (
-              <span className="ml-1 h-1.5 w-1.5 rounded-full bg-primary-500" />
+              <span aria-hidden="true" className="ml-1 size-1.5 rounded-full bg-primary-500" />
             )}
           </Button>
           <Button onClick={() => setShowForm(true)} icon={<Plus size={16} />}>

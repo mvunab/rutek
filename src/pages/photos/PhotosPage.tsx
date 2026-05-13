@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   ChevronDown, ChevronRight, Search, X, ZoomIn,
   Download, Truck, Calendar, User, Package, Camera,
   ChevronLeft, AlertTriangle, FileSignature, ImageIcon
 } from 'lucide-react';
-import { mockRoutePhotos } from '../../data/mockData';
+import { usePhotoStore } from '../../store/usePhotoStore';
 import type { RoutePhoto, PhotoType } from '../../types';
 import { clsx } from 'clsx';
 
@@ -20,19 +20,21 @@ const typeConfig: Record<PhotoType, { label: string; color: string; icon: React.
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
 function Lightbox({
   photos,
-  initialIndex,
+  index,
+  onIndexChange,
   onClose,
 }: {
   photos: RoutePhoto[];
-  initialIndex: number;
+  index: number;
+  onIndexChange: (next: number) => void;
   onClose: () => void;
 }) {
-  const [idx, setIdx] = useState(initialIndex);
+  const idx = Math.min(Math.max(index, 0), photos.length - 1);
   const photo = photos[idx];
   const cfg = typeConfig[photo.type];
 
-  const prev = () => setIdx(i => Math.max(0, i - 1));
-  const next = () => setIdx(i => Math.min(photos.length - 1, i + 1));
+  const prev = () => onIndexChange(Math.max(0, idx - 1));
+  const next = () => onIndexChange(Math.min(photos.length - 1, idx + 1));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/90 backdrop-blur-sm p-4">
@@ -99,7 +101,10 @@ function Lightbox({
           {photos.map((p, i) => (
             <button
               key={p.id}
-              onClick={() => setIdx(i)}
+              type="button"
+              aria-label={`Ver foto ${i + 1}`}
+              aria-current={i === idx}
+              onClick={() => onIndexChange(i)}
               className={clsx(
                 'flex-shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition-all',
                 i === idx ? 'border-white scale-105' : 'border-white/20 hover:border-white/50'
@@ -134,23 +139,25 @@ function RouteGroup({
   return (
     <div>
       {/* Group header */}
-      <div
+      <button
+        type="button"
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-3 px-4 py-2.5 bg-stone-100 border-y border-stone-200 cursor-pointer hover:bg-stone-200/60 transition-colors select-none"
+        aria-expanded={open}
+        className="w-full flex items-center gap-3 px-4 py-2.5 bg-stone-100 border-y border-stone-200 cursor-pointer hover:bg-stone-200/60 transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
       >
-        <span className="text-stone-400">
+        <span aria-hidden="true" className="text-stone-400">
           {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
         </span>
-        <span className="text-xs font-bold text-stone-700 uppercase tracking-wide">
+        <span className="text-xs font-semibold text-stone-700 uppercase tracking-wide">
           Nº Ruta: {routeCode}
         </span>
         <span className="ml-2 flex items-center gap-1.5 text-xs text-stone-500">
-          <Truck size={12} />{driver} · {plate}
+          <Truck size={12} aria-hidden="true" />{driver} · {plate}
         </span>
-        <span className="ml-auto text-[11px] text-stone-400 font-medium">
+        <span className="ml-auto text-[11px] text-stone-400 font-medium tabular-nums">
           {photos.length} foto{photos.length !== 1 ? 's' : ''}
         </span>
-      </div>
+      </button>
 
       {/* Rows */}
       {open && photos.map((photo, i) => {
@@ -166,20 +173,20 @@ function RouteGroup({
             {/* Actions */}
             <div className="flex items-center gap-1.5 px-3 py-2.5 flex-shrink-0 w-24">
               <button
-                className="w-5 h-5 rounded-full bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center transition-colors"
+                className="size-5 rounded-full bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center transition-colors"
                 title="Eliminar"
               >
                 <X size={11} />
               </button>
               <button
                 onClick={() => onViewPhoto(photos, i)}
-                className="w-5 h-5 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 flex items-center justify-center transition-colors"
+                className="size-5 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 flex items-center justify-center transition-colors"
                 title="Ver foto"
               >
                 <ZoomIn size={11} />
               </button>
               <button
-                className="w-5 h-5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-500 flex items-center justify-center transition-colors"
+                className="size-5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-500 flex items-center justify-center transition-colors"
                 title="Descargar"
               >
                 <Download size={11} />
@@ -247,9 +254,14 @@ export function PhotosPage() {
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<PhotoType | 'all'>('all');
   const [lightbox, setLightbox] = useState<{ photos: RoutePhoto[]; index: number } | null>(null);
+  const { photos, fetchPhotos } = usePhotoStore();
+
+  useEffect(() => {
+    void fetchPhotos();
+  }, [fetchPhotos]);
 
   const filtered = useMemo(() => {
-    return mockRoutePhotos.filter(p => {
+    return photos.filter(p => {
       if (filterType !== 'all' && p.type !== filterType) return false;
       if (search) {
         const t = search.toLowerCase();
@@ -263,7 +275,7 @@ export function PhotosPage() {
       }
       return true;
     });
-  }, [search, filterType]);
+  }, [photos, search, filterType]);
 
   // Group by routeCode, preserving order
   const groups = useMemo(() => {
@@ -287,10 +299,10 @@ export function PhotosPage() {
   const typeCounts = useMemo(() =>
     Object.fromEntries(
       (['entrega', 'recepcion', 'dano', 'firma', 'otro'] as PhotoType[]).map(t => [
-        t, mockRoutePhotos.filter(p => p.type === t).length,
+        t, photos.filter(p => p.type === t).length,
       ])
     ),
-  []);
+  [photos]);
 
   return (
     <div className="space-y-4 -mt-1">
@@ -399,7 +411,8 @@ export function PhotosPage() {
       {lightbox && (
         <Lightbox
           photos={lightbox.photos}
-          initialIndex={lightbox.index}
+          index={lightbox.index}
+          onIndexChange={(next) => setLightbox(prev => prev ? { ...prev, index: next } : prev)}
           onClose={() => setLightbox(null)}
         />
       )}

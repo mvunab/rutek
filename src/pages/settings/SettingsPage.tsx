@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Building2, Moon, Sun, Monitor, Check } from 'lucide-react';
+import { Building2, Moon, Sun, Monitor, Check, Key, Eye, EyeOff } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input, Select } from '../../components/ui/Input';
@@ -32,10 +32,16 @@ const emptyForm: CompanyForm = {
 };
 
 export function SettingsPage() {
-  const { tenant, updateTenant } = useAuthStore();
+  const { tenant, updateTenant, changeMyPassword, loading } = useAuthStore();
   const { theme, setTheme } = useUiStore();
   const [form, setForm] = useState<CompanyForm>(emptyForm);
   const [savedCompany, setSavedCompany] = useState(false);
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [savedPw, setSavedPw] = useState(false);
+  const [pwError, setPwError] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNext, setShowNext] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     if (!tenant) return;
@@ -71,6 +77,27 @@ export function SettingsPage() {
     });
     setSavedCompany(true);
     window.setTimeout(() => setSavedCompany(false), 2500);
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError('');
+    if (pwForm.next !== pwForm.confirm) {
+      setPwError('Las contraseñas no coinciden');
+      return;
+    }
+    if (pwForm.next.length < 6) {
+      setPwError('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    const ok = await changeMyPassword(pwForm.current, pwForm.next);
+    if (ok) {
+      setSavedPw(true);
+      setPwForm({ current: '', next: '', confirm: '' });
+      window.setTimeout(() => setSavedPw(false), 2500);
+    } else {
+      setPwError('No se pudo cambiar la contraseña. Verifica tu contraseña actual.');
+    }
   };
 
   if (!tenant) {
@@ -225,6 +252,99 @@ export function SettingsPage() {
               >
                 <Check size={16} aria-hidden />
                 Cambios guardados
+              </span>
+            )}
+          </div>
+        </form>
+      </Card>
+
+      {/* Contraseña */}
+      <Card padding="lg">
+        <div className="flex items-start gap-3 mb-6">
+          <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
+            <Key size={20} />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+              Cambiar contraseña
+            </h2>
+            <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
+              Actualiza tu contraseña de acceso a la plataforma.
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handlePasswordSubmit} className="space-y-4">
+          <div className="space-y-4">
+            <div className="relative">
+              <Input
+                label="Contraseña actual"
+                type={showCurrent ? 'text' : 'password'}
+                value={pwForm.current}
+                onChange={(e) => setPwForm(prev => ({ ...prev, current: e.target.value }))}
+                required
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrent(!showCurrent)}
+                className="absolute right-3 top-8 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+              >
+                {showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <div className="relative">
+              <Input
+                label="Nueva contraseña"
+                type={showNext ? 'text' : 'password'}
+                value={pwForm.next}
+                onChange={(e) => setPwForm(prev => ({ ...prev, next: e.target.value }))}
+                required
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNext(!showNext)}
+                className="absolute right-3 top-8 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+              >
+                {showNext ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <div className="relative">
+              <Input
+                label="Confirmar nueva contraseña"
+                type={showConfirm ? 'text' : 'password'}
+                value={pwForm.confirm}
+                onChange={(e) => setPwForm(prev => ({ ...prev, confirm: e.target.value }))}
+                required
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm(!showConfirm)}
+                className="absolute right-3 top-8 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+              >
+                {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {pwError && (
+            <p className="text-sm text-red-600 dark:text-red-400">{pwError}</p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Cambiando...' : 'Cambiar contraseña'}
+            </Button>
+            {savedPw && (
+              <span
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400"
+                role="status"
+                aria-live="polite"
+              >
+                <Check size={16} aria-hidden />
+                Contraseña actualizada
               </span>
             )}
           </div>
