@@ -17,7 +17,7 @@ export interface Tenant {
 }
 
 // ─── Auth / Users ─────────────────────────────────────────────────────────────
-export type UserRole = 'admin' | 'operator' | 'driver' | 'client';
+export type UserRole = 'super_admin' | 'admin' | 'operator' | 'driver' | 'client';
 
 export interface User {
   id: string;
