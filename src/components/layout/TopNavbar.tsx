@@ -2,10 +2,10 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Truck, Package, Map, UserCircle2,
   Users, Bell, Search, ChevronDown, LogOut, Settings,
-  Menu, X,
+  Menu, X, Shield, Building2, FileClock,
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import type { UserRole } from '../../types';
 
@@ -14,14 +14,22 @@ interface NavItem {
   icon: React.ReactNode;
   label: string;
   roles: UserRole[];
+  end?: boolean;
 }
 
-const navItems: NavItem[] = [
+const tenantNavItems: NavItem[] = [
   { to: '/dashboard',    icon: <LayoutDashboard size={15} />, label: 'Back Office',         roles: ['admin', 'operator'] },
   { to: '/rutas',        icon: <Truck size={15} />,           label: 'Admin. de Rutas',     roles: ['admin', 'operator', 'driver'] },
   { to: '/pedidos',      icon: <Package size={15} />,         label: 'Pedidos',             roles: ['admin', 'operator', 'driver', 'client'] },
   { to: '/clientes',     icon: <Users size={15} />,           label: 'Clientes',            roles: ['admin', 'operator'] },
   { to: '/usuarios',     icon: <UserCircle2 size={15} />,     label: 'Usuarios Sistema',    roles: ['admin'] },
+];
+
+const superAdminNavItems: NavItem[] = [
+  { to: '/super-admin',          icon: <LayoutDashboard size={15} />, label: 'Resumen Global', roles: ['super_admin'], end: true },
+  { to: '/super-admin/tenants',  icon: <Building2 size={15} />,       label: 'Tenants',        roles: ['super_admin'] },
+  { to: '/super-admin/users',    icon: <Users size={15} />,           label: 'Usuarios',       roles: ['super_admin'] },
+  { to: '/super-admin/auditoria',icon: <FileClock size={15} />,       label: 'Auditoría',      roles: ['super_admin'] },
 ];
 
 const roleLabels: Record<UserRole, string> = {
@@ -33,16 +41,20 @@ const roleLabels: Record<UserRole, string> = {
 };
 
 export function TopNavbar() {
-  const { user, tenant, logout } = useAuthStore();
+  const { user, tenant, isSuperAdmin, logout } = useAuthStore();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const filteredItems = navItems.filter(
-    item => user && item.roles.includes(user.role)
-  );
+  const inSuperAdminContext = isSuperAdmin || pathname.startsWith('/super-admin');
+
+  const filteredItems = useMemo(() => {
+    if (!user) return [];
+    const items = inSuperAdminContext ? superAdminNavItems : tenantNavItems;
+    return items.filter(item => item.roles.includes(user.role));
+  }, [user, inSuperAdminContext]);
 
   const handleLogout = () => {
     logout();
@@ -84,13 +96,25 @@ export function TopNavbar() {
       <div className="flex items-center gap-2 sm:gap-4 px-4 sm:px-6 h-14 border-b border-stone-100 dark:border-stone-800">
         {/* Logo */}
         <div className="flex items-center gap-2 sm:gap-2.5 sm:mr-2 min-w-0 flex-shrink-0">
-          <div aria-hidden="true" className="size-7 bg-primary-700 rounded-md flex items-center justify-center flex-shrink-0">
-            <Map size={14} className="text-white" />
+          <div
+            aria-hidden="true"
+            className={clsx(
+              'size-7 rounded-md flex items-center justify-center flex-shrink-0',
+              inSuperAdminContext ? 'bg-violet-600' : 'bg-primary-700',
+            )}
+          >
+            {inSuperAdminContext ? <Shield size={14} className="text-white" /> : <Map size={14} className="text-white" />}
           </div>
           <div className="leading-tight min-w-0">
             <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 tracking-tight">Rutek</p>
-            {tenant && (
-              <p className="text-[10px] text-stone-400 dark:text-stone-500 leading-none truncate max-w-[100px] sm:max-w-[140px]">{tenant.name}</p>
+            {inSuperAdminContext ? (
+              <p className="text-[10px] text-violet-600 dark:text-violet-400 leading-none font-semibold uppercase tracking-wider">
+                Panel Global
+              </p>
+            ) : (
+              tenant && (
+                <p className="text-[10px] text-stone-400 dark:text-stone-500 leading-none truncate max-w-[100px] sm:max-w-[140px]">{tenant.name}</p>
+              )
             )}
           </div>
         </div>
@@ -161,7 +185,13 @@ export function TopNavbar() {
             aria-haspopup="true"
             aria-label="Menú de usuario"
           >
-            <div aria-hidden="true" className="size-7 bg-primary-700 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0">
+            <div
+              aria-hidden="true"
+              className={clsx(
+                'size-7 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0',
+                inSuperAdminContext ? 'bg-violet-600' : 'bg-primary-700',
+              )}
+            >
               {user?.name.charAt(0)}
             </div>
             <div className="text-left hidden md:block">
@@ -212,17 +242,20 @@ export function TopNavbar() {
       {/* Nav tabs — solo escritorio */}
       <nav
         className="hidden lg:flex items-center gap-0.5 px-4 h-11"
-        aria-label="Principal"
+        aria-label={inSuperAdminContext ? 'Panel global' : 'Principal'}
       >
         {filteredItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            end={item.end}
             className={({ isActive }) => clsx(
-              'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-150 whitespace-nowrap',
+              'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-150 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-stone-900',
               isActive
-                ? 'bg-primary-700 text-white shadow-sm'
-                : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800'
+                ? inSuperAdminContext
+                  ? 'bg-violet-600 text-white shadow-sm focus-visible:ring-violet-500'
+                  : 'bg-primary-700 text-white shadow-sm focus-visible:ring-primary-500'
+                : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 focus-visible:ring-primary-500'
             )}
           >
             {item.icon}
@@ -266,15 +299,18 @@ export function TopNavbar() {
                 <li key={item.to}>
                   <NavLink
                     to={item.to}
+                    end={item.end}
                     onClick={closeMobileMenu}
                     className={({ isActive }) => clsx(
                       'flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors',
                       isActive
-                        ? 'bg-primary-700 text-white'
+                        ? inSuperAdminContext
+                          ? 'bg-violet-600 text-white'
+                          : 'bg-primary-700 text-white'
                         : 'text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800'
                     )}
                   >
-                    <span className="flex-shrink-0 opacity-90">{item.icon}</span>
+                    <span className="flex-shrink-0 opacity-90" aria-hidden="true">{item.icon}</span>
                     {item.label}
                   </NavLink>
                 </li>

@@ -59,6 +59,11 @@ const AdminUsersPage = lazy(() =>
     default: m.AdminUsersPage,
   })),
 );
+const AuditPage = lazy(() =>
+  import('./pages/super-admin/AuditPage').then((m) => ({
+    default: m.AuditPage,
+  })),
+);
 const NotFound = lazy(() =>
   import('./pages/NotFound').then((m) => ({ default: m.NotFound })),
 );
@@ -213,6 +218,14 @@ function App() {
                 element={
                   <ProtectedRoute requireSuperAdmin>
                     <AdminUsersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="super-admin/auditoria"
+                element={
+                  <ProtectedRoute requireSuperAdmin>
+                    <AuditPage />
                   </ProtectedRoute>
                 }
               />

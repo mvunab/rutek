@@ -37,8 +37,8 @@ interface SuperAdminStore {
   updateTenant: (id: string, patch: Partial<CreateTenantInput>) => Promise<void>;
   toggleTenantActive: (id: string, active: boolean) => Promise<void>;
   deleteTenant: (id: string) => Promise<void>;
-  createTenantAdmin: (tenantId: string, input: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
-  updateUser: (id: string, patch: { name?: string; email?: string; role?: string; active?: boolean }) => Promise<void>;
+  createTenantAdmin: (tenantId: string, input: { name: string; email: string; password: string; phone?: string; role?: 'admin' | 'operator' }) => Promise<void>;
+  updateUser: (id: string, patch: { name?: string; email?: string; role?: string; phone?: string; active?: boolean }) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
   resetUserPassword: (userId: string, password: string) => Promise<void>;
   changeMyPassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
@@ -161,7 +161,8 @@ export const useSuperAdminStore = create<SuperAdminStore>((set, get) => ({
       await get().fetchTenantDetail(tenantId);
       set({ loading: false });
     } catch (err: any) {
-      set({ error: err.message, loading: false });
+      set({ error: err?.message ?? 'Error al crear usuario', loading: false });
+      throw err;
     }
   },
 
@@ -183,7 +184,8 @@ export const useSuperAdminStore = create<SuperAdminStore>((set, get) => ({
         set({ loading: false });
       }
     } catch (err: any) {
-      set({ error: err.message, loading: false });
+      set({ error: err?.message ?? 'Error al actualizar usuario', loading: false });
+      throw err;
     }
   },
 
@@ -205,7 +207,8 @@ export const useSuperAdminStore = create<SuperAdminStore>((set, get) => ({
         set({ loading: false });
       }
     } catch (err: any) {
-      set({ error: err.message, loading: false });
+      set({ error: err?.message ?? 'Error al eliminar usuario', loading: false });
+      throw err;
     }
   },
 
