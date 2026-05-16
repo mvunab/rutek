@@ -2,7 +2,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Truck, Package, Map, UserCircle2,
   Users, Bell, Search, ChevronDown, LogOut, Settings,
-  Menu, X, Shield, Building2, FileClock,
+  Menu, X, Shield, Building2, FileClock, Car,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useEffect, useMemo, useState } from 'react';
@@ -19,9 +19,10 @@ interface NavItem {
 
 const tenantNavItems: NavItem[] = [
   { to: '/dashboard',    icon: <LayoutDashboard size={15} />, label: 'Back Office',         roles: ['admin', 'operator'] },
-  { to: '/rutas',        icon: <Truck size={15} />,           label: 'Admin. de Rutas',     roles: ['admin', 'operator', 'driver'] },
-  { to: '/pedidos',      icon: <Package size={15} />,         label: 'Pedidos',             roles: ['admin', 'operator', 'driver', 'client'] },
+  { to: '/rutas',        icon: <Truck size={15} />,           label: 'Rutas',             roles: ['admin', 'operator', 'driver'] },
+  { to: '/pedidos',      icon: <Package size={15} />,         label: 'Pedidos',            roles: ['client'] },
   { to: '/clientes',     icon: <Users size={15} />,           label: 'Clientes',            roles: ['admin', 'operator'] },
+  { to: '/vehiculos',    icon: <Car size={15} />,             label: 'Vehículos',           roles: ['admin', 'operator'] },
   { to: '/usuarios',     icon: <UserCircle2 size={15} />,     label: 'Usuarios Sistema',    roles: ['admin'] },
 ];
 

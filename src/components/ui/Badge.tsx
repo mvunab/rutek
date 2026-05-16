@@ -1,5 +1,8 @@
 import { clsx } from 'clsx';
-import type { OrderStatus, RouteStatus, OrderPriority } from '../../types';
+import { useAuthStore } from '../../store/useAuthStore';
+import { resolveOrderStatusLabel } from '../../lib/orderStatusLabels';
+import type { OrderPriority, RouteStatus } from '../../types';
+import { normalizeRouteStatus, routeStatusLabel } from '../../lib/routeStatusLabels';
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'purple' | 'slate';
 
@@ -45,28 +48,44 @@ export function Badge({ variant = 'default', children, className, dot }: BadgePr
   );
 }
 
-export function OrderStatusBadge({ status }: { status: OrderStatus }) {
-  const config: Record<OrderStatus, { label: string; variant: BadgeVariant }> = {
-    pending: { label: 'Pendiente', variant: 'warning' },
-    confirmed: { label: 'Confirmado', variant: 'info' },
-    in_transit: { label: 'En tránsito', variant: 'purple' },
-    delivered: { label: 'Entregado', variant: 'success' },
-    cancelled: { label: 'Cancelado', variant: 'danger' },
-    returned: { label: 'Devuelto', variant: 'slate' },
-  };
-  const { label, variant } = config[status];
+function variantForOrderSlug(slug: string): BadgeVariant {
+  switch (slug) {
+    case 'pending':
+      return 'warning';
+    case 'in_transit':
+      return 'purple';
+    case 'delivered':
+      return 'success';
+    case 'rejected':
+      return 'danger';
+    case 'confirmed':
+      return 'info';
+    case 'cancelled':
+    case 'returned':
+      return 'slate';
+    default:
+      return 'slate';
+  }
+}
+
+/** Muestra etiqueta legible (built-in, legado o definida por el tenant). */
+export function OrderStatusBadge({ status }: { status: string }) {
+  const tenant = useAuthStore((s) => s.tenant);
+  const label = resolveOrderStatusLabel(status, tenant);
+  const variant = variantForOrderSlug(status);
   return <Badge variant={variant} dot>{label}</Badge>;
 }
 
-export function RouteStatusBadge({ status }: { status: RouteStatus }) {
-  const config: Record<RouteStatus, { label: string; variant: BadgeVariant }> = {
-    planned: { label: 'Planificada', variant: 'info' },
-    active: { label: 'Activa', variant: 'success' },
-    completed: { label: 'Completada', variant: 'slate' },
-    cancelled: { label: 'Cancelada', variant: 'danger' },
+export function RouteStatusBadge({ status }: { status: RouteStatus | string }) {
+  const normalized = normalizeRouteStatus(String(status));
+  const label = routeStatusLabel(normalized);
+  const variants: Record<RouteStatus, BadgeVariant> = {
+    not_started: 'info',
+    in_progress: 'warning',
+    completed: 'success',
+    cancelled: 'danger',
   };
-  const { label, variant } = config[status];
-  return <Badge variant={variant} dot>{label}</Badge>;
+  return <Badge variant={variants[normalized]} dot>{label}</Badge>;
 }
 
 export function PriorityBadge({ priority }: { priority: OrderPriority }) {

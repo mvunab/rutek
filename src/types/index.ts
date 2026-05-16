@@ -14,6 +14,8 @@ export interface Tenant {
   address?: string;
   city?: string;
   region?: string;
+  /** Estados de pedido extra definidos por el admin del tenant (`slug` → `label`). */
+  customOrderStatuses?: { slug: string; label: string }[];
 }
 
 // ─── Auth / Users ─────────────────────────────────────────────────────────────
@@ -66,13 +68,14 @@ export interface ServiceHistory {
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
-export type OrderStatus =
+export type BuiltinOrderStatus =
   | 'pending'
-  | 'confirmed'
   | 'in_transit'
   | 'delivered'
-  | 'cancelled'
-  | 'returned';
+  | 'rejected';
+
+/** Slug en API: base + valores definidos por el tenant. */
+export type OrderStatus = BuiltinOrderStatus | (string & {});
 
 export type OrderPriority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -101,6 +104,10 @@ export interface Order {
   estimatedDelivery: string;
   actualDelivery?: string;
   routeId?: string;
+  /** Bultos de este pedido; en la ruta se suman con los demás pedidos asignados. */
+  bultos: number;
+  /** URL de la guía de despacho (imagen o documento). */
+  dispatchGuideUrl?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -114,7 +121,11 @@ export interface Address {
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
-export type RouteStatus = 'planned' | 'active' | 'completed' | 'cancelled';
+export type RouteStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled';
 
 export interface RouteStop {
   id: string;
@@ -161,6 +172,7 @@ export interface Vehicle {
   year: number;
   capacity: number;
   available: boolean;
+  createdAt?: string;
 }
 
 // ─── Dashboard Stats ─────────────────────────────────────────────────────────
@@ -205,6 +217,7 @@ export interface DeliveryRecord {
   obs: string;
   zona: string;
   routeId?: string;
+  orderId?: string;
 }
 
 // ─── Peoneta (asistente de entrega) ──────────────────────────────────────────
@@ -247,7 +260,7 @@ export interface RoutePhoto {
 
 // ─── Filters ─────────────────────────────────────────────────────────────────
 export interface OrderFilters {
-  status?: OrderStatus | 'all';
+  status?: string | 'all';
   priority?: OrderPriority | 'all';
   clientId?: string;
   dateFrom?: string;

@@ -34,6 +34,11 @@ const PeonetasPage = lazy(() =>
     default: m.PeonetasPage,
   })),
 );
+const VehiclesPage = lazy(() =>
+  import('./pages/vehicles/VehiclesPage').then((m) => ({
+    default: m.VehiclesPage,
+  })),
+);
 const SettingsPage = lazy(() =>
   import('./pages/settings/SettingsPage').then((m) => ({
     default: m.SettingsPage,
@@ -178,6 +183,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <PeonetasPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="vehiculos"
+                element={
+                  <ProtectedRoute>
+                    <VehiclesPage />
                   </ProtectedRoute>
                 }
               />

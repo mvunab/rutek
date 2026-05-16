@@ -2,18 +2,37 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Plus, Search, ChevronUp, ChevronDown, ChevronsUpDown,
   CheckCircle2, Circle, Truck, Clock, RotateCcw, XCircle,
-  Download, RefreshCw, SlidersHorizontal, Edit2, Eye, Map
+  Download, RefreshCw, SlidersHorizontal, Edit2, Eye, Package, Map as MapIcon, UserCircle
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { RouteStatusBadge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useRouteStore } from '../../store/useRouteStore';
 import { useDeliveryStore } from '../../store/useDeliveryStore';
-import type { DeliveryRecord, DeliveryStatus } from '../../types';
+import type { DeliveryRecord, DeliveryStatus, Route, Order } from '../../types';
 import { clsx } from 'clsx';
+import { ApiError } from '../../lib/api';
+import { useOrderStore } from '../../store/useOrderStore';
+import { useAuthStore } from '../../store/useAuthStore';
+import { useClientStore } from '../../store/useClientStore';
+import { useUserStore } from '../../store/useUserStore';
+import { useVehicleStore } from '../../store/useVehicleStore';
+import { OrderForm, type OrderFormData } from '../../components/orders/OrderForm';
+import { OrderDetailModal } from '../../components/orders/OrderDetailModal';
 
-// ─── Status config ────────────────────────────────────────────────────────────
+/** Fecha legible para cabecera de ruta (planificación / inicio). */
+function formatRouteDay(isoLike: string | undefined): string {
+  if (!isoLike?.trim()) return '—';
+  try {
+    const d = new Date(isoLike);
+    if (Number.isNaN(d.getTime())) return '—';
+    return new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium' }).format(d);
+  } catch {
+    return '—';
+  }
+}
 const statusConfig: Record<DeliveryStatus, {
   label: string;
   bg: string;
@@ -82,36 +101,86 @@ function ColHeader({
 
 // ─── Route Form (create/edit) ─────────────────────────────────────────────────
 interface RouteFormData {
-  name: string; notes: string; startTime: string;
-  estimatedDistance: number; estimatedDuration: number;
+  code: string;
+  name: string;
+  notes: string;
 }
 
 function RouteForm({
-  initial, onSubmit, onCancel, submitLabel = 'Guardar',
+  initial,
+  onSubmit,
+  onCancel,
+  submitLabel = 'Guardar',
+  error,
 }: {
   initial?: Partial<RouteFormData>;
-  onSubmit: (data: RouteFormData) => void;
+  onSubmit: (data: RouteFormData) => void | Promise<void>;
   onCancel: () => void;
   submitLabel?: string;
+  error?: string | null;
 }) {
   const [form, setForm] = useState<RouteFormData>({
-    name: '', notes: '', startTime: '08:00', estimatedDistance: 0, estimatedDuration: 60, ...initial,
+    code: '',
+    name: '',
+    notes: '',
+    ...initial,
   });
+  const [saving, setSaving] = useState(false);
   const f = (field: keyof RouteFormData) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setForm(p => ({ ...p, [field]: e.target.type === 'number' ? Number(e.target.value) : e.target.value }));
+      setForm((p) => ({ ...p, [field]: e.target.value }));
+
+  const handleSubmit = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    try {
+      await onSubmit({
+        code: form.code.trim(),
+        name: form.name.trim(),
+        notes: form.notes.trim(),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <Input label="Nombre de la ruta" placeholder="Ej: Ruta Santiago Norte" value={form.name} onChange={f('name')} />
-      <div className="grid grid-cols-3 gap-3">
-        <Input label="Hora inicio" type="time" value={form.startTime} onChange={f('startTime')} />
-        <Input label="Distancia (km)" type="number" min={0} value={form.estimatedDistance} onChange={f('estimatedDistance')} />
-        <Input label="Duración (min)" type="number" min={0} value={form.estimatedDuration} onChange={f('estimatedDuration')} />
-      </div>
-      <Textarea label="Notas" placeholder="Instrucciones..." value={form.notes} onChange={f('notes')} rows={3} />
+      {error && (
+        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+          {error}
+        </p>
+      )}
+      <Input
+        label="Código / folio interno"
+        placeholder="Ej: 2028050006 (opcional; se genera si lo dejas vacío)"
+        value={form.code}
+        onChange={f('code')}
+        name="route_code"
+        autoComplete="off"
+        spellCheck={false}
+      />
+      <Input
+        label="Nombre de la ruta"
+        placeholder="Ej: Santiago Norte"
+        value={form.name}
+        onChange={f('name')}
+        name="route_name"
+      />
+      <Textarea
+        label="Notas"
+        placeholder="Instrucciones opcionales…"
+        value={form.notes}
+        onChange={f('notes')}
+        rows={3}
+      />
       <div className="flex justify-end gap-3 pt-2">
-        <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-        <Button onClick={() => onSubmit(form)} disabled={!form.name.trim()}>{submitLabel}</Button>
+        <Button type="button" variant="ghost" onClick={onCancel} disabled={saving}>
+          Cancelar
+        </Button>
+        <Button type="button" onClick={() => void handleSubmit()} loading={saving} disabled={!form.name.trim()}>
+          {submitLabel}
+        </Button>
       </div>
     </div>
   );
@@ -121,7 +190,7 @@ function RouteForm({
 function DeliveryDetailModal({ record, onClose }: { record: DeliveryRecord; onClose: () => void }) {
   const cfg = statusConfig[record.estado];
   return (
-    <Modal open onClose={onClose} title="Detalle de entrega" description={`Pedido ${record.pedido}`} size="lg">
+    <Modal open onClose={onClose} title="Detalle de parada" description={`Pedido ${record.pedido}`} size="lg">
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <StatusBadge status={record.estado} />
@@ -130,8 +199,8 @@ function DeliveryDetailModal({ record, onClose }: { record: DeliveryRecord; onCl
         <div className="grid grid-cols-2 gap-3">
           {[
             ['Cliente',    record.cliente],
-            ['Entrega',    record.entrega],
-            ['Pedido',     record.pedido],
+            ['Punto de entrega', record.entrega],
+            ['Folio',     record.pedido],
             ['Factura',    record.factura || '–'],
             ['Tipo',       record.tipo],
             ['Referencia', record.ref],
@@ -180,15 +249,515 @@ function DeliveryDetailModal({ record, onClose }: { record: DeliveryRecord; onCl
   );
 }
 
+/** Detalle administrativo: crear y consultar pedidos en el contexto de esta ruta. */
+function RoutePedidosModal({ route, onClose }: { route: Route; onClose: () => void }) {
+  const { user } = useAuthStore();
+  const canManage = user?.role === 'admin' || user?.role === 'operator';
+  const { orders, assignToRoute, detachOrderFromRoute, fetchOrders, addOrder } = useOrderStore();
+  const { fetchRoutes, addOrderToRoute, updateRoute } = useRouteStore();
+  const { clients, fetchClients } = useClientStore();
+  const { users, fetchUsers } = useUserStore();
+  const { vehicles, fetchVehicles } = useVehicleStore();
+
+  useEffect(() => {
+    void fetchClients();
+    void fetchUsers();
+    void fetchVehicles();
+  }, [fetchClients, fetchUsers, fetchVehicles]);
+
+  const [pickOrderId, setPickOrderId] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createFormKey, setCreateFormKey] = useState(0);
+  const [detailOrder, setDetailOrder] = useState<Order | null>(null);
+  const [draftDriverId, setDraftDriverId] = useState(route.driverId ?? '');
+  const [draftVehicleId, setDraftVehicleId] = useState(route.vehicleId ?? '');
+
+  useEffect(() => {
+    setDraftDriverId(route.driverId ?? '');
+    setDraftVehicleId(route.vehicleId ?? '');
+  }, [route.id, route.driverId, route.vehicleId]);
+
+  const assigned = useMemo(
+    () =>
+      orders
+        .filter((o) => o.routeId === route.id)
+        .toSorted((a, b) => a.code.localeCompare(b.code, 'es')),
+    [orders, route.id],
+  );
+
+  const orphanOrders = useMemo(
+    () =>
+      orders.filter(
+        (o) =>
+          !o.routeId &&
+          o.status !== 'delivered' &&
+          o.status !== 'cancelled',
+      ),
+    [orders],
+  );
+
+  const totals = useMemo(() => {
+    const bultos = assigned.reduce((s, o) => s + (Number(o.bultos) || 0), 0);
+    return { pedidos: assigned.length, bultos };
+  }, [assigned]);
+
+  const orphanOptions = useMemo(() => {
+    const opts = orphanOrders.toSorted((a, b) => a.code.localeCompare(b.code, 'es'));
+    return [
+      { value: '', label: 'Seleccionar pedido sin ruta (legacy)…' },
+      ...opts.map((o) => ({
+        value: o.id,
+        label: `${o.code} · ${o.clientName?.trim() || 'Sin cliente'} · ${o.destination.city} · ${o.bultos} bultos`,
+      })),
+    ];
+  }, [orphanOrders]);
+
+  const driversList = useMemo(
+    () =>
+      users
+        .filter((u) => u.role === 'driver' && u.active)
+        .toSorted((a, b) => a.name.localeCompare(b.name, 'es')),
+    [users],
+  );
+
+  const driverSelectOpts = useMemo(
+    () => [
+      { value: '', label: 'Sin chofer asignado…' },
+      ...driversList.map((d) => ({ value: d.id, label: d.name })),
+    ],
+    [driversList],
+  );
+
+  const vehiclesSorted = useMemo(
+    () => vehicles.toSorted((a, b) => a.plate.localeCompare(b.plate, 'es')),
+    [vehicles],
+  );
+
+  const vehicleSelectOpts = useMemo(
+    () => [
+      { value: '', label: 'Sin vehículo asignado…' },
+      ...vehiclesSorted.map((v) => ({
+        value: v.id,
+        label: `${v.plate} · ${v.brand} ${v.model}${v.available ? '' : ' (no disponible)'}`,
+      })),
+    ],
+    [vehiclesSorted],
+  );
+
+  const assignmentDirty =
+    draftDriverId !== (route.driverId ?? '') || draftVehicleId !== (route.vehicleId ?? '');
+
+  const canClearAssignment =
+    !!(route.driverId || route.vehicleId || draftDriverId || draftVehicleId);
+
+  const handleAttachOrphan = async () => {
+    if (!pickOrderId) return;
+    setActionError(null);
+    setBusyId('add');
+    try {
+      await assignToRoute(pickOrderId, route.id);
+      addOrderToRoute(route.id, pickOrderId);
+      setPickOrderId('');
+      await fetchOrders();
+      await fetchRoutes();
+    } catch {
+      setActionError('No se pudo vincular el pedido. Revisa permisos y conexión.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleCreateOrder = async (data: OrderFormData) => {
+    const client = clients.find((c) => c.id === data.clientId);
+    setActionError(null);
+    setBusyId('create');
+    try {
+      const created = await addOrder({
+        clientId: data.clientId,
+        clientName: client?.companyName ?? '',
+        status: 'pending',
+        priority: data.priority,
+        routeId: route.id,
+        origin: { street: '', city: '', region: '' },
+        destination: {
+          street: data.destStreet,
+          city: data.destCity,
+          region: data.destRegion,
+        },
+        items: [],
+        totalWeight: 0,
+        totalVolume: 0,
+        estimatedDelivery: data.estimatedDelivery,
+        notes: data.notes,
+        bultos: data.bultos,
+        ...(data.dispatchGuideUrl.trim()
+          ? { dispatchGuideUrl: data.dispatchGuideUrl.trim() }
+          : {}),
+      });
+      if (created) addOrderToRoute(route.id, created.id);
+      setShowCreateForm(false);
+      setCreateFormKey((k) => k + 1);
+      await fetchOrders();
+      await fetchRoutes();
+    } catch {
+      setActionError('No se pudo crear el pedido en esta ruta.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleRemove = async (orderId: string) => {
+    setActionError(null);
+    setBusyId(orderId);
+    try {
+      await detachOrderFromRoute(orderId);
+      await fetchOrders();
+      await fetchRoutes();
+    } catch {
+      setActionError('No se pudo quitar el pedido de la ruta.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleSaveAssignment = async () => {
+    setActionError(null);
+    setBusyId('assign');
+    try {
+      const d = draftDriverId ? driversList.find((u) => u.id === draftDriverId) : undefined;
+      const v = draftVehicleId ? vehiclesSorted.find((x) => x.id === draftVehicleId) : undefined;
+      await updateRoute(route.id, {
+        driverId: d ? d.id : null,
+        driverName: d ? d.name : null,
+        vehicleId: v ? v.id : null,
+        vehiclePlate: v ? v.plate : null,
+      });
+      await fetchRoutes();
+    } catch {
+      setActionError('No se pudo guardar chofer o vehículo de la ruta.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleClearAssignment = async () => {
+    setActionError(null);
+    setBusyId('assign');
+    try {
+      await updateRoute(route.id, {
+        driverId: null,
+        driverName: null,
+        vehicleId: null,
+        vehiclePlate: null,
+      });
+      await fetchRoutes();
+    } catch {
+      setActionError('No se pudo quitar la asignación de la ruta.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const fechaSrc =
+    typeof route.startTime === 'string' && route.startTime.includes('T')
+      ? route.startTime
+      : route.createdAt;
+
+  return (
+    <>
+      <Modal open onClose={onClose} title={`Ruta ${route.code}`} description={route.name} size="xl">
+      <div className="space-y-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-2">
+            <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Fecha</p>
+            <p className="text-sm font-semibold text-stone-800 dark:text-stone-100">{formatRouteDay(fechaSrc)}</p>
+          </div>
+          <div className="rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-2 tabular-nums">
+            <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Pedidos</p>
+            <p className="text-sm font-semibold text-stone-800 dark:text-stone-100">{totals.pedidos}</p>
+          </div>
+          <div className="rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-2 tabular-nums">
+            <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Bultos totales</p>
+            <p className="text-sm font-semibold text-stone-800 dark:text-stone-100">{totals.bultos}</p>
+          </div>
+          <div className="rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-2 flex flex-col gap-1.5">
+            <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Estado ruta</p>
+            <RouteStatusBadge status={route.status} />
+          </div>
+        </div>
+
+        {canManage ? (
+          <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50/70 dark:bg-stone-900/45 p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <span className="flex size-9 shrink-0 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 items-center justify-center text-stone-400">
+                <UserCircle size={18} aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <h4 className="text-xs font-semibold text-stone-600 dark:text-stone-300 uppercase tracking-wide">
+                  Chofer y vehículo
+                </h4>
+                <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">
+                  Quién conduce y con qué patente cubre los pedidos de esta ruta. Se propaga a los registros de entrega ya ligados al itinerario.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-600 dark:text-stone-400">
+              <span>
+                <span className="font-semibold text-stone-500 dark:text-stone-500">Actual: </span>
+                {route.driverName?.trim() ? route.driverName.trim() : 'Sin chofer'}
+              </span>
+              <span className="text-stone-300 dark:text-stone-600">·</span>
+              <span translate="no">
+                <span className="font-semibold text-stone-500 dark:text-stone-500">Patente: </span>
+                {route.vehiclePlate?.trim() ? route.vehiclePlate.trim() : 'Sin vehículo'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Select
+                id={`route-driver-${route.id}`}
+                label="Chofer"
+                value={draftDriverId}
+                onChange={(e) => setDraftDriverId(e.target.value)}
+                options={driverSelectOpts}
+                disabled={busyId !== null}
+                autoComplete="off"
+              />
+              <Select
+                id={`route-vehicle-${route.id}`}
+                label="Vehículo"
+                value={draftVehicleId}
+                onChange={(e) => setDraftVehicleId(e.target.value)}
+                options={vehicleSelectOpts}
+                disabled={busyId !== null}
+                autoComplete="off"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button
+                type="button"
+                loading={busyId === 'assign'}
+                disabled={busyId !== null || !assignmentDirty}
+                onClick={() => void handleSaveAssignment()}
+              >
+                Guardar asignación
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={busyId !== null || !canClearAssignment}
+                onClick={() => void handleClearAssignment()}
+              >
+                Quitar asignación
+              </Button>
+            </div>
+          </div>
+        ) : (
+          (route.driverName?.trim() || route.vehiclePlate?.trim()) ? (
+            <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50/50 dark:bg-stone-900/40 px-4 py-3 text-xs text-stone-600 dark:text-stone-400">
+              <p className="font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-1">Chofer y vehículo</p>
+              <p>
+                {route.driverName?.trim() || 'Sin chofer'}
+                {(route.vehiclePlate?.trim()) ? (
+                  <span translate="no"> · Patente {route.vehiclePlate.trim()}</span>
+                ) : null}
+              </p>
+            </div>
+          ) : null
+        )}
+
+        {actionError && (
+          <p className="text-sm text-red-600 dark:text-red-400" role="alert">{actionError}</p>
+        )}
+
+        {assigned.length > 0 ? (
+          <p className="text-xs text-stone-500 dark:text-stone-400 tabular-nums" aria-live="polite">
+            <span className="font-semibold text-stone-600 dark:text-stone-300">
+              {assigned.filter((o) => o.status === 'delivered').length}/{assigned.length}
+            </span>{' '}
+            pedidos marcados como entregados · el estado de la ruta se actualiza desde el servidor
+          </p>
+        ) : null}
+
+        <div>
+          <h4 className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">
+            Pedidos en esta ruta
+          </h4>
+          {assigned.length === 0 ? (
+            <p className="text-sm text-stone-500 dark:text-stone-400 py-4 text-center border border-dashed border-stone-200 dark:border-stone-700 rounded-lg">
+              Ningún pedido asignado aún.
+            </p>
+          ) : (
+            <ul className="divide-y divide-stone-100 dark:divide-stone-800 rounded-lg border border-stone-200 dark:border-stone-700 overflow-hidden">
+              {assigned.map((o) => (
+                <li
+                  key={o.id}
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 bg-white dark:bg-stone-900 text-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono font-semibold text-stone-800 dark:text-stone-100">{o.code}</p>
+                    <p className="text-stone-500 dark:text-stone-400 truncate">
+                      {o.clientName?.trim() || 'Cliente por confirmar'} · {o.destination.city}
+                    </p>
+                  </div>
+                  <span className="tabular-nums font-semibold text-stone-700 dark:text-stone-200 shrink-0">
+                    {o.bultos} bultos
+                  </span>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      icon={<Eye size={13} />}
+                      onClick={() => setDetailOrder(o)}
+                      aria-label={`Ver pedido ${o.code}`}
+                    />
+                    {canManage ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        loading={busyId === o.id}
+                        disabled={busyId !== null}
+                        onClick={() => void handleRemove(o.id)}
+                        className="text-red-600 dark:text-red-400"
+                      >
+                        Quitar
+                      </Button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {canManage ? (
+          <div className="border-t border-stone-100 dark:border-stone-800 pt-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h4 className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">
+                Nuevo pedido en esta ruta
+              </h4>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                icon={
+                  showCreateForm ? (
+                    <ChevronUp size={18} aria-hidden />
+                  ) : (
+                    <Plus size={18} aria-hidden strokeWidth={2.25} />
+                  )
+                }
+                aria-expanded={showCreateForm}
+                aria-label={
+                  showCreateForm
+                    ? 'Ocultar formulario de nuevo pedido'
+                    : 'Mostrar formulario de nuevo pedido'
+                }
+                onClick={() => setShowCreateForm((v) => !v)}
+                disabled={busyId !== null}
+                className={
+                  showCreateForm
+                    ? '!bg-emerald-100 hover:!bg-emerald-200/90 !text-emerald-900 border border-emerald-300 shadow-sm dark:!bg-emerald-950/50 dark:hover:!bg-emerald-950/65 dark:!text-emerald-100 dark:border-emerald-800 rounded-full shrink-0 min-h-10 min-w-10 !p-0 focus-visible:!ring-emerald-500'
+                    : '!bg-emerald-600 hover:!bg-emerald-700 !text-white border-0 shadow-md hover:shadow-lg rounded-full shrink-0 min-h-10 min-w-10 !p-0 focus-visible:!ring-emerald-500'
+                }
+              />
+            </div>
+            <p className="text-xs text-stone-500 dark:text-stone-400">
+              Los pedidos se registran ya asociados a esta ruta (<strong className="font-medium text-stone-600 dark:text-stone-300">route_id</strong> obligatorio).
+            </p>
+            {showCreateForm ? (
+              <div className="rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50/90 dark:bg-stone-900/50 p-4">
+                <OrderForm
+                  key={createFormKey}
+                  submitLabel="Crear pedido en la ruta"
+                  onSubmit={(d) => void handleCreateOrder(d)}
+                  onCancel={() => setShowCreateForm(false)}
+                />
+              </div>
+            ) : null}
+
+            {orphanOrders.length > 0 ? (
+              <div className="space-y-3 pt-3 border-t border-dashed border-stone-200 dark:border-stone-700">
+                <h4 className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">
+                  Pedidos sin ruta (corrección)
+                </h4>
+                <p className="text-xs text-stone-500 dark:text-stone-400">
+                  Solo para datos antiguos: vincular un pedido huérfano a esta ruta.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 items-end">
+                  <Select
+                    id={`attach-orphan-route-${route.id}`}
+                    label="Pedido huérfano"
+                    value={pickOrderId}
+                    onChange={(e) => setPickOrderId(e.target.value)}
+                    options={orphanOptions}
+                    containerClassName="flex-1 w-full min-w-0"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => void handleAttachOrphan()}
+                    disabled={!pickOrderId || busyId !== null}
+                    loading={busyId === 'add'}
+                  >
+                    Vincular a la ruta
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-xs text-stone-500 dark:text-stone-400">
+            Solo administradores u operadores pueden crear pedidos o modificarlos en esta ruta.
+          </p>
+        )}
+
+        <div className="flex justify-end pt-2">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cerrar
+          </Button>
+        </div>
+      </div>
+    </Modal>
+      {detailOrder ? (
+        <OrderDetailModal
+          order={detailOrder}
+          onClose={() => setDetailOrder(null)}
+          routeLabel={`${route.code} · ${route.name}`}
+        />
+      ) : null}
+    </>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export function RoutesPage() {
-  const { addRoute, fetchRoutes } = useRouteStore();
+  const { routes, loading: routesLoading, addRoute, fetchRoutes } = useRouteStore();
   const { records, loaded: deliveriesLoaded, fetchRecords } = useDeliveryStore();
+  const { orders, fetchOrders } = useOrderStore();
 
   useEffect(() => {
     void fetchRecords();
     void fetchRoutes();
-  }, [fetchRecords, fetchRoutes]);
+    void fetchOrders();
+  }, [fetchRecords, fetchRoutes, fetchOrders]);
+
+  const routeAggById = useMemo(() => {
+    const map = new Map<string, { pedidos: number; bultos: number }>();
+    for (const r of routes) {
+      const pedidosEnRuta = orders.filter((o) => o.routeId === r.id);
+      map.set(r.id, {
+        pedidos: pedidosEnRuta.length,
+        bultos: pedidosEnRuta.reduce((s, o) => s + (Number(o.bultos) || 0), 0),
+      });
+    }
+    return map;
+  }, [routes, orders]);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sortCol, setSortCol] = useState<keyof DeliveryRecord | null>('estado');
@@ -198,7 +767,17 @@ export function RoutesPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [detailRecord, setDetailRecord] = useState<DeliveryRecord | null>(null);
   const [showNewRoute, setShowNewRoute] = useState(false);
+  const [newRouteError, setNewRouteError] = useState<string | null>(null);
   const [showStatusManager, setShowStatusManager] = useState(false);
+  const [routePedidosDetail, setRoutePedidosDetail] = useState<Route | null>(null);
+
+  useEffect(() => {
+    setRoutePedidosDetail((prev) => {
+      if (!prev) return null;
+      const fresh = routes.find((r) => r.id === prev.id);
+      return fresh ?? prev;
+    });
+  }, [routes]);
 
   // Sort handler
   const handleSort = (col: keyof DeliveryRecord) => {
@@ -260,14 +839,31 @@ export function RoutesPage() {
     Object.fromEntries(statuses.map(s => [s, records.filter(r => r.estado === s).length])),
   [records]);
 
-  const handleAddRoute = (data: RouteFormData) => {
-    addRoute({
-      name: data.name, status: 'planned', stops: [], orderIds: [],
-      estimatedDistance: data.estimatedDistance,
-      estimatedDuration: data.estimatedDuration,
-      startTime: data.startTime, notes: data.notes,
-    });
-    setShowNewRoute(false);
+  const handleAddRoute = async (data: RouteFormData) => {
+    setNewRouteError(null);
+    try {
+      await addRoute({
+        name: data.name,
+        ...(data.code ? { code: data.code } : {}),
+        ...(data.notes ? { notes: data.notes } : {}),
+      });
+      await fetchRoutes();
+      setShowNewRoute(false);
+    } catch (e) {
+      if (e instanceof ApiError) {
+        try {
+          const j = JSON.parse(e.body) as { message?: string | string[] };
+          const m = j.message;
+          setNewRouteError(
+            Array.isArray(m) ? m.join('. ') : m || `Error ${e.status}`,
+          );
+        } catch {
+          setNewRouteError(e.body || `Error ${e.status}`);
+        }
+      } else {
+        setNewRouteError('No se pudo crear la ruta');
+      }
+    }
   };
 
   const statusOptions = [
@@ -328,7 +924,7 @@ export function RoutesPage() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" />
           <input
             type="text"
-            placeholder="Buscar pedido, cliente, chofer…"
+            placeholder="Buscar folio, cliente, chofer…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-8 pr-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
@@ -344,7 +940,16 @@ export function RoutesPage() {
           Filtros
         </Button>
 
-        <Button variant="secondary" size="sm" icon={<RefreshCw size={14} />}>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<RefreshCw size={14} />}
+          onClick={() => {
+            void fetchRecords();
+            void fetchRoutes();
+            void fetchOrders();
+          }}
+        >
           Actualizar
         </Button>
 
@@ -374,15 +979,88 @@ export function RoutesPage() {
         </div>
       )}
 
+      <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Rutas (itinerario de salida)</h3>
+            <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+              <strong className="font-medium text-stone-600 dark:text-stone-300">Ruta</strong> e <strong className="font-medium text-stone-600 dark:text-stone-300">itinerario</strong> son lo mismo aquí: folio interno, nombre, fecha, cuántos <strong className="font-medium text-stone-600 dark:text-stone-300">pedidos</strong> lleva y <strong className="font-medium text-stone-600 dark:text-stone-300">bultos totales</strong> (suma de los bultos de cada pedido asignado). Usá <strong className="font-medium text-stone-600 dark:text-stone-300">Pedidos</strong> en cada fila para armar la ruta. La tabla inferior es el detalle operativo por parada (recepción, fecha y hora, chofer, vehículo, observaciones).
+            </p>
+          </div>
+        </div>
+        {routesLoading && routes.length === 0 ? (
+          <p className="text-xs text-stone-500 dark:text-stone-400">Cargando rutas…</p>
+        ) : routes.length === 0 ? (
+          <p className="text-xs text-stone-500 dark:text-stone-400">
+            Todavía no hay rutas en este tenant. Crea una con «Nueva ruta».
+          </p>
+        ) : (
+          <ul
+            className="divide-y divide-stone-100 dark:divide-stone-800 max-h-52 overflow-y-auto rounded-lg border border-stone-100 dark:border-stone-800"
+            aria-label="Listado de rutas"
+          >
+            {routes.map((r) => {
+              const agg = routeAggById.get(r.id) ?? { pedidos: 0, bultos: 0 };
+              const fechaSrc =
+                typeof r.startTime === 'string' && r.startTime.includes('T')
+                  ? r.startTime
+                  : r.createdAt;
+              return (
+                <li
+                  key={r.id}
+                  className="px-3 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 text-xs"
+                >
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:flex-1 sm:min-w-0 sm:justify-between">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
+                      <span translate="no" className="font-mono font-semibold text-stone-800 dark:text-stone-100 shrink-0">
+                        {r.code}
+                      </span>
+                      <span className="text-stone-800 dark:text-stone-100 font-medium truncate">{r.name}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-stone-500 dark:text-stone-400 shrink-0 tabular-nums">
+                      <span title="Fecha de registro o inicio planificado">{formatRouteDay(fechaSrc)}</span>
+                      <span className="text-stone-300 dark:text-stone-600" aria-hidden>
+                        ·
+                      </span>
+                      <span>
+                        {agg.pedidos}{' '}
+                        {agg.pedidos === 1 ? 'pedido' : 'pedidos'}
+                      </span>
+                      <span className="text-stone-300 dark:text-stone-600" aria-hidden>
+                        ·
+                      </span>
+                      <span>
+                        {agg.bultos} bultos
+                      </span>
+                      <RouteStatusBadge status={r.status} />
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="xs"
+                    icon={<Package size={14} />}
+                    onClick={() => setRoutePedidosDetail(r)}
+                    className="shrink-0 self-start sm:self-center"
+                  >
+                    Pedidos
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
       {/* Table */}
       {filtered.length === 0 ? (
         <EmptyState
-          icon={<Map size={32} />}
-          title={deliveriesLoaded && records.length === 0 ? 'Sin entregas registradas' : 'Sin registros'}
+          icon={<MapIcon size={32} />}
+          title={deliveriesLoaded && records.length === 0 ? 'Sin paradas en hoja de ruta' : 'Sin registros'}
           description={
             deliveriesLoaded && records.length === 0
-              ? 'Aún no hay entregas para mostrar. Cuando se generen entregas, aparecerán aquí.'
-              : 'No se encontraron entregas con los filtros aplicados.'
+              ? 'Aún no hay paradas registradas para rutas. Cuando existan movimientos ligados a pedidos en ruta, aparecerán aquí.'
+              : 'No hay paradas que coincidan con los filtros.'
           }
         />
       ) : (
@@ -402,8 +1080,8 @@ export function RoutesPage() {
                   </th>
                   <ColHeader label="Estado"     col="estado"    {...colProps} className="min-w-[120px]" />
                   <ColHeader label="Cliente"    col="cliente"   {...colProps} className="min-w-[140px]" />
-                  <ColHeader label="Entrega"    col="entrega"   {...colProps} className="min-w-[170px]" />
-                  <ColHeader label="Pedido"     col="pedido"    {...colProps} className="min-w-[110px]" />
+                  <ColHeader label="Punto entrega" col="entrega"   {...colProps} className="min-w-[170px]" />
+                  <ColHeader label="Folio"      col="pedido"    {...colProps} className="min-w-[110px]" />
                   <ColHeader label="Factura"    col="factura"   {...colProps} className="min-w-[110px]" />
                   <ColHeader label="Tipo"       col="tipo"      {...colProps} className="w-14" />
                   <ColHeader label="Ref."       col="ref"       {...colProps} className="min-w-[90px]" />
@@ -569,7 +1247,7 @@ export function RoutesPage() {
           <div className="flex items-center justify-between px-4 py-2.5 border-t border-stone-100 dark:border-stone-800 bg-stone-50 dark:bg-stone-800/80">
             <span className="text-xs text-stone-400 dark:text-stone-500">
               Mostrando <strong className="text-stone-600 dark:text-stone-300">{filtered.length}</strong> de{' '}
-              <strong className="text-stone-600 dark:text-stone-300">{records.length}</strong> entregas
+              <strong className="text-stone-600 dark:text-stone-300">{records.length}</strong> paradas
               {selected.size > 0 && <> · <strong className="text-primary-600 dark:text-primary-400">{selected.size}</strong> seleccionadas</>}
             </span>
             <div className="flex items-center gap-3 text-xs text-stone-400 dark:text-stone-500">
@@ -584,14 +1262,35 @@ export function RoutesPage() {
         </div>
       )}
 
+      {/* Detalle ruta + pedidos */}
+      {routePedidosDetail && (
+        <RoutePedidosModal route={routePedidosDetail} onClose={() => setRoutePedidosDetail(null)} />
+      )}
+
       {/* Detail modal */}
       {detailRecord && (
         <DeliveryDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} />
       )}
 
       {/* New route modal */}
-      <Modal open={showNewRoute} onClose={() => setShowNewRoute(false)} title="Crear nueva ruta" size="md">
-        <RouteForm onSubmit={handleAddRoute} onCancel={() => setShowNewRoute(false)} submitLabel="Crear ruta" />
+      <Modal
+        open={showNewRoute}
+        onClose={() => {
+          setNewRouteError(null);
+          setShowNewRoute(false);
+        }}
+        title="Crear nueva ruta"
+        size="md"
+      >
+        <RouteForm
+          onSubmit={handleAddRoute}
+          onCancel={() => {
+            setNewRouteError(null);
+            setShowNewRoute(false);
+          }}
+          submitLabel="Crear ruta"
+          error={newRouteError}
+        />
       </Modal>
 
       {/* Status manager modal */}
@@ -599,7 +1298,7 @@ export function RoutesPage() {
         open={showStatusManager}
         onClose={() => setShowStatusManager(false)}
         title="Gestión de estados"
-        description="Administra los estados operativos desde Administrador de Rutas"
+        description="Gestión de estados en Rutas"
         size="md"
       >
         <div className="space-y-3">

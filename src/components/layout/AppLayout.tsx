@@ -5,8 +5,16 @@ import { useAuthStore } from '../../store/useAuthStore';
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   '/dashboard':      { title: 'Dashboard',              subtitle: 'Resumen operacional en tiempo real' },
   '/clientes':       { title: 'Clientes',               subtitle: 'Administra y consulta tu cartera de clientes' },
-  '/pedidos':        { title: 'Gestión de Pedidos',     subtitle: 'Crea, modifica y rastrea pedidos' },
-  '/rutas':          { title: 'Admin. de Rutas',        subtitle: 'Planifica y monitorea rutas de distribución' },
+  '/pedidos': {
+    title: 'Mis pedidos',
+    subtitle:
+      'Seguimiento de tus envíos. El alta y la planificación en ruta las gestiona tu operador desde Rutas.',
+  },
+  '/rutas': {
+    title: 'Rutas',
+    subtitle:
+      'La ruta es el itinerario de salida: folio interno, nombre, fecha, pedidos asignados y bultos totales (suma por pedido). Abajo, detalle operativo por parada.',
+  },
   '/usuarios':       { title: 'Usuarios Sistema',       subtitle: 'Gestiona los usuarios de la plataforma' },
   '/fotos':          { title: 'Admin. Fotos',           subtitle: 'Fotografías de inspección y entrega desde la app móvil' },
   '/peonetas':       { title: 'Peonetas',               subtitle: 'Asistentes de entrega asignables a rutas' },

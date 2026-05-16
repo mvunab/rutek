@@ -28,6 +28,7 @@ export interface DbTenant {
   city: string | null;
   region: string | null;
   logo: string | null;
+  custom_order_statuses?: Json;
   created_at: string;
   updated_at: string;
 }
@@ -88,6 +89,8 @@ export interface DbOrder {
   estimated_delivery: string;
   actual_delivery: string | null;
   route_id: string | null;
+  bultos: number;
+  dispatch_guide_url: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -135,6 +138,7 @@ export interface DbDeliveryRecord {
   id: string;
   tenant_id: string;
   route_id: string | null;
+  order_id: string | null;
   ref: string;
   pedido: string;
   factura: string | null;

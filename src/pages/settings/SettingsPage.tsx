@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Building2, Moon, Sun, Monitor, Check, Key, Eye, EyeOff } from 'lucide-react';
+import { Building2, Moon, Sun, Monitor, Check, Key, Eye, EyeOff, Tags, Plus, Trash2 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input, Select } from '../../components/ui/Input';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useUiStore } from '../../store/useUiStore';
 import type { Tenant } from '../../types';
+import { api } from '../../lib/api';
 
 type CompanyForm = {
   name: string;
@@ -32,7 +33,7 @@ const emptyForm: CompanyForm = {
 };
 
 export function SettingsPage() {
-  const { tenant, updateTenant, changeMyPassword, loading } = useAuthStore();
+  const { tenant, user, updateTenant, changeMyPassword, loading } = useAuthStore();
   const { theme, setTheme } = useUiStore();
   const [form, setForm] = useState<CompanyForm>(emptyForm);
   const [savedCompany, setSavedCompany] = useState(false);
@@ -42,6 +43,10 @@ export function SettingsPage() {
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNext, setShowNext] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [extraOrderStatuses, setExtraOrderStatuses] = useState<{ slug: string; label: string }[]>([]);
+  const [orderStatusErr, setOrderStatusErr] = useState('');
+  const [savedOrderStatuses, setSavedOrderStatuses] = useState(false);
+  const [savingOrderStatuses, setSavingOrderStatuses] = useState(false);
 
   useEffect(() => {
     if (!tenant) return;
@@ -57,6 +62,39 @@ export function SettingsPage() {
       plan: tenant.plan,
     });
   }, [tenant]);
+
+  useEffect(() => {
+    setExtraOrderStatuses(
+      (tenant?.customOrderStatuses ?? []).map((r) => ({ slug: r.slug, label: r.label })),
+    );
+  }, [tenant?.customOrderStatuses]);
+
+  const handleSaveOrderStatuses = async () => {
+    if (!tenant || user?.role !== 'admin') return;
+    setOrderStatusErr('');
+    setSavingOrderStatuses(true);
+    try {
+      const cleaned = extraOrderStatuses
+        .map((r) => ({
+          slug: r.slug.trim().toLowerCase(),
+          label: r.label.trim(),
+        }))
+        .filter((r) => r.slug.length > 0 && r.label.length > 0);
+      const res = await api.patch<{ custom_order_statuses: { slug: string; label: string }[] }>(
+        '/tenant/order-statuses',
+        { custom_order_statuses: cleaned },
+      );
+      updateTenant({ customOrderStatuses: res.custom_order_statuses });
+      setSavedOrderStatuses(true);
+      window.setTimeout(() => setSavedOrderStatuses(false), 2200);
+    } catch {
+      setOrderStatusErr(
+        'No se pudo guardar. Los slugs deben ser únicos, en minúscula y solo letras/números/guion bajo (ej. en_bodega).',
+      );
+    } finally {
+      setSavingOrderStatuses(false);
+    }
+  };
 
   const set = <K extends keyof CompanyForm>(key: K, value: CompanyForm[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -157,6 +195,95 @@ export function SettingsPage() {
           </button>
         </div>
       </Card>
+
+      {user?.role === 'admin' && (
+        <Card padding="lg">
+          <div className="flex items-start gap-3 mb-5">
+            <div className="p-2 rounded-lg bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400">
+              <Tags size={20} aria-hidden />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+                Estados de pedido personalizados
+              </h2>
+              <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
+                El tenant siempre tiene Pendiente, En ruta, Entregado y Rechazada. Acá definís etiquetas extra (slug en minúscula, sin espacios).
+              </p>
+            </div>
+          </div>
+          {orderStatusErr ? (
+            <p className="text-sm text-red-600 dark:text-red-400 mb-3" role="alert">
+              {orderStatusErr}
+            </p>
+          ) : null}
+          <div className="space-y-3 mb-4">
+            {extraOrderStatuses.length === 0 ? (
+              <p className="text-sm text-stone-500 dark:text-stone-400">Sin estados adicionales.</p>
+            ) : null}
+            {extraOrderStatuses.map((row, i) => (
+              <div key={i} className="flex flex-wrap gap-2 items-end">
+                <Input
+                  label="Slug (interno)"
+                  spellCheck={false}
+                  autoComplete="off"
+                  value={row.slug}
+                  onChange={(e) => {
+                    const next = [...extraOrderStatuses];
+                    next[i] = { ...next[i], slug: e.target.value };
+                    setExtraOrderStatuses(next);
+                  }}
+                  containerClassName="flex-1 min-w-[140px]"
+                />
+                <Input
+                  label="Etiqueta visible"
+                  value={row.label}
+                  onChange={(e) => {
+                    const next = [...extraOrderStatuses];
+                    next[i] = { ...next[i], label: e.target.value };
+                    setExtraOrderStatuses(next);
+                  }}
+                  containerClassName="flex-1 min-w-[160px]"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    setExtraOrderStatuses(extraOrderStatuses.filter((_, j) => j !== i))
+                  }
+                  aria-label={`Quitar fila ${i + 1}`}
+                >
+                  <Trash2 size={16} aria-hidden />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2 items-center">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              icon={<Plus size={14} aria-hidden />}
+              onClick={() => setExtraOrderStatuses([...extraOrderStatuses, { slug: '', label: '' }])}
+              disabled={extraOrderStatuses.length >= 30}
+            >
+              Añadir estado
+            </Button>
+            <Button
+              type="button"
+              loading={savingOrderStatuses}
+              onClick={() => void handleSaveOrderStatuses()}
+            >
+              Guardar catálogo
+            </Button>
+            {savedOrderStatuses ? (
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                <Check size={14} aria-hidden /> Guardado
+              </span>
+            ) : null}
+          </div>
+        </Card>
+      )}
 
       {/* Empresa */}
       <Card padding="lg">

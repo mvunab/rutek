@@ -1,6 +1,63 @@
 import { create } from 'zustand';
-import type { Route, RouteFilters, RouteStatus } from '../types';
+import type { Route, RouteFilters, RouteStop } from '../types';
+import { normalizeRouteStatus } from '../lib/routeStatusLabels';
 import { api, isNetworkError } from '../lib/api';
+
+/** Cuerpo que espera `POST /routes` (`CreateRouteDto` en rutek-api, snake_case). */
+export type CreateRouteInput = {
+  name: string;
+  /** Folio / código legible; si se omite, se genera en el cliente. */
+  code?: string;
+  notes?: string;
+};
+
+/** Campos PATCH /routes/:id; `null` en chofer/vehículo los desasigna en el servidor. */
+export type PatchRouteInput = Omit<
+  Partial<Route>,
+  'driverId' | 'driverName' | 'vehicleId' | 'vehiclePlate'
+> & {
+  driverId?: string | null;
+  driverName?: string | null;
+  vehicleId?: string | null;
+  vehiclePlate?: string | null;
+};
+
+function mapRouteFromApi(row: Record<string, unknown>): Route {
+  const stops = (Array.isArray(row.stops) ? row.stops : []) as RouteStop[];
+  return {
+    id: String(row.id ?? ''),
+    tenantId: String(row.tenant_id ?? ''),
+    code: String(row.code ?? ''),
+    name: String(row.name ?? ''),
+    status: normalizeRouteStatus(String(row.status ?? '')),
+    driverId: row.driver_id ? String(row.driver_id) : undefined,
+    driverName: row.driver_name ? String(row.driver_name) : undefined,
+    vehicleId: row.vehicle_id ? String(row.vehicle_id) : undefined,
+    vehiclePlate: row.vehicle_plate ? String(row.vehicle_plate) : undefined,
+    stops,
+    orderIds: stops.map((s) => s.orderId).filter(Boolean),
+    startTime: row.start_time != null ? String(row.start_time) : undefined,
+    endTime: row.end_time != null ? String(row.end_time) : undefined,
+    estimatedDistance: Number(row.estimated_distance ?? 0),
+    estimatedDuration: Number(row.estimated_duration ?? 0),
+    createdAt: String(row.created_at ?? new Date().toISOString()),
+    notes: row.notes != null ? String(row.notes) : undefined,
+  };
+}
+
+function routePatchToApi(data: PatchRouteInput): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (data.status !== undefined) out.status = data.status;
+  if (data.driverId !== undefined) out.driver_id = data.driverId;
+  if (data.driverName !== undefined) out.driver_name = data.driverName;
+  if (data.vehicleId !== undefined) out.vehicle_id = data.vehicleId;
+  if (data.vehiclePlate !== undefined) out.vehicle_plate = data.vehiclePlate;
+  if (data.stops !== undefined) out.stops = data.stops;
+  if (data.estimatedDistance !== undefined) out.estimated_distance = data.estimatedDistance;
+  if (data.estimatedDuration !== undefined) out.estimated_duration = data.estimatedDuration;
+  if (data.notes !== undefined) out.notes = data.notes;
+  return out;
+}
 
 interface RouteStore {
   routes: Route[];
@@ -12,9 +69,9 @@ interface RouteStore {
   setFilters: (filters: Partial<RouteFilters>) => void;
   resetFilters: () => void;
   selectRoute: (route: Route | null) => void;
-  addRoute: (route: Omit<Route, 'id' | 'code' | 'createdAt' | 'tenantId'>) => Promise<void>;
-  updateRoute: (id: string, data: Partial<Route>) => Promise<void>;
-  updateRouteStatus: (id: string, status: RouteStatus) => Promise<void>;
+  addRoute: (input: CreateRouteInput) => Promise<void>;
+  updateRoute: (id: string, data: PatchRouteInput) => Promise<void>;
+  updateRouteStatus: (id: string, status: 'cancelled') => Promise<void>;
   assignDriver: (routeId: string, driverId: string, driverName: string) => Promise<void>;
   assignVehicle: (routeId: string, vehicleId: string, vehiclePlate: string) => Promise<void>;
   addOrderToRoute: (routeId: string, orderId: string) => Promise<void>;
@@ -37,8 +94,11 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
   fetchRoutes: async () => {
     set({ loading: true });
     try {
-      const data = await api.get<Route[]>('/routes');
-      set({ routes: Array.isArray(data) ? data : [], loaded: true });
+      const data = await api.get<Record<string, unknown>[]>('/routes');
+      set({
+        routes: Array.isArray(data) ? data.map(mapRouteFromApi) : [],
+        loaded: true,
+      });
     } catch (err) {
       if (isNetworkError(err)) {
         set({ routes: [] });
@@ -57,10 +117,24 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
 
   selectRoute: (route) => set({ selectedRoute: route }),
 
-  addRoute: async (data) => {
+  addRoute: async (input) => {
+    const code =
+      input.code?.trim() ||
+      `RT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const body: Record<string, unknown> = {
+      code,
+      name: input.name.trim(),
+      status: 'not_started',
+      stops: [],
+      estimated_distance: 0,
+      estimated_duration: 0,
+    };
+    if (input.notes?.trim()) body.notes = input.notes.trim();
     try {
-      const created = await api.post<Route>('/routes', data);
-      set((state) => ({ routes: [created, ...state.routes] }));
+      const created = await api.post<Record<string, unknown>>('/routes', body);
+      set((state) => ({
+        routes: [mapRouteFromApi(created), ...state.routes],
+      }));
     } catch (err) {
       if (isNetworkError(err)) return;
       throw err;
@@ -69,10 +143,17 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
 
   updateRoute: async (id, data) => {
     try {
-      const updated = await api.patch<Route>(`/routes/${id}`, data);
+      const body = routePatchToApi(data);
+      if (Object.keys(body).length === 0) return;
+      const updated = await api.patch<Record<string, unknown>>(
+        `/routes/${id}`,
+        body,
+      );
+      const mapped = mapRouteFromApi(updated);
       set((state) => ({
-        routes: state.routes.map((r) => (r.id === id ? updated : r)),
-        selectedRoute: state.selectedRoute?.id === id ? updated : state.selectedRoute,
+        routes: state.routes.map((r) => (r.id === id ? mapped : r)),
+        selectedRoute:
+          state.selectedRoute?.id === id ? mapped : state.selectedRoute,
       }));
     } catch (err) {
       if (isNetworkError(err)) return;
@@ -81,10 +162,8 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
   },
 
   updateRouteStatus: async (id, status) => {
-    const updates: Partial<Route> = { status };
-    if (status === 'active') updates.startTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-    if (status === 'completed') updates.endTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-    await get().updateRoute(id, updates);
+    if (status !== 'cancelled') return;
+    await get().updateRoute(id, { status: 'cancelled' });
   },
 
   assignDriver: async (routeId, driverId, driverName) => {
@@ -98,7 +177,20 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
   addOrderToRoute: async (routeId, orderId) => {
     const current = get().routes.find((r) => r.id === routeId);
     if (!current) return;
-    await get().updateRoute(routeId, { orderIds: [...current.orderIds, orderId] });
+    // La vinculación real es `orders.route_id` (PATCH /orders); acá solo
+    // actualizamos el estado local para reflejar el pedido en la lista.
+    set((state) => ({
+      routes: state.routes.map((r) =>
+        r.id === routeId
+          ? {
+              ...r,
+              orderIds: r.orderIds.includes(orderId)
+                ? r.orderIds
+                : [...r.orderIds, orderId],
+            }
+          : r,
+      ),
+    }));
   },
 
   deleteRoute: async (id) => {

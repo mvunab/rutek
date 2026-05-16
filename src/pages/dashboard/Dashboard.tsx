@@ -153,7 +153,9 @@ export function Dashboard() {
   }
 
   const recentOrders = orders.slice(0, 4);
-  const activeRoutes = routes.filter(r => r.status === 'active' || r.status === 'planned');
+  const activeRoutes = routes.filter(
+    (r) => r.status === 'not_started' || r.status === 'in_progress',
+  );
   const hasOrdersChart = ordersChart.length > 0;
   const hasStatusChart = statusChart.length > 0;
 
@@ -307,10 +309,10 @@ export function Dashboard() {
           <div className="flex items-center justify-between p-5 border-b border-stone-100 dark:border-stone-800">
             <div>
               <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Pedidos recientes</h3>
-              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Últimas actualizaciones</p>
+              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Para agrupar en rutas</p>
             </div>
-            <Button variant="ghost" size="xs" onClick={() => navigate('/pedidos')} icon={<ArrowRight size={12} />} iconPosition="right">
-              Ver todos
+            <Button variant="ghost" size="xs" onClick={() => navigate('/rutas')} icon={<ArrowRight size={12} />} iconPosition="right">
+              Ir a rutas
             </Button>
           </div>
           <div className="divide-y divide-stone-50 dark:divide-stone-800">
@@ -340,10 +342,10 @@ export function Dashboard() {
           <div className="flex items-center justify-between p-5 border-b border-stone-100 dark:border-stone-800">
             <div>
               <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Rutas activas</h3>
-              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Operación en tiempo real</p>
+              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Itinerario: pedidos y bultos totales</p>
             </div>
             <Button variant="ghost" size="xs" onClick={() => navigate('/rutas')} icon={<ArrowRight size={12} />} iconPosition="right">
-              Ver todas
+              Ver rutas
             </Button>
           </div>
           <div className="divide-y divide-stone-50 dark:divide-stone-800">
@@ -354,7 +356,7 @@ export function Dashboard() {
                     <span className="text-xs font-mono font-semibold text-stone-700 dark:text-stone-200">{route.code}</span>
                     <RouteStatusBadge status={route.status} />
                   </div>
-                  <span className="text-xs text-stone-400 dark:text-stone-500">{route.orderIds.length} pedidos</span>
+                  <span className="text-xs text-stone-400 dark:text-stone-500">{route.orderIds.length} paradas</span>
                 </div>
                 <div className="flex items-center gap-4 text-xs text-stone-400 dark:text-stone-500">
                   <span className="flex items-center gap-1">
@@ -370,16 +372,25 @@ export function Dashboard() {
                     {Math.floor(route.estimatedDuration / 60)}h {route.estimatedDuration % 60}m
                   </span>
                 </div>
-                {route.status === 'active' && (
-                  <div className="mt-2.5 w-full bg-stone-100 dark:bg-stone-800 rounded-full h-1">
+                {(() => {
+                  const totalInRoute = orders.filter((o) => o.routeId === route.id).length;
+                  const deliveredInRoute = orders.filter(
+                    (o) => o.routeId === route.id && o.status === 'delivered',
+                  ).length;
+                  if (totalInRoute === 0 || route.status === 'cancelled') return null;
+                  const pct = Math.round((deliveredInRoute / totalInRoute) * 100);
+                  return (
                     <div
-                      className="bg-primary-500 h-1 rounded-full transition-all"
-                      style={{
-                        width: `${(route.stops.filter(s => s.status === 'completed').length / route.stops.length) * 100}%`
-                      }}
-                    />
-                  </div>
-                )}
+                      className="mt-2.5 w-full bg-stone-100 dark:bg-stone-800 rounded-full h-1"
+                      title={`${deliveredInRoute}/${totalInRoute} pedidos entregados`}
+                    >
+                      <div
+                        className="bg-primary-500 h-1 rounded-full"
+                        style={{ width: `${pct}%`, transition: 'width 0.25s ease' }}
+                      />
+                    </div>
+                  );
+                })()}
               </div>
             ))}
             {activeRoutes.length === 0 && (
