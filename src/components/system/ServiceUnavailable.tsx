@@ -30,9 +30,15 @@ export function ServiceUnavailable() {
         <h1 className="text-lg font-semibold text-stone-900 dark:text-stone-100 mb-2">
           Servicio no disponible
         </h1>
-        <p className="text-sm text-stone-500 dark:text-stone-400 mb-8">
-          No podemos contactar al servidor en este momento. La aplicación quedará
-          bloqueada hasta restablecer la conexión.
+        <p className="text-sm text-stone-500 dark:text-stone-400 mb-4">
+          No podemos contactar al servidor en este momento.
+        </p>
+        <p className="text-xs text-stone-400 dark:text-stone-500 mb-8">
+          Puedes intentar{' '}
+          <a href="/login" className="text-primary-600 hover:underline">
+            iniciar sesión
+          </a>{' '}
+          o recargar la página. Si acabas de cambiar el DNS, espera unos minutos.
         </p>
 
         <Button

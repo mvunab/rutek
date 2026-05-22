@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { Key, Pencil, Plus, Search, Shield, Trash2, Truck, Users, Building2, X } from 'lucide-react';
+import { Key, Pencil, Plus, Search, Shield, Trash2, Truck, Users, Building2, X, PersonStanding } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -41,6 +41,13 @@ const roleConfig: Record<UserRole, { label: string; color: string; card: string;
     icon: <Truck size={14} />,
     description: 'Ejecuta entregas',
   },
+  peoneta: {
+    label: 'Peoneta',
+    color: 'bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-950/45 dark:text-orange-300 dark:border-orange-800',
+    card: 'bg-orange-50 border-orange-200 dark:bg-orange-950/50 dark:border-orange-800',
+    icon: <PersonStanding size={14} />,
+    description: 'Asiste en entregas (app móvil)',
+  },
   client: {
     label: 'Cliente',
     color: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/45 dark:text-amber-300 dark:border-amber-800',
@@ -54,6 +61,7 @@ const MANAGED_ROLES: { value: ManagedRole; label: string }[] = [
   { value: 'admin', label: 'Administrador' },
   { value: 'operator', label: 'Operador Logístico' },
   { value: 'driver', label: 'Repartidor' },
+  { value: 'peoneta', label: 'Peoneta' },
   { value: 'client', label: 'Cliente' },
 ];
 
@@ -291,7 +299,7 @@ export function UsersPage() {
           />
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
-          {(['all', 'admin', 'operator', 'driver', 'client'] as const).map((r) => (
+          {(['all', 'admin', 'operator', 'driver', 'peoneta', 'client'] as const).map((r) => (
             <button
               key={r}
               type="button"
@@ -316,7 +324,7 @@ export function UsersPage() {
       </div>
 
       {/* Role summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {(Object.entries(roleConfig) as [UserRole, typeof roleConfig[UserRole]][])
           .filter(([role]) => role !== 'super_admin')
           .map(([role, config]) => {

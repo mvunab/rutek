@@ -9,8 +9,11 @@ interface ModalProps {
   title?: string;
   description?: string;
   children: ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full' | '3xl';
   footer?: ReactNode;
+  /** Sin cabecera por defecto; el contenido define título y cierre. */
+  bare?: boolean;
+  contentClassName?: string;
 }
 
 const sizeClasses = {
@@ -18,10 +21,22 @@ const sizeClasses = {
   md: 'max-w-md',
   lg: 'max-w-lg',
   xl: 'max-w-2xl',
+  '2xl': 'max-w-3xl',
   full: 'max-w-4xl',
+  '3xl': 'max-w-5xl',
 };
 
-export function Modal({ open, onClose, title, description, children, size = 'md', footer }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  size = 'md',
+  footer,
+  bare = false,
+  contentClassName,
+}: ModalProps) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -50,16 +65,16 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
         'flex flex-col max-h-[90vh]',
         sizeClasses[size]
       )}>
-        {(title || description) && (
+        {!bare && (title || description) ? (
           <div className="flex items-start justify-between gap-4 p-6 border-b border-stone-100 dark:border-stone-800">
             <div>
-              {title && <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">{title}</h2>}
-              {description && <p className="text-sm text-stone-500 dark:text-stone-400 mt-1">{description}</p>}
+              {title ? <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">{title}</h2> : null}
+              {description ? <p className="text-sm text-stone-500 dark:text-stone-400 mt-1">{description}</p> : null}
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose} icon={<X size={16} />} className="flex-shrink-0 -mt-1 -mr-2" />
+            <Button variant="ghost" size="sm" onClick={onClose} icon={<X size={16} />} className="flex-shrink-0 -mt-1 -mr-2" aria-label="Cerrar" />
           </div>
-        )}
-        <div className="overflow-y-auto flex-1 p-6">
+        ) : null}
+        <div className={clsx('overflow-y-auto flex-1', bare ? contentClassName : clsx('p-6', contentClassName))}>
           {children}
         </div>
         {footer && (

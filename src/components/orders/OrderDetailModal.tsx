@@ -52,6 +52,23 @@ export function OrderDetailModal({
           <p className="text-sm text-stone-800 dark:text-stone-100">{order.clientName}</p>
         </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+          <div className="rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-2">
+            <p className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">Chofer</p>
+            <p className="text-stone-800 dark:text-stone-100">{order.driverName?.trim() || '—'}</p>
+          </div>
+          <div className="rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-2">
+            <p className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">Peoneta</p>
+            <p className="text-stone-800 dark:text-stone-100">{order.peonetaName?.trim() || '—'}</p>
+          </div>
+          <div className="rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-2">
+            <p className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">Vehículo</p>
+            <p translate="no" className="font-mono text-stone-800 dark:text-stone-100">
+              {order.vehiclePlate?.trim() || '—'}
+            </p>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-2">
             <p className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">

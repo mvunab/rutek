@@ -19,7 +19,7 @@ export interface Tenant {
 }
 
 // ─── Auth / Users ─────────────────────────────────────────────────────────────
-export type UserRole = 'super_admin' | 'admin' | 'operator' | 'driver' | 'client';
+export type UserRole = 'super_admin' | 'admin' | 'operator' | 'driver' | 'peoneta' | 'client';
 
 export interface User {
   id: string;
@@ -111,6 +111,15 @@ export interface Order {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  /** RM-1: chofer asignado a este pedido específico. */
+  driverId?: string | null;
+  driverName?: string | null;
+  /** RM-1: peoneta asignada a este pedido específico. */
+  peonetaId?: string | null;
+  peonetaName?: string | null;
+  /** Vehículo asignado a este pedido (varios por ruta). */
+  vehicleId?: string | null;
+  vehiclePlate?: string | null;
 }
 
 export interface Address {
@@ -147,8 +156,12 @@ export interface Route {
   status: RouteStatus;
   driverId?: string;
   driverName?: string;
+  /** @deprecated Usar vehicleId/vehiclePlate en cada pedido. */
   vehicleId?: string;
+  /** @deprecated Usar vehicleId/vehiclePlate en cada pedido. */
   vehiclePlate?: string;
+  /** RM-3: cliente único de la ruta. Se infiere del primer pedido asignado. */
+  clientId?: string | null;
   stops: RouteStop[];
   orderIds: string[];
   startTime?: string;
@@ -172,6 +185,11 @@ export interface Vehicle {
   year: number;
   capacity: number;
   available: boolean;
+  /** VIN opcional (11–17 caracteres) para integración futura con scraping. */
+  vin?: string | null;
+  maintenanceDueDate?: string | null;
+  circulationPermitDueDate?: string | null;
+  technicalReviewDueDate?: string | null;
   createdAt?: string;
 }
 

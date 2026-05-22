@@ -90,6 +90,12 @@ function mapOrderFromApi(row: Record<string, unknown>): Order {
     notes: row.notes != null ? String(row.notes) : undefined,
     createdAt: String(row.created_at ?? ''),
     updatedAt: String(row.updated_at ?? ''),
+    driverId: row.driver_id != null ? String(row.driver_id) : null,
+    driverName: row.driver_name != null ? String(row.driver_name) : null,
+    peonetaId: row.peoneta_id != null ? String(row.peoneta_id) : null,
+    peonetaName: row.peoneta_name != null ? String(row.peoneta_name) : null,
+    vehicleId: row.vehicle_id != null ? String(row.vehicle_id) : null,
+    vehiclePlate: row.vehicle_plate != null ? String(row.vehicle_plate) : null,
   };
 }
 
@@ -196,6 +202,12 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
 
       if (data.clientId !== undefined) body.client_id = data.clientId;
       if (data.clientName !== undefined) body.client_name = data.clientName;
+      if (data.driverId !== undefined) body.driver_id = data.driverId;
+      if (data.driverName !== undefined) body.driver_name = data.driverName;
+      if (data.peonetaId !== undefined) body.peoneta_id = data.peonetaId;
+      if (data.peonetaName !== undefined) body.peoneta_name = data.peonetaName;
+      if (data.vehicleId !== undefined) body.vehicle_id = data.vehicleId;
+      if (data.vehiclePlate !== undefined) body.vehicle_plate = data.vehiclePlate;
       if (data.origin !== undefined) {
         body.origin_street = data.origin.street;
         body.origin_city = data.origin.city;

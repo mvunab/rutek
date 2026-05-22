@@ -9,10 +9,17 @@ import {
   ChevronsUpDown,
   Filter,
   Truck,
+  AlertTriangle,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { Vehicle, VehicleType } from '../../types';
 import { useVehicleStore, type CreateVehicleInput } from '../../store/useVehicleStore';
+import {
+  summarizeVehicleCompliance,
+  formatComplianceHint,
+  VEHICLE_COMPLIANCE_WARN_DAYS,
+  type VehicleComplianceSummary,
+} from '../../lib/vehicleCompliance';
 import { Button } from '../../components/ui/Button';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { Input, Select } from '../../components/ui/Input';
@@ -80,6 +87,18 @@ interface VehicleFormState {
   type: VehicleType;
   capacity: string;
   available: boolean;
+  vin: string;
+  maintenanceDueDate: string;
+  circulationPermitDueDate: string;
+  technicalReviewDueDate: string;
+}
+
+const VIN_RE = /^[A-HJ-NPR-Z0-9]{11,17}$/i;
+
+function toDateInputValue(iso?: string | null): string {
+  if (!iso?.trim()) return '';
+  const d = iso.trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '';
 }
 
 function emptyForm(): VehicleFormState {
@@ -91,6 +110,10 @@ function emptyForm(): VehicleFormState {
     type: 'cargo_truck',
     capacity: '0',
     available: true,
+    vin: '',
+    maintenanceDueDate: '',
+    circulationPermitDueDate: '',
+    technicalReviewDueDate: '',
   };
 }
 
@@ -103,7 +126,37 @@ function vehicleToForm(v: Vehicle): VehicleFormState {
     type: v.type,
     capacity: String(v.capacity),
     available: v.available,
+    vin: v.vin ?? '',
+    maintenanceDueDate: toDateInputValue(v.maintenanceDueDate),
+    circulationPermitDueDate: toDateInputValue(v.circulationPermitDueDate),
+    technicalReviewDueDate: toDateInputValue(v.technicalReviewDueDate),
   };
+}
+
+function VehicleComplianceBadges({ summary }: { summary: VehicleComplianceSummary }) {
+  if (summary.alertCount === 0) {
+    return <span className="text-xs text-stone-400 dark:text-stone-500">Al día</span>;
+  }
+  return (
+    <ul className="space-y-1 min-w-[140px]">
+      {summary.items.map((item) => (
+        <li key={item.kind}>
+          <span
+            className={clsx(
+              'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border max-w-full',
+              item.status === 'expired'
+                ? 'bg-red-50 text-red-800 border-red-200 dark:bg-red-950/50 dark:text-red-200 dark:border-red-900'
+                : 'bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-950/50 dark:text-amber-200 dark:border-amber-900',
+            )}
+            title={formatComplianceHint(item)}
+          >
+            <AlertTriangle size={10} className="shrink-0" aria-hidden />
+            <span className="truncate">{formatComplianceHint(item)}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function getApiMessage(err: unknown, fallback: string): string {
@@ -128,6 +181,7 @@ export function VehiclesPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [estadoFilter, setEstadoFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [complianceFilter, setComplianceFilter] = useState<'all' | 'alerts'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [form, setForm] = useState<VehicleFormState>(emptyForm);
@@ -150,17 +204,41 @@ export function VehiclesPage() {
     setSortDir((d) => (d === 'asc' ? 'desc' : d === 'desc' ? 'none' : 'asc'));
   };
 
+  const complianceByVehicleId = useMemo(() => {
+    const map = new Map<string, VehicleComplianceSummary>();
+    for (const v of vehicles) {
+      map.set(
+        v.id,
+        summarizeVehicleCompliance({
+          maintenanceDueDate: v.maintenanceDueDate,
+          circulationPermitDueDate: v.circulationPermitDueDate,
+          technicalReviewDueDate: v.technicalReviewDueDate,
+        }),
+      );
+    }
+    return map;
+  }, [vehicles]);
+
+  const fleetAlertCount = useMemo(
+    () => vehicles.filter((v) => (complianceByVehicleId.get(v.id)?.alertCount ?? 0) > 0).length,
+    [vehicles, complianceByVehicleId],
+  );
+
   const filtered = useMemo(() => {
     let rows = vehicles.filter((v) => {
       if (estadoFilter === 'active' && !v.available) return false;
       if (estadoFilter === 'inactive' && v.available) return false;
+      if (complianceFilter === 'alerts' && (complianceByVehicleId.get(v.id)?.alertCount ?? 0) === 0) {
+        return false;
+      }
       if (!search.trim()) return true;
       const t = search.toLowerCase();
       return (
         v.plate.toLowerCase().includes(t) ||
         v.brand.toLowerCase().includes(t) ||
         v.model.toLowerCase().includes(t) ||
-        String(v.year).includes(t)
+        String(v.year).includes(t) ||
+        (v.vin?.toLowerCase().includes(t) ?? false)
       );
     });
     if (sortDir !== 'none') {
@@ -179,7 +257,7 @@ export function VehiclesPage() {
       });
     }
     return rows;
-  }, [vehicles, search, estadoFilter, sortCol, sortDir]);
+  }, [vehicles, search, estadoFilter, complianceFilter, complianceByVehicleId, sortCol, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -224,6 +302,11 @@ export function VehiclesPage() {
       setFormError('La capacidad debe ser un número ≥ 0 (usa 0 si no aplica).');
       return null;
     }
+    const vin = form.vin.trim().toUpperCase();
+    if (vin && !VIN_RE.test(vin)) {
+      setFormError('VIN inválido: usa 11–17 caracteres (sin I, O ni Q).');
+      return null;
+    }
     return {
       plate,
       brand,
@@ -232,6 +315,10 @@ export function VehiclesPage() {
       type: form.type,
       capacity: cap,
       available: form.available,
+      vin: vin || null,
+      maintenanceDueDate: form.maintenanceDueDate.trim() || null,
+      circulationPermitDueDate: form.circulationPermitDueDate.trim() || null,
+      technicalReviewDueDate: form.technicalReviewDueDate.trim() || null,
     };
   };
 
@@ -276,7 +363,7 @@ export function VehiclesPage() {
             Vehículos
           </h1>
           <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
-            Patente, marca, modelo, año y estado. Capacidad y tipo son opcionales para el modelo de datos.
+            Flota con VIN opcional, fechas de mantención y documentación. Alertas {VEHICLE_COMPLIANCE_WARN_DAYS} días antes del vencimiento.
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -319,7 +406,7 @@ export function VehiclesPage() {
               type="search"
               name="vehicle-search"
               autoComplete="off"
-              placeholder="Buscar por patente, marca, modelo, año…"
+              placeholder="Buscar por patente, marca, modelo, VIN…"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -344,8 +431,37 @@ export function VehiclesPage() {
               ]}
             />
           </div>
+          <div className="w-full sm:w-48">
+            <Select
+              label="Vencimientos"
+              id={`${formBaseId}-compliance-filter`}
+              value={complianceFilter}
+              onChange={(e) => {
+                setComplianceFilter(e.target.value as 'all' | 'alerts');
+                setPage(1);
+              }}
+              options={[
+                { value: 'all', label: 'Todos' },
+                { value: 'alerts', label: 'Con alertas' },
+              ]}
+            />
+          </div>
         </div>
       )}
+
+
+      {fleetAlertCount > 0 ? (
+        <div
+          className="flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
+          role="status"
+        >
+          <AlertTriangle size={18} className="shrink-0 mt-0.5" aria-hidden />
+          <p>
+            <strong className="font-semibold tabular-nums">{fleetAlertCount}</strong>{' '}
+            {fleetAlertCount === 1 ? 'vehículo tiene' : 'vehículos tienen'} mantención o documentación por vencer o vencida.
+          </p>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-300">
@@ -362,7 +478,7 @@ export function VehiclesPage() {
 
       <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+          <table className="w-full min-w-[920px]">
             <thead>
               <tr className="border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/90">
                 <th
@@ -375,19 +491,25 @@ export function VehiclesPage() {
                 <Col colKey="brand" label="Marca" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
                 <Col colKey="model" label="Modelo" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
                 <Col colKey="year" label="Año" className="w-24 tabular-nums" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                <th scope="col" className="p-3 text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wide min-w-[120px]">
+                  VIN
+                </th>
+                <th scope="col" className="p-3 text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wide min-w-[180px]">
+                  Vencimientos
+                </th>
                 <Col colKey="available" label="Estado" className="w-28" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
               </tr>
             </thead>
             <tbody>
               {loading && !loaded ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-sm text-stone-500" role="status" aria-live="polite">
+                  <td colSpan={8} className="py-12 text-center text-sm text-stone-500" role="status" aria-live="polite">
                     Cargando vehículos…
                   </td>
                 </tr>
               ) : paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-6">
+                  <td colSpan={8} className="p-6">
                     <EmptyState
                       icon={<Truck className="size-10 text-stone-300 dark:text-stone-600" aria-hidden />}
                       title="Sin vehículos"
@@ -434,6 +556,14 @@ export function VehiclesPage() {
                       {v.model}
                     </td>
                     <td className="px-3 py-2.5 text-sm tabular-nums text-stone-700 dark:text-stone-200">{v.year}</td>
+                    <td className="px-3 py-2.5">
+                      <span translate="no" className="font-mono text-xs text-stone-600 dark:text-stone-300">
+                        {v.vin?.trim() || '–'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 align-top">
+                      <VehicleComplianceBadges summary={complianceByVehicleId.get(v.id)!} />
+                    </td>
                     <td className="px-3 py-2.5">
                       <span
                         className={clsx(
@@ -572,6 +702,52 @@ export function VehiclesPage() {
               placeholder="0"
               hint="Puedes usar 0 si no aplica."
             />
+            <Input
+              id={`${formBaseId}-vin`}
+              label="VIN (opcional)"
+              name="vin"
+              value={form.vin}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  vin: e.target.value.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/gi, '').slice(0, 17),
+                }))
+              }
+              placeholder="17 caracteres máx."
+              autoComplete="off"
+              spellCheck={false}
+              translate="no"
+              hint="Para futura carga automática de datos del vehículo vía scraping."
+              containerClassName="sm:col-span-2"
+            />
+            <Input
+              id={`${formBaseId}-maintenance`}
+              label="Próxima mantención"
+              name="maintenanceDueDate"
+              type="date"
+              value={form.maintenanceDueDate}
+              onChange={(e) => setForm((f) => ({ ...f, maintenanceDueDate: e.target.value }))}
+            />
+            <Input
+              id={`${formBaseId}-circulation`}
+              label="Venc. permiso de circulación"
+              name="circulationPermitDueDate"
+              type="date"
+              value={form.circulationPermitDueDate}
+              onChange={(e) => setForm((f) => ({ ...f, circulationPermitDueDate: e.target.value }))}
+            />
+            <Input
+              id={`${formBaseId}-technical`}
+              label="Venc. revisión técnica"
+              name="technicalReviewDueDate"
+              type="date"
+              value={form.technicalReviewDueDate}
+              onChange={(e) => setForm((f) => ({ ...f, technicalReviewDueDate: e.target.value }))}
+              containerClassName="sm:col-span-2"
+            />
+            <p className="sm:col-span-2 text-xs text-stone-500 dark:text-stone-400 -mt-1">
+              Alerta amarilla {VEHICLE_COMPLIANCE_WARN_DAYS} días antes; roja si ya venció.
+            </p>
             <div className="sm:col-span-2 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4 border-t border-stone-100 dark:border-stone-800 pt-4 mt-1">
               <div className="min-w-0">
                 <p id={`${formBaseId}-estado-label`} className="text-sm font-medium text-stone-700 dark:text-stone-300">

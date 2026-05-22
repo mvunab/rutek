@@ -2,9 +2,6 @@ import { useEffect } from 'react';
 import {
   Package, Truck, Users, Map, TrendingUp, Clock,
   CheckCircle2, AlertCircle, ArrowRight,
-  Route, UserCheck,
-  PersonStanding, Building2,
-  ShieldCheck, Camera, ChevronRight
 } from 'lucide-react';
 import {
   AreaChart, Area, PieChart, Pie, Cell,
@@ -19,116 +16,6 @@ import { useDashboardStore } from '../../store/useDashboardStore';
 import { useOrderStore } from '../../store/useOrderStore';
 import { useRouteStore } from '../../store/useRouteStore';
 
-// ─── Back Office Quick Access ─────────────────────────────────────────────────
-interface MenuItem {
-  label: string;
-  description?: string;
-  icon: React.ReactNode;
-  to?: string;
-  soon?: boolean;
-  accent: string;   // tailwind bg color for icon bg
-  iconColor: string; // tailwind text color for icon
-}
-
-function BackOfficeMenu() {
-  const navigate = useNavigate();
-
-  const operaciones: MenuItem[] = [
-    {
-      label: 'Administrador de Rutas',
-      description: 'Gestiona y monitorea las rutas del día',
-      icon: <Route size={18} />,
-      to: '/rutas',
-      accent: 'bg-emerald-100',
-      iconColor: 'text-emerald-600',
-    },
-  ];
-
-  const administracion: MenuItem[] = [
-    { label: 'Repartidores',       icon: <UserCheck size={15} />,     to: '/usuarios',  accent: 'bg-orange-100', iconColor: 'text-orange-500' },
-    { label: 'Peonetas',           icon: <PersonStanding size={15}/>, to: '/peonetas', accent: 'bg-orange-100', iconColor: 'text-orange-500' },
-    { label: 'Clientes',           icon: <Building2 size={15} />,      to: '/clientes',  accent: 'bg-red-100',    iconColor: 'text-red-500' },
-    { label: 'Usuarios Sistema',   icon: <ShieldCheck size={15} />,  to: '/usuarios',  accent: 'bg-violet-100', iconColor: 'text-violet-500' },
-    { label: 'Admin. Fotos',       icon: <Camera size={15} />,       to: '/fotos',     accent: 'bg-blue-100',   iconColor: 'text-blue-600' },
-  ];
-
-  const go = (item: MenuItem) => {
-    if (!item.soon && item.to) navigate(item.to);
-  };
-
-  return (
-    <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-sm overflow-hidden">
-      <div className="px-5 py-3 border-b border-stone-100 dark:border-stone-800 flex items-center gap-2">
-        <span className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">Accesos rápidos</span>
-      </div>
-
-      <div className="p-5 space-y-5">
-        {/* Operaciones — destacadas */}
-        <div>
-          <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider mb-2.5">Operaciones</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {operaciones.map(item => (
-              <button
-                key={item.label}
-                onClick={() => go(item)}
-                disabled={item.soon}
-                className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all group
-                  ${item.soon
-                    ? 'border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/40 cursor-not-allowed opacity-60'
-                    : 'border-stone-200 dark:border-stone-700 hover:border-primary-200 dark:hover:border-primary-600 hover:bg-primary-50/40 dark:hover:bg-primary-950/30 hover:shadow-sm cursor-pointer'
-                  }`}
-              >
-                <div className={`flex-shrink-0 p-2 rounded-lg ${item.accent}`}>
-                  <span className={item.iconColor}>{item.icon}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-stone-700 dark:text-stone-200 leading-tight">{item.label}</p>
-                  {item.description && (
-                    <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5 truncate">{item.description}</p>
-                  )}
-                </div>
-                {item.soon
-                  ? <span className="flex-shrink-0 text-[10px] font-semibold text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded-full">Pronto</span>
-                  : <ChevronRight size={14} className="flex-shrink-0 text-stone-300 dark:text-stone-600 group-hover:text-primary-400 transition-colors" />
-                }
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Administración — grid compacto */}
-        <div>
-          <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider mb-2.5">Administración</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-            {administracion.map(item => (
-              <button
-                key={item.label}
-                onClick={() => go(item)}
-                disabled={item.soon}
-                title={item.soon ? 'Próximamente' : item.label}
-                className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-center transition-all group
-                  ${item.soon
-                    ? 'border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/40 cursor-not-allowed opacity-50'
-                    : 'border-stone-200 dark:border-stone-700 hover:border-primary-200 dark:hover:border-primary-600 hover:bg-primary-50/40 dark:hover:bg-primary-950/30 hover:shadow-sm cursor-pointer'
-                  }`}
-              >
-                <div className={`p-2 rounded-lg ${item.accent}`}>
-                  <span className={item.iconColor}>{item.icon}</span>
-                </div>
-                <span className="text-[11px] font-medium text-stone-600 dark:text-stone-300 leading-tight line-clamp-2">
-                  {item.label}
-                </span>
-                {item.soon && (
-                  <span className="text-[9px] text-stone-400 dark:text-stone-500">Pronto</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const CHART_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ef4444'];
 
@@ -176,9 +63,6 @@ export function Dashboard() {
           <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Operación activa</span>
         </div>
       </div>
-
-      {/* Back Office Quick Access */}
-      <BackOfficeMenu />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

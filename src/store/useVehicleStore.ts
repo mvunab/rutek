@@ -14,6 +14,10 @@ function toVehicle(r: DbVehicle): Vehicle {
     year: r.year,
     capacity: r.capacity,
     available: r.available,
+    vin: r.vin ?? null,
+    maintenanceDueDate: r.maintenance_due_date ?? null,
+    circulationPermitDueDate: r.circulation_permit_due_date ?? null,
+    technicalReviewDueDate: r.technical_review_due_date ?? null,
     createdAt: r.created_at,
   };
 }
@@ -26,6 +30,10 @@ export interface CreateVehicleInput {
   type?: VehicleType;
   capacity?: number;
   available?: boolean;
+  vin?: string | null;
+  maintenanceDueDate?: string | null;
+  circulationPermitDueDate?: string | null;
+  technicalReviewDueDate?: string | null;
 }
 
 export type UpdateVehicleInput = Partial<CreateVehicleInput>;
@@ -38,6 +46,35 @@ interface VehicleStore {
   createVehicle: (input: CreateVehicleInput) => Promise<Vehicle>;
   updateVehicle: (id: string, patch: UpdateVehicleInput) => Promise<Vehicle>;
   deleteVehicle: (id: string) => Promise<void>;
+}
+
+function buildVehicleBody(input: CreateVehicleInput | UpdateVehicleInput): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if ('plate' in input && input.plate !== undefined) body.plate = input.plate.trim();
+  if ('brand' in input && input.brand !== undefined) body.brand = input.brand.trim();
+  if ('model' in input && input.model !== undefined) body.model = input.model.trim();
+  if ('year' in input && input.year !== undefined) body.year = input.year;
+  if ('type' in input && input.type !== undefined) body.type = input.type;
+  if ('capacity' in input && input.capacity !== undefined) body.capacity = input.capacity;
+  if ('available' in input && input.available !== undefined) body.available = input.available;
+  if ('vin' in input && input.vin !== undefined) {
+    const v = input.vin?.trim().toUpperCase() ?? '';
+    body.vin = v.length > 0 ? v : null;
+  }
+  if ('maintenanceDueDate' in input && input.maintenanceDueDate !== undefined) {
+    body.maintenanceDueDate = input.maintenanceDueDate?.trim() ? input.maintenanceDueDate.trim() : null;
+  }
+  if ('circulationPermitDueDate' in input && input.circulationPermitDueDate !== undefined) {
+    body.circulationPermitDueDate = input.circulationPermitDueDate?.trim()
+      ? input.circulationPermitDueDate.trim()
+      : null;
+  }
+  if ('technicalReviewDueDate' in input && input.technicalReviewDueDate !== undefined) {
+    body.technicalReviewDueDate = input.technicalReviewDueDate?.trim()
+      ? input.technicalReviewDueDate.trim()
+      : null;
+  }
+  return body;
 }
 
 export const useVehicleStore = create<VehicleStore>((set) => ({
@@ -65,15 +102,19 @@ export const useVehicleStore = create<VehicleStore>((set) => ({
   },
 
   createVehicle: async (input) => {
-    const body = {
-      plate: input.plate.trim(),
-      brand: input.brand.trim(),
-      model: input.model.trim(),
+    const body = buildVehicleBody({
+      plate: input.plate,
+      brand: input.brand,
+      model: input.model,
       year: input.year,
-      ...(input.type !== undefined && { type: input.type }),
-      ...(input.capacity !== undefined && { capacity: input.capacity }),
-      ...(input.available !== undefined && { available: input.available }),
-    };
+      type: input.type ?? 'cargo_truck',
+      capacity: input.capacity ?? 0,
+      available: input.available ?? true,
+      vin: input.vin,
+      maintenanceDueDate: input.maintenanceDueDate,
+      circulationPermitDueDate: input.circulationPermitDueDate,
+      technicalReviewDueDate: input.technicalReviewDueDate,
+    });
     const inserted = await api.post<DbVehicle>('/vehicles', body);
     const v = toVehicle(inserted);
     set((s) => ({ vehicles: [v, ...s.vehicles] }));
@@ -81,15 +122,7 @@ export const useVehicleStore = create<VehicleStore>((set) => ({
   },
 
   updateVehicle: async (id, patch) => {
-    const body: Record<string, unknown> = {};
-    if (patch.plate !== undefined) body.plate = patch.plate.trim();
-    if (patch.brand !== undefined) body.brand = patch.brand.trim();
-    if (patch.model !== undefined) body.model = patch.model.trim();
-    if (patch.year !== undefined) body.year = patch.year;
-    if (patch.type !== undefined) body.type = patch.type;
-    if (patch.capacity !== undefined) body.capacity = patch.capacity;
-    if (patch.available !== undefined) body.available = patch.available;
-
+    const body = buildVehicleBody(patch);
     const updated = await api.patch<DbVehicle>(`/vehicles/${id}`, body);
     const v = toVehicle(updated);
     set((s) => ({

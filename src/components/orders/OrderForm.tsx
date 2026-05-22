@@ -33,6 +33,11 @@ interface OrderFormProps {
   onSubmit: (data: OrderFormData) => void | Promise<void>;
   onCancel: () => void;
   submitLabel?: string;
+  /**
+   * Cuando se crea un pedido dentro de una ruta con cliente ya fijado,
+   * pasa el UUID aquí para pre-seleccionarlo y bloquearlo.
+   */
+  lockedClientId?: string;
 }
 
 const EMPTY_INITIAL: Partial<OrderFormData> = {};
@@ -42,8 +47,12 @@ export function OrderForm({
   onSubmit,
   onCancel,
   submitLabel = 'Guardar',
+  lockedClientId,
 }: OrderFormProps) {
-  const [form, setForm] = useState<OrderFormData>({ ...emptyOrderForm, ...initial });
+  const effectiveInitial = lockedClientId
+    ? { ...initial, clientId: lockedClientId }
+    : initial;
+  const [form, setForm] = useState<OrderFormData>({ ...emptyOrderForm, ...effectiveInitial });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { clients } = useClientStore();
 
@@ -138,7 +147,12 @@ export function OrderForm({
             options={clientOptions}
             error={errors.clientId}
             containerClassName="col-span-2"
-            hint="Si el cliente no está cerrado aún, elegí la cuenta provisional que uses en tu proceso; podés corregirlo después."
+            disabled={!!lockedClientId}
+            hint={
+              lockedClientId
+                ? 'El cliente está fijado por la ruta y no puede cambiarse aquí.'
+                : 'Si el cliente no está cerrado aún, elegí la cuenta provisional que uses en tu proceso; podés corregirlo después.'
+            }
           />
           <Select label="Prioridad" value={form.priority} onChange={setField('priority')} options={priorityOptions} />
           <Input

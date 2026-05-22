@@ -9,6 +9,7 @@ const roleLabels: Record<UserRole, string> = {
   admin: 'Administrador',
   operator: 'Operador Logístico',
   driver: 'Repartidor',
+  peoneta: 'Peoneta',
   client: 'Cliente',
 };
 

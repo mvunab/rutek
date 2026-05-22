@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Activity } from 'lucide-react';
 import { AppLayout } from './components/layout/AppLayout';
 import { AnimatedPage } from './components/layout/AnimatedPage';
@@ -28,11 +28,6 @@ const UsersPage = lazy(() =>
 );
 const PhotosPage = lazy(() =>
   import('./pages/photos/PhotosPage').then((m) => ({ default: m.PhotosPage })),
-);
-const PeonetasPage = lazy(() =>
-  import('./pages/peonetas/PeonetasPage').then((m) => ({
-    default: m.PeonetasPage,
-  })),
 );
 const VehiclesPage = lazy(() =>
   import('./pages/vehicles/VehiclesPage').then((m) => ({
@@ -114,20 +109,28 @@ function ProtectedRoute({
   return <>{children}</>;
 }
 
+function GuardedOutlet() {
+  return (
+    <BackendGuard>
+      <Outlet />
+    </BackendGuard>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
-      <BackendGuard>
-        <Suspense fallback={<PageFallback />}>
-          <Routes>
-            <Route
-              path="/login"
-              element={
-                <AnimatedPage className="min-h-screen">
-                  <LoginPage />
-                </AnimatedPage>
-              }
-            />
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              <AnimatedPage className="min-h-screen">
+                <LoginPage />
+              </AnimatedPage>
+            }
+          />
+          <Route element={<GuardedOutlet />}>
             <Route path="/" element={<AppLayout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route
@@ -180,11 +183,7 @@ function App() {
               />
               <Route
                 path="peonetas"
-                element={
-                  <ProtectedRoute>
-                    <PeonetasPage />
-                  </ProtectedRoute>
-                }
+                element={<Navigate to="/usuarios" replace />}
               />
               <Route
                 path="vehiculos"
@@ -251,9 +250,9 @@ function App() {
                 </AnimatedPage>
               }
             />
-          </Routes>
-        </Suspense>
-      </BackendGuard>
+          </Route>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

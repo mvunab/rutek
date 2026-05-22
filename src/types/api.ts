@@ -185,6 +185,10 @@ export interface DbVehicle {
   type: string;
   capacity: number;
   available: boolean;
+  vin?: string | null;
+  maintenance_due_date?: string | null;
+  circulation_permit_due_date?: string | null;
+  technical_review_due_date?: string | null;
   created_at: string;
   updated_at: string;
 }

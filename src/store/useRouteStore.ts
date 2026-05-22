@@ -6,9 +6,11 @@ import { api, isNetworkError } from '../lib/api';
 /** Cuerpo que espera `POST /routes` (`CreateRouteDto` en rutek-api, snake_case). */
 export type CreateRouteInput = {
   name: string;
-  /** Folio / código legible; si se omite, se genera en el cliente. */
+  /** Folio / código legible; si se omite, se genera en el servidor. */
   code?: string;
   notes?: string;
+  /** UUID del cliente al que pertenece esta ruta (RM-3). Opcional: si se omite, se infiere del primer pedido asignado. */
+  clientId?: string;
 };
 
 /** Campos PATCH /routes/:id; `null` en chofer/vehículo los desasigna en el servidor. */
@@ -42,6 +44,7 @@ function mapRouteFromApi(row: Record<string, unknown>): Route {
     estimatedDuration: Number(row.estimated_duration ?? 0),
     createdAt: String(row.created_at ?? new Date().toISOString()),
     notes: row.notes != null ? String(row.notes) : undefined,
+    clientId: row.client_id != null ? String(row.client_id) : null,
   };
 }
 
@@ -59,6 +62,19 @@ function routePatchToApi(data: PatchRouteInput): Record<string, unknown> {
   return out;
 }
 
+/** Body para PATCH /routes/:id/assign-driver (RM-1). */
+export type AssignDriverToRouteInput = {
+  /** UUID del driver; null para desasignar. */
+  driverId: string | null;
+  driverName?: string | null;
+  /** UUID de la peoneta (opcional). */
+  peonetaId?: string | null;
+  peonetaName?: string | null;
+  /** UUID del vehículo (opcional). */
+  vehicleId?: string | null;
+  vehiclePlate?: string | null;
+};
+
 interface RouteStore {
   routes: Route[];
   selectedRoute: Route | null;
@@ -72,6 +88,11 @@ interface RouteStore {
   addRoute: (input: CreateRouteInput) => Promise<void>;
   updateRoute: (id: string, data: PatchRouteInput) => Promise<void>;
   updateRouteStatus: (id: string, status: 'cancelled') => Promise<void>;
+  /**
+   * RM-1: llama PATCH /routes/:id/assign-driver.
+   * Actualiza driver_id / peoneta_id en TODOS los pedidos de la ruta.
+   */
+  assignDriverToOrders: (routeId: string, input: AssignDriverToRouteInput) => Promise<void>;
   assignDriver: (routeId: string, driverId: string, driverName: string) => Promise<void>;
   assignVehicle: (routeId: string, vehicleId: string, vehiclePlate: string) => Promise<void>;
   addOrderToRoute: (routeId: string, orderId: string) => Promise<void>;
@@ -118,18 +139,12 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
   selectRoute: (route) => set({ selectedRoute: route }),
 
   addRoute: async (input) => {
-    const code =
-      input.code?.trim() ||
-      `RT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const body: Record<string, unknown> = {
-      code,
       name: input.name.trim(),
-      status: 'not_started',
-      stops: [],
-      estimated_distance: 0,
-      estimated_duration: 0,
     };
+    if (input.code?.trim()) body.code = input.code.trim();
     if (input.notes?.trim()) body.notes = input.notes.trim();
+    if (input.clientId?.trim()) body.client_id = input.clientId.trim();
     try {
       const created = await api.post<Record<string, unknown>>('/routes', body);
       set((state) => ({
@@ -166,8 +181,26 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
     await get().updateRoute(id, { status: 'cancelled' });
   },
 
+  assignDriverToOrders: async (routeId, input) => {
+    try {
+      const body: Record<string, unknown> = {
+        driver_id: input.driverId,
+      };
+      if (input.driverName !== undefined) body.driver_name = input.driverName;
+      if (input.peonetaId !== undefined) body.peoneta_id = input.peonetaId;
+      if (input.peonetaName !== undefined) body.peoneta_name = input.peonetaName;
+      if (input.vehicleId !== undefined) body.vehicle_id = input.vehicleId;
+      if (input.vehiclePlate !== undefined) body.vehicle_plate = input.vehiclePlate;
+      await api.patch(`/routes/${routeId}/assign-driver`, body);
+      // No llama fetchRoutes aquí — el caller es responsable de refrescar.
+    } catch (err) {
+      if (isNetworkError(err)) return;
+      throw err;
+    }
+  },
+
   assignDriver: async (routeId, driverId, driverName) => {
-    await get().updateRoute(routeId, { driverId, driverName });
+    await get().assignDriverToOrders(routeId, { driverId, driverName });
   },
 
   assignVehicle: async (routeId, vehicleId, vehiclePlate) => {

@@ -1,4 +1,18 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+/** En producción sin VITE_API_URL usa el mismo origen (evita DNS distinto al del HTML). */
+function resolveApiUrl(): string {
+  const fromEnv = import.meta.env.VITE_API_URL;
+  if (typeof fromEnv === 'string' && fromEnv.trim().length > 0) {
+    return fromEnv.trim().replace(/\/$/, '');
+  }
+  if (import.meta.env.MODE === 'development') {
+    return 'http://localhost:4000';
+  }
+  return '';
+}
+
+const API_URL = resolveApiUrl();
+
+const PING_TIMEOUT_MS = 8_000;
 
 export class ApiError extends Error {
   readonly status: number;
@@ -109,18 +123,25 @@ export const api = {
  *
  * Intenta primero /health (estándar) y cae a / como fallback.
  */
-export async function pingBackend(signal?: AbortSignal): Promise<boolean> {
+export async function pingBackend(externalSignal?: AbortSignal): Promise<boolean> {
   const endpoints = ['/health', '/'];
   for (const path of endpoints) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
+    const onExternalAbort = () => controller.abort();
+    externalSignal?.addEventListener('abort', onExternalAbort);
     try {
       await fetch(`${API_URL}${path}`, {
         method: 'GET',
-        signal,
+        signal: controller.signal,
         cache: 'no-store',
       });
       return true;
     } catch {
       // continuar con el siguiente endpoint
+    } finally {
+      clearTimeout(timeoutId);
+      externalSignal?.removeEventListener('abort', onExternalAbort);
     }
   }
   return false;
