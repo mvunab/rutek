@@ -14,7 +14,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   },
   '/rutas': {
     title: 'Rutas',
-    subtitle: 'Itinerarios de salida: folio, nombre, fecha, pedidos, bultos y estado. Usa Pedidos en cada fila para gestionar la ruta.',
+    subtitle: 'Selecciona un itinerario en el listado para ver el detalle y gestionar pedidos en el panel lateral.',
   },
   '/usuarios':      { title: 'Usuarios Sistema', subtitle: 'Administradores, operadores, repartidores, peonetas y clientes de la plataforma' },
   '/fotos':         { title: 'Admin. Fotos',      subtitle: 'Fotografías de inspección y entrega desde la app móvil' },
@@ -33,6 +33,8 @@ export function AppLayout() {
 
   const inSuperAdmin = isSuperAdmin || location.pathname.startsWith('/super-admin');
   const pageInfo = pageTitles[location.pathname] ?? { title: 'Rutek' };
+  /** Rutas usa layout de altura fija: scroll solo en listado y panel de detalle. */
+  const isRoutesPage = location.pathname === '/rutas';
 
   return (
     <div className="flex h-screen bg-stone-50 dark:bg-stone-950 overflow-hidden">
@@ -84,7 +86,14 @@ export function AppLayout() {
             )}
           </div>
 
-          <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-6 min-h-0 bg-stone-50 dark:bg-stone-950 focus:outline-none">
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className={clsx(
+              'flex-1 min-h-0 p-6 bg-stone-50 dark:bg-stone-950 focus:outline-none',
+              isRoutesPage ? 'overflow-hidden flex flex-col' : 'overflow-y-auto',
+            )}
+          >
             <Outlet />
           </main>
         </div>

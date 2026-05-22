@@ -33,6 +33,51 @@
   .dark ::-webkit-scrollbar-thumb:hover {
     @apply bg-stone-500;
   }
+
+  /* Panel lateral de rutas */
+  .route-panel-scroll {
+    scrollbar-color: #d6d3d1 #fafaf9;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .route-panel-scroll::-webkit-scrollbar {
+    width: 10px;
+  }
+  .route-panel-scroll::-webkit-scrollbar-track {
+    background: #fafaf9;
+    border-radius: 4px;
+  }
+  .route-panel-scroll::-webkit-scrollbar-thumb {
+    background: #d6d3d1;
+    border-radius: 4px;
+    border: 2px solid #fafaf9;
+  }
+  .route-panel-scroll::-webkit-scrollbar-thumb:hover {
+    background: #a8a29e;
+  }
+  .dark .route-panel-scroll {
+    scrollbar-color: #6b6b6b #141414;
+  }
+  .dark .route-panel-scroll::-webkit-scrollbar-track {
+    background: #141414;
+  }
+  .dark .route-panel-scroll::-webkit-scrollbar-thumb {
+    background: #525252;
+    border-color: #141414;
+  }
+  .dark .route-panel-scroll::-webkit-scrollbar-thumb:hover {
+    background: #737373;
+  }
+
+  /* Listado de rutas (columna central) */
+  .route-list-scroll {
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  .route-panel-scroll {
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
 }
 
 @layer utilities {

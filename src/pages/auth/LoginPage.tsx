@@ -1,14 +1,13 @@
 import { useState, useEffect, useId } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Truck, Eye, EyeOff, LogIn } from 'lucide-react';
+import { Map, Eye, EyeOff, LogIn } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Button } from '../../components/ui/Button';
 
-const FEATURES = [
-  { id: 'orders', icon: '📦', text: 'Gestión completa de pedidos y clientes' },
-  { id: 'routes', icon: '🗺️', text: 'Planificación y monitoreo de rutas' },
-  { id: 'roles', icon: '👥', text: 'Roles diferenciados por actor' },
-  { id: 'tenant', icon: '🏢', text: 'Arquitectura multi-tenant SaaS' },
+const PITCH_HIGHLIGHTS = [
+  'Pedidos y rutas en una sola vista',
+  'Seguimiento de entregas en tiempo real',
+  'Coordinación simple de choferes y flota',
 ] as const;
 
 export function LoginPage() {
@@ -49,58 +48,96 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-stone-950 flex">
-      <div className="hidden lg:flex flex-col justify-between w-[420px] flex-shrink-0 bg-white dark:bg-stone-900 border-r border-stone-200 dark:border-stone-800 p-10">
-        <div>
-          <div className="flex items-center gap-3 mb-12">
-            <div className="size-10 bg-primary-600 rounded-xl flex items-center justify-center shadow-sm">
-              <Truck size={20} className="text-white" />
-            </div>
-            <div>
-              <p className="text-lg font-semibold text-stone-900 dark:text-stone-100">Rutek</p>
-              <p className="text-xs text-stone-400 dark:text-stone-500">Logistics SaaS</p>
-            </div>
-          </div>
+    <div className="min-h-screen min-h-dvh bg-white flex">
+      {/* Panel visual — solo escritorio */}
+      <aside
+        className="hidden lg:flex relative flex-1 max-w-[min(52%,560px)] min-w-[380px] flex-col overflow-hidden"
+        aria-label="Presentación de Rutek"
+      >
+        <img
+          src="/login-hero.png"
+          alt=""
+          className="absolute inset-0 size-full object-cover object-[center_55%]"
+          fetchPriority="high"
+          decoding="async"
+        />
+        {/* Tono oscuro arriba: legibilidad del pitch */}
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-transparent from-22% via-primary-900/95 via-48% to-primary-950 to-100%"
+          aria-hidden
+        />
+        {/* Tono claro abajo: velo azul extendido hacia el centro */}
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-primary-500/46 from-0% via-primary-600/22 via-20% to-transparent to-72%"
+          aria-hidden
+        />
 
-          <h1 className="text-3xl font-semibold text-stone-900 dark:text-stone-100 leading-tight mb-4 text-balance">
-            Gestión de transporte de carga
-          </h1>
-          <p className="text-stone-500 dark:text-stone-400 text-sm leading-relaxed">
-            Plataforma multi-tenant para planificar rutas, gestionar pedidos y monitorear
-            operaciones logísticas en tiempo real.
-          </p>
-
-          <div className="mt-8 space-y-3">
-            {FEATURES.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 text-sm text-stone-500 dark:text-stone-400">
-                <span className="text-base" aria-hidden="true">{item.icon}</span>
-                {item.text}
+        <div className="relative z-10 flex flex-col flex-1 min-h-full">
+          <header className="p-10 pb-0">
+            <div className="inline-flex items-center gap-2.5 rounded-full bg-primary-950/40 backdrop-blur-sm border border-white/15 px-3 py-1.5 shadow-lg">
+              <div
+                className="size-7 rounded-md flex items-center justify-center flex-shrink-0 bg-primary-700"
+                aria-hidden
+              >
+                <Map size={14} className="text-white" strokeWidth={2} />
               </div>
-            ))}
+              <span className="text-sm font-semibold tracking-tight text-white">Rutek</span>
+            </div>
+          </header>
+
+          <div className="px-10 pt-8 pb-6 text-white">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-200/90 mb-3">
+              Logística en movimiento
+            </p>
+            <h1 className="text-[2rem] xl:text-[2.35rem] font-bold leading-[1.12] tracking-tight text-balance text-white">
+              Tu operación, con rumbo claro
+            </h1>
+            <p className="mt-3 text-base xl:text-lg leading-relaxed text-white/80 max-w-md text-pretty">
+              Coordina pedidos, rutas y entregas sin perder visibilidad del día a día.
+              Menos fricción en oficina, más control en terreno.
+            </p>
+
+            <ul className="mt-7 space-y-2.5 border-t border-white/15 pt-6" role="list">
+              {PITCH_HIGHLIGHTS.map((text) => (
+                <li key={text} className="flex items-center gap-2.5 text-sm text-white/90">
+                  <span
+                    className="size-1.5 rounded-full bg-primary-300 shrink-0"
+                    aria-hidden
+                  />
+                  {text}
+                </li>
+              ))}
+            </ul>
+
           </div>
 
-        </div>
+          <div className="flex-1 min-h-[32%]" aria-hidden />
 
-        <div className="text-xs text-stone-400 dark:text-stone-500">
-          Rutek © 2024 · Plataforma de logística
+          <p className="px-10 pb-8 text-[11px] text-primary-950/55">
+            Rutek © {new Date().getFullYear()}
+          </p>
         </div>
-      </div>
+      </aside>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-8">
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-white border-l border-stone-100">
         <div className="w-full max-w-md">
           <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="size-9 bg-primary-600 rounded-xl flex items-center justify-center shadow-sm">
-              <Truck size={18} className="text-white" />
+            <div className="size-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-primary-700 shadow-sm">
+              <Map size={18} className="text-white" strokeWidth={2} aria-hidden />
             </div>
-            <p className="text-lg font-semibold text-stone-900 dark:text-stone-100">Rutek</p>
+            <p className="text-lg font-semibold text-stone-900">Rutek</p>
           </div>
 
-          <h2 className="text-2xl font-semibold text-stone-900 dark:text-stone-100 mb-1">Iniciar sesión</h2>
-          <p className="text-sm text-stone-500 dark:text-stone-400 mb-8">Accede a tu plataforma de logística</p>
+          <h2 className="text-2xl font-semibold text-stone-900 mb-1">
+            Iniciar sesión
+          </h2>
+          <p className="text-sm text-stone-500 mb-8">
+            Ingresa con tu cuenta para continuar
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-4 mb-6">
             <div>
-              <label htmlFor={emailId} className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1.5">Email</label>
+              <label htmlFor={emailId} className="block text-sm font-medium text-stone-700 mb-1.5">Email</label>
               <input
                 id={emailId}
                 type="email"
@@ -110,13 +147,13 @@ export function LoginPage() {
                 spellCheck={false}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2.5 text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent shadow-sm"
-                placeholder="usuario@empresa.cl"
+                className="w-full bg-white border border-stone-300 rounded-lg px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent shadow-sm"
+                placeholder="tu@correo.cl"
                 required
               />
             </div>
             <div>
-              <label htmlFor={passwordId} className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1.5">Contraseña</label>
+              <label htmlFor={passwordId} className="block text-sm font-medium text-stone-700 mb-1.5">Contraseña</label>
               <div className="relative">
                 <input
                   id={passwordId}
@@ -125,7 +162,7 @@ export function LoginPage() {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2.5 pr-10 text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent shadow-sm"
+                  className="w-full bg-white border border-stone-300 rounded-lg px-3 py-2.5 pr-10 text-sm text-stone-900 placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent shadow-sm"
                   placeholder="••••••••"
                   required
                 />
@@ -134,7 +171,7 @@ export function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                   aria-pressed={showPassword}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500 hover:text-stone-600 dark:hover:text-stone-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
                 >
                   {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                 </button>
@@ -145,9 +182,9 @@ export function LoginPage() {
               <div
                 role="alert"
                 aria-live="polite"
-                className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg"
+                className="p-3 bg-red-50 border border-red-200 rounded-lg"
               >
-                <p className="text-xs text-red-700 dark:text-red-300">{error}</p>
+                <p className="text-xs text-red-700">{error}</p>
               </div>
             )}
 

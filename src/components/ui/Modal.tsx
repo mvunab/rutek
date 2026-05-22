@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from './Button';
@@ -127,6 +127,91 @@ export function ConfirmModal({
       }
     >
       <p className="text-sm text-stone-600 dark:text-stone-300">{message}</p>
+    </Modal>
+  );
+}
+
+interface TypeToConfirmModalProps {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
+  title: string;
+  message: React.ReactNode;
+  /** Texto exacto que el usuario debe escribir (comparación sin distinguir mayúsculas). */
+  confirmPhrase?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  loading?: boolean;
+}
+
+export function TypeToConfirmModal({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmPhrase = 'eliminar',
+  confirmLabel = 'Eliminar',
+  cancelLabel = 'Cancelar',
+  loading = false,
+}: TypeToConfirmModalProps) {
+  const [typed, setTyped] = useState('');
+
+  useEffect(() => {
+    if (!open) setTyped('');
+  }, [open]);
+
+  const canConfirm =
+    typed.trim().toLowerCase() === confirmPhrase.trim().toLowerCase();
+
+  const handleConfirm = () => {
+    if (!canConfirm || loading) return;
+    void Promise.resolve(onConfirm());
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={title}
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={loading}>
+            {cancelLabel}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleConfirm}
+            disabled={!canConfirm || loading}
+            loading={loading}
+          >
+            {confirmLabel}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="text-sm text-stone-600 dark:text-stone-300">{message}</div>
+        <label className="block text-sm font-medium text-stone-700 dark:text-stone-200">
+          Escribe <span translate="no" className="font-mono text-red-600 dark:text-red-400">{confirmPhrase}</span> para confirmar
+          <input
+            type="text"
+            name="delete_confirm"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+            disabled={loading}
+            className="mt-1.5 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-100"
+            placeholder={confirmPhrase}
+            aria-describedby="type-to-confirm-hint"
+          />
+        </label>
+        <p id="type-to-confirm-hint" className="text-xs text-stone-500 dark:text-stone-400">
+          Esta acción no se puede deshacer.
+        </p>
+      </div>
     </Modal>
   );
 }

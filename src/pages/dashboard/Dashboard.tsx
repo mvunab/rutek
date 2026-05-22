@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   Package, Truck, Users, Map, TrendingUp, Clock,
   CheckCircle2, AlertCircle, ArrowRight,
@@ -15,24 +15,36 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useDashboardStore } from '../../store/useDashboardStore';
 import { useOrderStore } from '../../store/useOrderStore';
 import { useRouteStore } from '../../store/useRouteStore';
+import { useClientStore } from '../../store/useClientStore';
+import { EntityStatusBreakdown } from '../../components/dashboard/EntityStatusBreakdown';
+import {
+  buildOrderStatusBreakdown,
+  buildRouteStatusBreakdown,
+  computeDashboardKpis,
+  kpiOrdersTotalSubtitle,
+  mergeDashboardStats,
+  orderStatusToChartPoints,
+} from '../../lib/dashboardStatusBreakdown';
 
 
 const CHART_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ef4444'];
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { user, isSuperAdmin } = useAuthStore();
+  const { user, tenant, isSuperAdmin } = useAuthStore();
   const { stats, ordersChart, statusChart, fetchDashboard } = useDashboardStore();
   const { orders, fetchOrders } = useOrderStore();
   const { routes, fetchRoutes } = useRouteStore();
+  const { clients, fetchClients } = useClientStore();
 
   useEffect(() => {
     if (!isSuperAdmin) {
       void fetchDashboard();
       void fetchOrders();
       void fetchRoutes();
+      void fetchClients();
     }
-  }, [isSuperAdmin, fetchDashboard, fetchOrders, fetchRoutes]);
+  }, [isSuperAdmin, fetchDashboard, fetchOrders, fetchRoutes, fetchClients]);
 
   if (isSuperAdmin) {
     navigate('/super-admin', { replace: true });
@@ -43,8 +55,31 @@ export function Dashboard() {
   const activeRoutes = routes.filter(
     (r) => r.status === 'not_started' || r.status === 'in_progress',
   );
+
+  const routeStatusRows = useMemo(() => buildRouteStatusBreakdown(routes), [routes]);
+  const orderStatusRows = useMemo(
+    () => buildOrderStatusBreakdown(orders, tenant),
+    [orders, tenant],
+  );
+
+  const effectiveStatusChart = useMemo(() => {
+    if (statusChart.length > 0) return statusChart;
+    return orderStatusToChartPoints(orders, tenant);
+  }, [statusChart, orders, tenant]);
+
+  const kpis = useMemo(
+    () =>
+      mergeDashboardStats(
+        stats,
+        computeDashboardKpis(orders, routes, clients.length),
+      ),
+    [stats, orders, routes, clients.length],
+  );
+
+  const ordersTotalSubtitle = useMemo(() => kpiOrdersTotalSubtitle(orders), [orders]);
+
   const hasOrdersChart = ordersChart.length > 0;
-  const hasStatusChart = statusChart.length > 0;
+  const hasStatusChart = effectiveStatusChart.length > 0;
 
   return (
     <div className="space-y-6">
@@ -68,31 +103,54 @@ export function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Pedidos totales"
-          value={stats.totalOrders}
-          subtitle="Este mes"
+          value={orders.length}
+          subtitle={ordersTotalSubtitle}
           icon={<Package size={20} />}
           color="blue"
         />
         <StatCard
           title="En tránsito"
-          value={stats.ordersInTransit}
-          subtitle="Pedidos activos"
+          value={kpis.ordersInTransit}
+          subtitle="Estado: en ruta"
           icon={<Truck size={20} />}
           color="violet"
         />
         <StatCard
           title="Entregados"
-          value={stats.ordersDelivered}
-          subtitle={`${stats.deliveryRate}% de efectividad`}
+          value={kpis.ordersDelivered}
+          subtitle={`${kpis.deliveryRate}% de efectividad`}
           icon={<CheckCircle2 size={20} />}
           color="emerald"
         />
         <StatCard
           title="Pendientes"
-          value={stats.ordersPending}
-          subtitle="Requieren atención"
+          value={kpis.ordersPending}
+          subtitle="Estado: pendiente"
           icon={<AlertCircle size={20} />}
           color="amber"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <EntityStatusBreakdown
+          title="Rutas por estado"
+          subtitle="Distribución de todos los itinerarios"
+          icon={<Map size={18} />}
+          total={routes.length}
+          rows={routeStatusRows}
+          emptyMessage="No hay rutas registradas"
+          onViewAll={() => navigate('/rutas')}
+          viewAllLabel="Ver rutas"
+        />
+        <EntityStatusBreakdown
+          title="Pedidos por estado"
+          subtitle="Distribución de todos los pedidos"
+          icon={<Package size={18} />}
+          total={orders.length}
+          rows={orderStatusRows}
+          emptyMessage="No hay pedidos registrados"
+          onViewAll={() => navigate('/pedidos')}
+          viewAllLabel="Ver pedidos"
         />
       </div>
 
@@ -150,7 +208,7 @@ export function Dashboard() {
               <ResponsiveContainer width="100%" height={140}>
                 <PieChart>
                   <Pie
-                    data={statusChart}
+                    data={effectiveStatusChart}
                     cx="50%"
                     cy="50%"
                     innerRadius={40}
@@ -158,7 +216,7 @@ export function Dashboard() {
                     dataKey="value"
                     paddingAngle={3}
                   >
-                    {statusChart.map((entry, index) => (
+                    {effectiveStatusChart.map((entry, index) => (
                       <Cell key={entry.label} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                     ))}
                   </Pie>
@@ -168,7 +226,7 @@ export function Dashboard() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="space-y-2 mt-2">
-                {statusChart.map((item, i) => (
+                {effectiveStatusChart.map((item, i) => (
                   <div key={item.label} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span aria-hidden="true" className="size-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS[i] }} />
@@ -287,10 +345,10 @@ export function Dashboard() {
       {/* Secondary stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Rutas activas', value: stats.activeRoutes, icon: <Map size={16} />, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Clientes', value: stats.totalClients, icon: <Users size={16} />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Efectividad', value: `${stats.deliveryRate}%`, icon: <TrendingUp size={16} />, color: 'text-violet-600', bg: 'bg-violet-50' },
-          { label: 'Tiempo prom.', value: `${stats.avgDeliveryTime}d`, icon: <Clock size={16} />, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'Rutas activas', value: kpis.activeRoutes, icon: <Map size={16} />, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/40' },
+          { label: 'Clientes', value: kpis.totalClients, icon: <Users size={16} />, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+          { label: 'Efectividad', value: `${kpis.deliveryRate}%`, icon: <TrendingUp size={16} />, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/40' },
+          { label: 'Tiempo prom.', value: kpis.avgDeliveryTime > 0 ? `${kpis.avgDeliveryTime} d` : '—', icon: <Clock size={16} />, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40' },
         ].map((item) => (
           <div key={item.label} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-4 flex items-center gap-3 shadow-sm">
             <div className={`p-2 rounded-lg ${item.bg} dark:opacity-90 ${item.color}`}>{item.icon}</div>

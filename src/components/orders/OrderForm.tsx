@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { clsx } from 'clsx';
 import { Button } from '../ui/Button';
 import { Input, Select, Textarea } from '../ui/Input';
 import { useClientStore } from '../../store/useClientStore';
@@ -24,7 +25,7 @@ export const emptyOrderForm: OrderFormData = {
   destRegion: 'Metropolitana',
   estimatedDelivery: '',
   notes: '',
-  bultos: 0,
+  bultos: 1,
   dispatchGuideUrl: '',
 };
 
@@ -38,6 +39,10 @@ interface OrderFormProps {
    * pasa el UUID aquí para pre-seleccionarlo y bloquearlo.
    */
   lockedClientId?: string;
+  /** Nombre visible si el cliente está bloqueado (p. ej. inactivo en el listado). */
+  lockedClientName?: string;
+  /** Estilos para panel lateral oscuro. */
+  variant?: 'default' | 'dark';
 }
 
 const EMPTY_INITIAL: Partial<OrderFormData> = {};
@@ -48,7 +53,16 @@ export function OrderForm({
   onCancel,
   submitLabel = 'Guardar',
   lockedClientId,
+  lockedClientName,
+  variant = 'default',
 }: OrderFormProps) {
+  const isDark = variant === 'dark';
+  const sectionTitle = isDark
+    ? 'text-xs font-semibold text-stone-500 uppercase tracking-wide mb-3'
+    : 'text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3';
+  const fieldClass = isDark
+    ? '[&_label]:text-stone-400 [&_input]:bg-stone-900/90 [&_input]:border-stone-700 [&_input]:text-stone-100 [&_select]:bg-stone-900/90 [&_select]:border-stone-700 [&_select]:text-stone-100 [&_textarea]:bg-stone-900/90 [&_textarea]:border-stone-700 [&_textarea]:text-stone-100 [&_.text-xs]:text-stone-500'
+    : '';
   const effectiveInitial = lockedClientId
     ? { ...initial, clientId: lockedClientId }
     : initial;
@@ -69,6 +83,7 @@ export function OrderForm({
     if (!form.destStreet.trim()) errs.destStreet = 'Requerido';
     if (!form.destCity.trim()) errs.destCity = 'Requerido';
     if (!form.estimatedDelivery) errs.estimatedDelivery = 'Requerido';
+    if (!form.bultos || form.bultos < 1) errs.bultos = 'Indica al menos 1 bulto';
     return errs;
   };
 
@@ -97,26 +112,25 @@ export function OrderForm({
   ];
 
   return (
-    <div className="space-y-5">
+    <div className={clsx('space-y-5', fieldClass)}>
       <div>
-        <h4 className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">
-          Detalle de despacho (planificado)
-        </h4>
+        <h4 className={sectionTitle}>Detalle de despacho (planificado)</h4>
         <div className="grid grid-cols-2 gap-3">
           <Input
             label="Bultos"
             id="order-form-bultos"
             type="number"
             inputMode="numeric"
-            min={0}
+            min={1}
             step={1}
-            value={Number.isNaN(form.bultos) ? 0 : form.bultos}
+            value={Number.isNaN(form.bultos) ? 1 : form.bultos}
             onChange={(e) =>
               setForm((prev) => ({
                 ...prev,
-                bultos: Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                bultos: Math.max(1, Math.floor(Number(e.target.value) || 1)),
               }))
             }
+            error={errors.bultos}
           />
           <Input
             label="Guía de despacho (URL)"
@@ -136,24 +150,29 @@ export function OrderForm({
       </div>
 
       <div>
-        <h4 className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">
-          Información general
-        </h4>
+        <h4 className={sectionTitle}>Información general</h4>
         <div className="grid grid-cols-2 gap-3">
-          <Select
-            label="Cliente"
-            value={form.clientId}
-            onChange={setField('clientId')}
-            options={clientOptions}
-            error={errors.clientId}
-            containerClassName="col-span-2"
-            disabled={!!lockedClientId}
-            hint={
-              lockedClientId
-                ? 'El cliente está fijado por la ruta y no puede cambiarse aquí.'
-                : 'Si el cliente no está cerrado aún, elegí la cuenta provisional que uses en tu proceso; podés corregirlo después.'
-            }
-          />
+          {lockedClientId ? (
+            <Input
+              label="Cliente"
+              id="order-form-client-locked"
+              value={lockedClientName ?? clients.find((c) => c.id === lockedClientId)?.companyName ?? lockedClientId}
+              readOnly
+              disabled
+              containerClassName="col-span-2"
+              hint="El cliente está fijado por la ruta y no puede cambiarse aquí."
+            />
+          ) : (
+            <Select
+              label="Cliente"
+              value={form.clientId}
+              onChange={setField('clientId')}
+              options={clientOptions}
+              error={errors.clientId}
+              containerClassName="col-span-2"
+              hint="Si el cliente no está cerrado aún, elegí la cuenta provisional que uses en tu proceso; podés corregirlo después."
+            />
+          )}
           <Select label="Prioridad" value={form.priority} onChange={setField('priority')} options={priorityOptions} />
           <Input
             label="Entrega estimada"
@@ -166,9 +185,7 @@ export function OrderForm({
       </div>
 
       <div>
-        <h4 className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">
-          Dirección de entrega
-        </h4>
+        <h4 className={sectionTitle}>Dirección de entrega</h4>
         <div className="grid grid-cols-2 gap-3">
           <Input
             label="Dirección"
