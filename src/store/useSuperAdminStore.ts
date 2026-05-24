@@ -42,6 +42,7 @@ interface SuperAdminStore {
   deleteUser: (id: string) => Promise<void>;
   resetUserPassword: (userId: string, password: string) => Promise<void>;
   changeMyPassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
+  updateTenantFeatures: (tenantId: string, patch: Record<string, unknown>) => Promise<void>;
 }
 
 export const useSuperAdminStore = create<SuperAdminStore>((set, get) => ({
@@ -232,6 +233,25 @@ export const useSuperAdminStore = create<SuperAdminStore>((set, get) => ({
     } catch (err: any) {
       set({ error: err.message, loading: false });
       return false;
+    }
+  },
+
+  updateTenantFeatures: async (tenantId, patch) => {
+    set({ loading: true, error: null });
+    try {
+      const updated = await superAdminService.updateTenantFeatures(tenantId, patch as any);
+      const selected = get().selectedTenant;
+      if (selected) {
+        set({
+          selectedTenant: { ...selected, ...(updated as any) },
+          loading: false,
+        });
+      } else {
+        set({ loading: false });
+      }
+    } catch (err: any) {
+      set({ error: err?.message ?? 'Error al actualizar features', loading: false });
+      throw err;
     }
   },
 }));

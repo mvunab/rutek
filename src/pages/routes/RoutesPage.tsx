@@ -1,8 +1,9 @@
-import { useEffect, useState, useMemo, type ReactNode } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   Plus, Search, ChevronUp, ChevronDown,
   Download, RefreshCw, SlidersHorizontal, Package, UserCircle, Route as RouteIcon, Truck,
-  Pencil, Trash2, X, Copy, MapPin, Box, ArrowLeft, Check,
+  Pencil, Trash2, X, Copy, MapPin, Box, ArrowLeft, Check, FileSpreadsheet,
+  CheckCircle2, AlertCircle, Eye,
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { RouteStatusBadge } from '../../components/ui/Badge';
@@ -21,6 +22,388 @@ import { useUserStore } from '../../store/useUserStore';
 import { useVehicleStore } from '../../store/useVehicleStore';
 import { OrderForm, type OrderFormData } from '../../components/orders/OrderForm';
 import { OrderDetailModal } from '../../components/orders/OrderDetailModal';
+import { useRouteImportStore } from '../../store/useRouteImportStore';
+import type { ImportPreview } from '../../store/useRouteImportStore';
+import { toast } from '../../store/useToastStore';
+
+// ─── Panel resize ─────────────────────────────────────────────────────────────
+
+const PANEL_WIDTH_KEY = 'rutek-route-panel-width';
+const PANEL_MIN = 280;
+const PANEL_MAX = 640;
+const PANEL_DEFAULT = 384; // ~24rem
+
+function usePanelWidth() {
+  const [width, setWidth] = useState<number>(() => {
+    const stored = localStorage.getItem(PANEL_WIDTH_KEY);
+    const n = stored ? parseInt(stored, 10) : NaN;
+    return isNaN(n) ? PANEL_DEFAULT : Math.min(PANEL_MAX, Math.max(PANEL_MIN, n));
+  });
+
+  const commit = useCallback((w: number) => {
+    const clamped = Math.min(PANEL_MAX, Math.max(PANEL_MIN, w));
+    setWidth(clamped);
+    localStorage.setItem(PANEL_WIDTH_KEY, String(clamped));
+  }, []);
+
+  return { width, commit };
+}
+
+function PanelResizeHandle({ onResize }: { onResize: (delta: number) => void }) {
+  const dragging = useRef(false);
+  const lastX = useRef(0);
+
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    dragging.current = true;
+    lastX.current = e.clientX;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    e.preventDefault();
+  };
+
+  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!dragging.current) return;
+    const delta = lastX.current - e.clientX; // arrastrar izquierda = panel más ancho
+    lastX.current = e.clientX;
+    onResize(delta);
+  };
+
+  const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    dragging.current = false;
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+  };
+
+  return (
+    <div
+      role="separator"
+      aria-label="Ajustar ancho del panel de detalle"
+      aria-orientation="vertical"
+      tabIndex={0}
+      className={clsx(
+        'hidden lg:flex items-center justify-center',
+        'w-3 shrink-0 self-stretch cursor-col-resize select-none',
+        'group relative z-10',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+      )}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft') onResize(-16);
+        if (e.key === 'ArrowRight') onResize(16);
+      }}
+    >
+      {/* línea visible */}
+      <div className="w-px h-full bg-stone-200 dark:bg-stone-800 group-hover:bg-primary-400 dark:group-hover:bg-primary-600 transition-colors" />
+      {/* pastilla central */}
+      <div className="absolute top-1/2 -translate-y-1/2 w-1 h-8 rounded-full bg-stone-300 dark:bg-stone-600 group-hover:bg-primary-400 dark:group-hover:bg-primary-500 transition-colors" />
+    </div>
+  );
+}
+
+// ─── Import Excel Modal ───────────────────────────────────────────────────────
+
+function ImportExcelModal({
+  open,
+  onClose,
+  onImported,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const { fetchPreview, confirmImport, preview, previewLoading, previewError, confirmLoading, confirmError, lastResult, reset } =
+    useRouteImportStore();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [step, setStep] = useState<'upload' | 'preview' | 'done'>('upload');
+  const [routeName, setRouteName] = useState('');
+  const [routeDate, setRouteDate] = useState('');
+  const [showAllRows, setShowAllRows] = useState(false);
+
+  const handleClose = useCallback(() => {
+    reset();
+    setFile(null);
+    setStep('upload');
+    setRouteName('');
+    setRouteDate('');
+    setShowAllRows(false);
+    onClose();
+  }, [reset, onClose]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFile(f);
+    setStep('upload');
+    setShowAllRows(false);
+    const p = await fetchPreview(f);
+    if (p) {
+      setRouteName('');
+      setRouteDate(p.route_date ?? '');
+      setStep('preview');
+      if (p.rows.length === 0) {
+        toast.warning('Sin pedidos detectados', 'El Excel no contiene filas de datos válidas. Verifica el formato.');
+      } else {
+        toast.info(`Preview lista · ${p.rows.length} pedidos`, `Ruta N° ${p.route_number} · ${p.transport_company || 'sin empresa'}`);
+      }
+    } else {
+      const err = useRouteImportStore.getState().previewError;
+      if (err) toast.error('Error al leer el Excel', err);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!file) return;
+    const res = await confirmImport(file, {
+      routeName: routeName.trim() || undefined,
+      routeDate: routeDate || undefined,
+      driverNameHint: preview?.driver_name_hint || undefined,
+    });
+    if (!res) {
+      const err = useRouteImportStore.getState().confirmError;
+      if (err) toast.error('Error al importar', err);
+      return;
+    }
+
+    if (res) {
+      setStep('done');
+      onImported();
+
+      // Notificación de éxito
+      toast.info(
+        `Ruta ${res.route_code} importada`,
+        `${res.orders_created} pedido${res.orders_created !== 1 ? 's' : ''} creados · cliente: ${res.client_name}`,
+      );
+
+      // Advertencia si el cliente fue creado con datos incompletos
+      const rowsWithoutClient = (preview?.rows ?? []).filter((r) => !r.client_name.trim());
+      if (rowsWithoutClient.length > 0) {
+        toast.warning(
+          'Pedidos sin cliente identificado',
+          `${rowsWithoutClient.length} fila${rowsWithoutClient.length !== 1 ? 's' : ''} no tenían cliente en el Excel. Se asignó el cliente principal de la ruta.`,
+        );
+      }
+
+      // Advertencia si el cliente fue creado nuevo (sin datos completos)
+      toast.warning(
+        'Cliente creado con datos incompletos',
+        `"${res.client_name}" fue creado automáticamente desde el Excel. Completa RUT, contacto y dirección en el módulo de Clientes.`,
+        8000,
+      );
+    }
+  };
+
+  const previewRows = preview?.rows ?? [];
+  const visibleRows = showAllRows ? previewRows : previewRows.slice(0, 8);
+
+  if (!open) return null;
+
+  return (
+    <Modal open={open} onClose={handleClose} title="Importar desde Excel" size="2xl">
+      <div className="space-y-5">
+        {/* Step: upload */}
+        {step !== 'done' && (
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="sr-only"
+              onChange={handleFileChange}
+              aria-label="Seleccionar archivo Excel"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className={clsx(
+                'w-full rounded-xl border-2 border-dashed p-6 flex flex-col items-center gap-2 transition-colors text-center',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                previewLoading
+                  ? 'opacity-60 cursor-wait border-stone-300 dark:border-stone-700'
+                  : file
+                    ? 'border-emerald-300 bg-emerald-50/60 dark:border-emerald-700 dark:bg-emerald-950/30'
+                    : 'border-stone-300 hover:border-primary-400 hover:bg-primary-50/40 dark:border-stone-600 dark:hover:border-primary-600',
+              )}
+            >
+              <FileSpreadsheet
+                size={28}
+                className={file ? 'text-emerald-600 dark:text-emerald-400' : 'text-stone-400'}
+                aria-hidden
+              />
+              {previewLoading ? (
+                <p className="text-sm text-stone-500">Leyendo archivo…</p>
+              ) : file ? (
+                <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300 truncate max-w-xs">
+                  {file.name}
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm font-medium text-stone-700 dark:text-stone-200">
+                    Haz clic para seleccionar el Excel
+                  </p>
+                  <p className="text-xs text-stone-400">.xlsx · máx. 10 MB</p>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {previewError && (
+          <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 px-3 py-2.5" role="alert">
+            <AlertCircle size={16} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" aria-hidden />
+            <p className="text-xs text-red-700 dark:text-red-300">{previewError}</p>
+          </div>
+        )}
+        {confirmError && (
+          <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 px-3 py-2.5" role="alert">
+            <AlertCircle size={16} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" aria-hidden />
+            <p className="text-xs text-red-700 dark:text-red-300">{confirmError}</p>
+          </div>
+        )}
+
+        {/* Step: done */}
+        {step === 'done' && lastResult && (
+          <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 p-5 space-y-3 text-center">
+            <CheckCircle2 size={36} className="mx-auto text-emerald-500" aria-hidden />
+            <div>
+              <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                ¡Ruta importada correctamente!
+              </p>
+              <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
+                <span translate="no" className="font-mono font-bold">{lastResult.route_code}</span>
+                {' '}· {lastResult.orders_created} pedidos creados · cliente: {lastResult.client_name}
+              </p>
+            </div>
+            <Button onClick={handleClose}>Cerrar</Button>
+          </div>
+        )}
+
+        {/* Step: preview */}
+        {step === 'preview' && preview && (
+          <>
+            {/* Metadata del Excel */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: 'N° de ruta', value: String(preview.route_number) },
+                { label: 'Empresa', value: preview.transport_company || '—' },
+                { label: 'Flete', value: preview.flete_type || '—' },
+                { label: 'Total bultos', value: String(preview.total_bultos_declared) },
+              ].map((item) => (
+                <div key={item.label} className="rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-2">
+                  <p className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">
+                    {item.label}
+                  </p>
+                  <p className="text-sm font-semibold text-stone-800 dark:text-stone-100 truncate" translate="no">
+                    {item.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Opciones de la ruta */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-stone-700 dark:text-stone-300 mb-1.5">
+                  Nombre de la ruta
+                </label>
+                <input
+                  type="text"
+                  value={routeName}
+                  onChange={(e) => setRouteName(e.target.value)}
+                  placeholder={`Ruta ${preview.route_number} · ${preview.rows[0]?.client_name ?? '…'}`}
+                  className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-2 text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-stone-700 dark:text-stone-300 mb-1.5">
+                  Fecha de la ruta
+                </label>
+                <input
+                  type="date"
+                  value={routeDate}
+                  onChange={(e) => setRouteDate(e.target.value)}
+                  className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-2 text-sm text-stone-900 dark:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                />
+              </div>
+            </div>
+
+            {preview.driver_name_hint && (
+              <p className="text-xs text-stone-500 dark:text-stone-400">
+                <span className="font-medium">Chofer en el Excel:</span>{' '}
+                <span translate="no">{preview.driver_name_hint}</span>
+                {' '}(solo referencia, asígnalo desde el panel de pedidos)
+              </p>
+            )}
+
+            {/* Tabla de pedidos a crear */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-stone-600 dark:text-stone-300 uppercase tracking-wide">
+                  {previewRows.length} pedidos a crear
+                </p>
+                {previewRows.length > 8 && (
+                  <button
+                    type="button"
+                    className="text-xs text-primary-600 dark:text-primary-400 hover:underline focus-visible:outline-none"
+                    onClick={() => setShowAllRows((v) => !v)}
+                  >
+                    <Eye size={12} className="inline mr-1" aria-hidden />
+                    {showAllRows ? 'Mostrar menos' : `Ver todos (${previewRows.length})`}
+                  </button>
+                )}
+              </div>
+              <div className="rounded-xl border border-stone-200 dark:border-stone-700 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-stone-50 dark:bg-stone-800/70 border-b border-stone-200 dark:border-stone-700">
+                        {['Cliente', 'Entrega', 'OC', 'Factura', 'Tipo', 'Cajas', 'Unids'].map((h) => (
+                          <th key={h} className="text-left px-3 py-2 font-semibold text-stone-600 dark:text-stone-300 whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+                      {visibleRows.map((row, i) => (
+                        <tr key={i} className="hover:bg-stone-50 dark:hover:bg-stone-800/40">
+                          <td className="px-3 py-2 font-medium text-stone-800 dark:text-stone-200 whitespace-nowrap">{row.client_name}</td>
+                          <td className="px-3 py-2 text-stone-600 dark:text-stone-400 max-w-[180px] truncate">{row.entrega}</td>
+                          <td className="px-3 py-2 text-stone-500 dark:text-stone-500 whitespace-nowrap font-mono">{row.numero_oc || '—'}</td>
+                          <td className="px-3 py-2 text-stone-500 dark:text-stone-500 whitespace-nowrap font-mono">{row.factura || '—'}</td>
+                          <td className="px-3 py-2 text-stone-500 dark:text-stone-500">{row.tipo || '—'}</td>
+                          <td className="px-3 py-2 text-stone-700 dark:text-stone-300 tabular-nums text-right">{row.cajas}</td>
+                          <td className="px-3 py-2 text-stone-700 dark:text-stone-300 tabular-nums text-right">{row.unidades}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end pt-1">
+              <Button variant="ghost" onClick={handleClose} disabled={confirmLoading}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => void handleConfirm()}
+                loading={confirmLoading}
+                icon={<FileSpreadsheet size={15} />}
+              >
+                Crear ruta y {previewRows.length} pedidos
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Fecha legible para cabecera de ruta ─────────────────────────────────────
 
 /** Fecha legible para cabecera de ruta (planificación / inicio). */
 function formatRouteDay(isoLike: string | undefined): string {
@@ -223,6 +606,38 @@ function summarizeRouteVehicles(
   return legacyRoutePlate?.trim() ?? '';
 }
 
+/** Choferes y peonetas viven en el pedido (RM-1), no en la ruta. */
+function summarizeRouteAssignees(
+  routeOrders: Order[],
+  field: 'driverName' | 'peonetaName',
+): string {
+  const names = [
+    ...new Set(
+      routeOrders
+        .map((o) => o[field]?.trim())
+        .filter((n): n is string => Boolean(n)),
+    ),
+  ];
+  if (names.length === 0) return '';
+  if (names.length === 1) return names[0]!;
+  if (names.length === 2) return names.join(' · ');
+  return `${names[0]} +${names.length - 1}`;
+}
+
+function orderToFormData(order: Order): OrderFormData {
+  return {
+    clientId: order.clientId,
+    priority: order.priority,
+    destStreet: order.destination.street,
+    destCity: order.destination.city,
+    destRegion: order.destination.region || 'Metropolitana',
+    estimatedDelivery: order.estimatedDelivery,
+    notes: order.notes ?? '',
+    bultos: order.bultos,
+    dispatchGuideUrl: order.dispatchGuideUrl ?? '',
+  };
+}
+
 type SortDir = 'asc' | 'desc' | null;
 type RouteSortKey = 'code' | 'name' | 'status' | 'pedidos' | 'bultos' | 'fecha' | 'driverName' | 'vehiclePlate';
 
@@ -351,12 +766,14 @@ function RouteForm({
 
 function RouteDetailPlaceholder() {
   return (
-    <div className="flex flex-1 min-h-0 flex-col items-center justify-center px-4 py-6 text-center">
-      <RouteIcon size={32} className="text-stone-300 dark:text-stone-600 mb-2" aria-hidden />
-      <p className="text-sm font-medium text-stone-500 dark:text-stone-400">Selecciona una ruta</p>
-      <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-1 max-w-[200px] text-pretty">
-        El detalle y los pedidos aparecerán aquí.
-      </p>
+    <div className="flex flex-1 min-h-0 flex-col items-center justify-center px-6 py-20 text-center gap-3">
+      <RouteIcon size={40} className="text-stone-300 dark:text-stone-600" aria-hidden />
+      <div className="space-y-1.5">
+        <p className="text-sm font-medium text-stone-500 dark:text-stone-400">Selecciona una ruta</p>
+        <p className="text-[11px] text-stone-400 dark:text-stone-500 max-w-[200px] text-pretty">
+          El detalle y los pedidos aparecerán aquí.
+        </p>
+      </div>
     </div>
   );
 }
@@ -383,6 +800,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createFormKey, setCreateFormKey] = useState(0);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   // Asignación por pedido individual
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [orderDraftDriver, setOrderDraftDriver] = useState('');
@@ -573,6 +991,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
     setBusyId(orderId);
     try {
       await detachOrderFromRoute(orderId);
+      setEditingOrderId((prev) => (prev === orderId ? null : prev));
       await fetchOrders();
       await fetchRoutes();
     } catch {
@@ -583,11 +1002,76 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
   };
 
   const handleOpenOrderAssign = (o: Order) => {
+    setEditingOrderId(null);
     setExpandedOrderId(o.id);
     setOrderDraftDriver(o.driverId ?? '');
     setOrderDraftPeoneta(o.peonetaId ?? '');
     setOrderDraftVehicle(o.vehicleId ?? '');
     setOrderApplyToAll(false);
+  };
+
+  const handleOpenOrderEdit = (o: Order) => {
+    setDetailOrder(null);
+    if (expandedOrderId) handleCancelOrderAssign();
+    setEditingOrderId((prev) => (prev === o.id ? null : o.id));
+  };
+
+  const handleUpdateOrder = async (orderId: string, data: OrderFormData) => {
+    const clientId = data.clientId?.trim();
+    if (!clientId) {
+      setActionError('Selecciona un cliente para el pedido.');
+      return;
+    }
+    const client = clients.find((c) => c.id === clientId);
+    const existing = assigned.find((x) => x.id === orderId);
+    const clientName =
+      client?.companyName?.trim() ||
+      existing?.clientName?.trim() ||
+      '';
+    if (!clientName) {
+      setActionError(
+        'No se pudo resolver el nombre del cliente. Recarga la página o verifica que el cliente exista.',
+      );
+      return;
+    }
+    setActionError(null);
+    setBusyId(orderId);
+    try {
+      await updateOrder(orderId, {
+        clientId,
+        clientName,
+        priority: data.priority,
+        destination: {
+          street: data.destStreet,
+          city: data.destCity,
+          region: data.destRegion,
+        },
+        estimatedDelivery: data.estimatedDelivery,
+        notes: data.notes,
+        bultos: data.bultos,
+        dispatchGuideUrl: data.dispatchGuideUrl,
+      });
+      setEditingOrderId(null);
+      await fetchOrders();
+      await fetchRoutes();
+    } catch (err) {
+      let msg = 'No se pudo actualizar el pedido.';
+      if (err instanceof ApiError) {
+        try {
+          const parsed = JSON.parse(err.body) as { message?: string | string[] };
+          const apiMsg = parsed.message;
+          if (typeof apiMsg === 'string' && apiMsg.length > 0) msg = apiMsg;
+          else if (Array.isArray(apiMsg) && apiMsg.length > 0) msg = apiMsg.join(' · ');
+        } catch {
+          if (err.body) msg = err.body;
+        }
+      } else if (err instanceof Error && err.message) {
+        msg = err.message;
+      }
+      setActionError(msg);
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const handleCancelOrderAssign = () => {
@@ -689,6 +1173,15 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
     }
     return assigned[0]?.clientName?.trim() || '—';
   }, [route.clientId, clients, assigned]);
+
+  const routeDriversLabel = useMemo(
+    () => summarizeRouteAssignees(assigned, 'driverName'),
+    [assigned],
+  );
+  const routePeonetasLabel = useMemo(
+    () => summarizeRouteAssignees(assigned, 'peonetaName'),
+    [assigned],
+  );
 
   const [codeCopied, setCodeCopied] = useState(false);
   const [deleteRouteOpen, setDeleteRouteOpen] = useState(false);
@@ -808,9 +1301,23 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
             <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-2.5 pt-2.5 border-t border-stone-200 dark:border-stone-800">
               <RouteModalStat label="Cliente">{routeClientLabel}</RouteModalStat>
               <RouteModalStat label="Fecha">{formatRouteDayElegant(fechaSrc)}</RouteModalStat>
-              <RouteModalStat label="Chofer">{route.driverName?.trim() || '—'}</RouteModalStat>
+              <RouteModalStat label="Choferes">
+                <span title="Asignación por pedido en esta ruta">
+                  {routeDriversLabel || '—'}
+                </span>
+                {routePeonetasLabel ? (
+                  <span
+                    className="block text-[10px] font-normal text-stone-400 dark:text-stone-500 mt-0.5 leading-snug"
+                    title="Peoneta por pedido"
+                  >
+                    Peoneta: {routePeonetasLabel}
+                  </span>
+                ) : null}
+              </RouteModalStat>
               <RouteModalStat label="Vehículos">
-                {summarizeRouteVehicles(assigned, route.vehiclePlate) || '—'}
+                <span title="Patente por pedido en esta ruta">
+                  {summarizeRouteVehicles(assigned, route.vehiclePlate) || '—'}
+                </span>
               </RouteModalStat>
             </div>
 
@@ -867,6 +1374,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
                   .filter(Boolean)
                   .join(' · ');
                 const isAssignOpen = expandedOrderId === o.id;
+                const isEditOpen = editingOrderId === o.id;
                 const vehicleWarn = isAssignOpen ? getSameVehicleConflict(o.id) : null;
 
                 return (
@@ -880,7 +1388,17 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
                       </div>
                       <div className="min-w-0 flex-1 space-y-0.5">
                         <p translate="no" className="font-mono text-sm font-bold text-stone-900 dark:text-white">
-                          {o.code}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingOrderId(null);
+                              setDetailOrder(o);
+                            }}
+                            className="hover:text-violet-600 dark:hover:text-violet-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 rounded"
+                            title="Ver detalle del pedido"
+                          >
+                            {o.code}
+                          </button>
                         </p>
                         <p className="text-[11px] text-stone-500 dark:text-stone-500 truncate flex items-center gap-1">
                           <MapPin size={10} className="shrink-0" aria-hidden />
@@ -928,8 +1446,9 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
                           <OrderCardAction
                             icon={<Pencil size={16} />}
                             label="Editar"
-                            onClick={() => setDetailOrder(o)}
-                            disabled={busyId !== null}
+                            active={isEditOpen}
+                            onClick={() => handleOpenOrderEdit(o)}
+                            disabled={busyId !== null && busyId !== o.id}
                           />
                           <OrderCardAction
                             icon={<Trash2 size={16} />}
@@ -1019,6 +1538,25 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
                             Cancelar
                           </Button>
                         </div>
+                      </div>
+                    ) : null}
+
+                    {isEditOpen ? (
+                      <div className="border-t border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900/40 px-3 py-3">
+                        <p className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-3">
+                          Editar pedido
+                        </p>
+                        <OrderForm
+                          key={`edit-${o.id}`}
+                          initial={orderToFormData(o)}
+                          submitLabel="Guardar cambios"
+                          onSubmit={(d) => void handleUpdateOrder(o.id, d)}
+                          onCancel={() => setEditingOrderId(null)}
+                          lockedClientId={route.clientId?.trim() || undefined}
+                          lockedClientName={
+                            routeClientLabel !== '—' ? routeClientLabel : undefined
+                          }
+                        />
                       </div>
                     ) : null}
                   </li>
@@ -1165,13 +1703,17 @@ export function RoutesPage() {
   }, [fetchRoutes, fetchOrders]);
 
   const routeAggById = useMemo(() => {
-    const map = new Map<string, { pedidos: number; bultos: number; vehiclesLabel: string }>();
+    const map = new Map<
+      string,
+      { pedidos: number; bultos: number; vehiclesLabel: string; driversLabel: string }
+    >();
     for (const r of routes) {
       const pedidosEnRuta = orders.filter((o) => o.routeId === r.id);
       map.set(r.id, {
         pedidos: pedidosEnRuta.length,
         bultos: pedidosEnRuta.reduce((s, o) => s + (Number(o.bultos) || 0), 0),
         vehiclesLabel: summarizeRouteVehicles(pedidosEnRuta, r.vehiclePlate),
+        driversLabel: summarizeRouteAssignees(pedidosEnRuta, 'driverName'),
       });
     }
     return map;
@@ -1183,6 +1725,13 @@ export function RoutesPage() {
   const [filterRouteStatus, setFilterRouteStatus] = useState<RouteStatus | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [showNewRoute, setShowNewRoute] = useState(false);
+  const [showImportExcel, setShowImportExcel] = useState(false);
+  const { width: detailPanelWidth, commit: commitPanelWidth } = usePanelWidth();
+  const pendingWidth = useRef(detailPanelWidth);
+  const handlePanelResize = useCallback((delta: number) => {
+    pendingWidth.current = Math.min(PANEL_MAX, Math.max(PANEL_MIN, pendingWidth.current + delta));
+    commitPanelWidth(pendingWidth.current);
+  }, [commitPanelWidth]);
   const [newRouteError, setNewRouteError] = useState<string | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
 
@@ -1202,11 +1751,19 @@ export function RoutesPage() {
       if (filterRouteStatus !== 'all' && r.status !== filterRouteStatus) return false;
       if (search) {
         const t = search.toLowerCase();
+        const pedidosEnRuta = orders.filter((o) => o.routeId === r.id);
+        const agg = routeAggById.get(r.id);
         return (
           r.code.toLowerCase().includes(t) ||
           r.name.toLowerCase().includes(t) ||
-          (r.driverName?.toLowerCase().includes(t) ?? false) ||
-          (r.vehiclePlate?.toLowerCase().includes(t) ?? false)
+          (agg?.driversLabel.toLowerCase().includes(t) ?? false) ||
+          (agg?.vehiclesLabel.toLowerCase().includes(t) ?? false) ||
+          pedidosEnRuta.some(
+            (o) =>
+              (o.driverName?.toLowerCase().includes(t) ?? false) ||
+              (o.peonetaName?.toLowerCase().includes(t) ?? false) ||
+              (o.vehiclePlate?.toLowerCase().includes(t) ?? false),
+          )
         );
       }
       return true;
@@ -1214,8 +1771,8 @@ export function RoutesPage() {
 
     if (sortCol && sortDir) {
       data = data.toSorted((a, b) => {
-        const aggA = routeAggById.get(a.id) ?? { pedidos: 0, bultos: 0, vehiclesLabel: '' };
-        const aggB = routeAggById.get(b.id) ?? { pedidos: 0, bultos: 0, vehiclesLabel: '' };
+        const aggA = routeAggById.get(a.id) ?? { pedidos: 0, bultos: 0, vehiclesLabel: '', driversLabel: '' };
+        const aggB = routeAggById.get(b.id) ?? { pedidos: 0, bultos: 0, vehiclesLabel: '', driversLabel: '' };
         let av: string | number = '';
         let bv: string | number = '';
         switch (sortCol) {
@@ -1244,8 +1801,8 @@ export function RoutesPage() {
             bv = routeDateKey(b);
             break;
           case 'driverName':
-            av = a.driverName ?? '';
-            bv = b.driverName ?? '';
+            av = aggA.driversLabel;
+            bv = aggB.driversLabel;
             break;
           case 'vehiclePlate':
             av = aggA.vehiclesLabel;
@@ -1260,7 +1817,7 @@ export function RoutesPage() {
       });
     }
     return data;
-  }, [routes, filterRouteStatus, search, sortCol, sortDir, routeAggById]);
+  }, [routes, orders, filterRouteStatus, search, sortCol, sortDir, routeAggById]);
 
   const statusCounts = useMemo(
     () => Object.fromEntries(ROUTE_STATUSES.map((s) => [s, routes.filter((r) => r.status === s).length])),
@@ -1350,6 +1907,15 @@ export function RoutesPage() {
         </Button>
 
         <div className="flex-1" />
+
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<FileSpreadsheet size={14} />}
+          onClick={() => setShowImportExcel(true)}
+        >
+          Importar Excel
+        </Button>
 
         <Button size="sm" onClick={() => setShowNewRoute(true)} icon={<Plus size={14} />}>
           Nueva ruta
@@ -1494,20 +2060,23 @@ export function RoutesPage() {
           </div>
         </div>
 
+        {/* Handle de resize (solo desktop) */}
+        <PanelResizeHandle onResize={handlePanelResize} />
+
         {/* Columna derecha: misma caja en vacío o con detalle; scroll solo dentro del panel */}
         <div
+          style={{ width: detailPanelWidth }}
           className={clsx(
             'flex flex-col min-h-0 max-h-full shrink-0 overflow-hidden',
             selectedRoute
               ? [
                   'w-full max-lg:fixed max-lg:inset-0 max-lg:z-50 max-lg:h-dvh max-lg:max-h-dvh',
-                  'lg:w-[min(100%,24rem)] xl:w-[26rem] lg:h-full lg:relative',
-                  'lg:border-l lg:border-stone-200/90 dark:lg:border-stone-800',
+                  'lg:h-full lg:relative',
+                  'lg:border-stone-200/90 dark:lg:border-stone-800',
                 ]
               : [
                   'hidden lg:flex lg:h-full',
-                  'lg:w-[min(100%,24rem)] xl:w-[26rem]',
-                  'lg:border-l lg:border-dashed lg:border-stone-200 dark:lg:border-stone-800',
+                  'lg:border-dashed lg:border-stone-200 dark:lg:border-stone-800',
                   'lg:bg-stone-100/80 lg:border-stone-200 dark:lg:bg-stone-900/30 dark:lg:border-stone-800',
                 ],
           )}
@@ -1522,6 +2091,15 @@ export function RoutesPage() {
           )}
         </div>
       </div>
+
+      <ImportExcelModal
+        open={showImportExcel}
+        onClose={() => setShowImportExcel(false)}
+        onImported={() => {
+          void fetchRoutes();
+          void fetchOrders();
+        }}
+      />
 
       <Modal
         open={showNewRoute}

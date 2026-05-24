@@ -5,6 +5,7 @@ import { AppLayout } from './components/layout/AppLayout';
 import { AnimatedPage } from './components/layout/AnimatedPage';
 import { useAuthStore } from './store/useAuthStore';
 import { BackendGuard } from './components/system/BackendGuard';
+import { ToastContainer } from './components/ui/Toast';
 
 const LoginPage = lazy(() =>
   import('./pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })),
@@ -120,6 +121,7 @@ function GuardedOutlet() {
 function App() {
   return (
     <BrowserRouter>
+      <ToastContainer />
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route

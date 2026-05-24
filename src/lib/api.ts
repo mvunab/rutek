@@ -113,6 +113,29 @@ export const api = {
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+
+  /** Sube un FormData (multipart) con Authorization automático. */
+  postForm: async <T>(path: string, form: FormData): Promise<T> => {
+    const accessToken = getAccessToken();
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}${path}`, {
+        method: 'POST',
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+        body: form,
+      });
+    } catch (err) {
+      const netErr = new NetworkError(undefined, err);
+      notifyNetworkError(netErr);
+      throw netErr;
+    }
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new ApiError(res.status, body);
+    }
+    const text = await res.text();
+    return text ? JSON.parse(text) : (undefined as T);
+  },
 };
 
 /**

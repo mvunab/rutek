@@ -8,6 +8,8 @@ import { clsx } from 'clsx';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import type { UserRole } from '../../types';
+import { useToastStore } from '../../store/useToastStore';
+import { NotificationCenter } from '../notifications/NotificationCenter';
 
 interface NavItem {
   to: string;
@@ -71,6 +73,8 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
   const { user, tenant, isSuperAdmin, logout } = useAuthStore();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const [notifOpen, setNotifOpen] = useState(false);
+  const unreadCount = useToastStore((s) => s.unreadCount());
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebar-collapsed') === 'true'; }
@@ -247,7 +251,8 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
             <li className="relative group/item">
               <button
                 type="button"
-                aria-label="Notificaciones"
+                aria-label={unreadCount > 0 ? `Notificaciones — ${unreadCount} sin leer` : 'Notificaciones'}
+                onClick={() => setNotifOpen(true)}
                 className={clsx(
                   'w-full flex items-center rounded-lg text-sm font-medium',
                   'transition-colors duration-150',
@@ -258,11 +263,20 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
               >
                 <span className="relative flex-shrink-0" aria-hidden="true">
                   <Bell size={18} />
-                  <span className="absolute -top-0.5 -right-0.5 size-1.5 bg-primary-500 rounded-full" aria-label="Hay notificaciones" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold tabular-nums">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
                 </span>
                 {showLabels && (
-                  <span className={clsx('transition-opacity duration-150', collapsed ? 'opacity-0' : 'opacity-100 delay-100')}>
+                  <span className={clsx('flex-1 transition-opacity duration-150', collapsed ? 'opacity-0' : 'opacity-100 delay-100')}>
                     Notificaciones
+                  </span>
+                )}
+                {showLabels && unreadCount > 0 && !collapsed && (
+                  <span className="ml-auto shrink-0 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold tabular-nums">
+                    {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
               </button>
@@ -381,6 +395,9 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
       >
         {renderNav(true)}
       </aside>
+
+      {/* ── Centro de notificaciones ── */}
+      <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} />
     </>
   );
 }

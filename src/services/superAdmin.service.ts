@@ -123,4 +123,15 @@ export const superAdminService = {
   async changeMyPassword(currentPassword: string, newPassword: string) {
     return api.put('/super-admin/me/change-password', { currentPassword, newPassword });
   },
+
+  async updateTenantFeatures(tenantId: string, patch: {
+    excel_import_enabled?: boolean;
+    excel_import_config?: {
+      route_number_row?: number;
+      route_number_col?: number;
+      data_start_row?: number;
+    };
+  }) {
+    return api.patch(`/super-admin/tenants/${tenantId}/features`, patch);
+  },
 };
