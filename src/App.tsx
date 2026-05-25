@@ -68,6 +68,9 @@ const AuditPage = lazy(() =>
 const NotFound = lazy(() =>
   import('./pages/NotFound').then((m) => ({ default: m.NotFound })),
 );
+const TrackingPage = lazy(() =>
+  import('./pages/tracking/TrackingPage').then((m) => ({ default: m.TrackingPage })),
+);
 
 function PageFallback() {
   return (
@@ -129,6 +132,14 @@ function App() {
             element={
               <AnimatedPage className="min-h-screen">
                 <LoginPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/tracking/:token"
+            element={
+              <AnimatedPage className="min-h-screen">
+                <TrackingPage />
               </AnimatedPage>
             }
           />

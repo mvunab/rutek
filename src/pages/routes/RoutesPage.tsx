@@ -3,7 +3,7 @@ import {
   Plus, Search, ChevronUp, ChevronDown,
   Download, RefreshCw, SlidersHorizontal, Package, UserCircle, Route as RouteIcon, Truck,
   Pencil, Trash2, X, Copy, MapPin, Box, ArrowLeft, Check, FileSpreadsheet,
-  CheckCircle2, AlertCircle, Eye,
+  CheckCircle2, AlertCircle, Eye, LayoutGrid, LayoutList, Share2,
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { RouteStatusBadge } from '../../components/ui/Badge';
@@ -23,8 +23,8 @@ import { useVehicleStore } from '../../store/useVehicleStore';
 import { OrderForm, type OrderFormData } from '../../components/orders/OrderForm';
 import { OrderDetailModal } from '../../components/orders/OrderDetailModal';
 import { useRouteImportStore } from '../../store/useRouteImportStore';
-import type { ImportPreview } from '../../store/useRouteImportStore';
 import { toast } from '../../store/useToastStore';
+import { SendTrackingModal } from '../../components/communications/SendTrackingModal';
 
 // ─── Panel resize ─────────────────────────────────────────────────────────────
 
@@ -549,6 +549,66 @@ function RouteListItem({
   );
 }
 
+const LAYOUT_KEY = 'rutek-routes-layout';
+type RouteLayout = 'cards' | 'table';
+
+function RouteTableRow({
+  route,
+  agg,
+  fecha,
+  selected,
+  onSelect,
+}: {
+  route: Route;
+  agg: { pedidos: number; bultos: number; vehiclesLabel: string; driversLabel: string };
+  fecha: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <tr
+      onClick={onSelect}
+      className={clsx(
+        'cursor-pointer transition-colors border-b border-stone-100 dark:border-stone-800',
+        selected
+          ? 'bg-violet-50 dark:bg-violet-950/30'
+          : 'hover:bg-stone-50 dark:hover:bg-stone-800/50',
+      )}
+    >
+      <td className="px-4 py-2.5 whitespace-nowrap">
+        <span translate="no" className={clsx('font-mono text-xs font-bold', selected ? 'text-violet-700 dark:text-violet-300' : 'text-stone-700 dark:text-stone-200')}>
+          {route.code}
+        </span>
+      </td>
+      <td className="px-4 py-2.5 max-w-[200px]">
+        <p className="text-sm text-stone-700 dark:text-stone-200 truncate">{route.name}</p>
+      </td>
+      <td className="px-4 py-2.5 whitespace-nowrap">
+        <RouteStatusBadge status={route.status} />
+      </td>
+      <td className="px-4 py-2.5 whitespace-nowrap text-xs text-stone-500 dark:text-stone-400 tabular-nums">
+        {fecha}
+      </td>
+      <td className="px-4 py-2.5 whitespace-nowrap text-xs text-stone-600 dark:text-stone-300 tabular-nums text-right">
+        {agg.pedidos}
+      </td>
+      <td className="px-4 py-2.5 whitespace-nowrap text-xs text-stone-600 dark:text-stone-300 tabular-nums text-right">
+        {agg.bultos}
+      </td>
+      <td className="px-4 py-2.5 max-w-[130px]">
+        <span translate="no" className="text-xs text-stone-500 dark:text-stone-400 font-mono truncate block">
+          {agg.vehiclesLabel || '—'}
+        </span>
+      </td>
+      <td className="px-4 py-2.5 max-w-[140px]">
+        <span className="text-xs text-stone-500 dark:text-stone-400 truncate block">
+          {agg.driversLabel || '—'}
+        </span>
+      </td>
+    </tr>
+  );
+}
+
 function OrderCardAction({
   icon,
   label,
@@ -801,6 +861,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
   const [createFormKey, setCreateFormKey] = useState(0);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [trackingOrder, setTrackingOrder] = useState<{ id: string; code: string } | null>(null);
   // Asignación por pedido individual
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [orderDraftDriver, setOrderDraftDriver] = useState('');
@@ -1451,6 +1512,12 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
                             disabled={busyId !== null && busyId !== o.id}
                           />
                           <OrderCardAction
+                            icon={<Share2 size={16} />}
+                            label="Enviar"
+                            onClick={() => setTrackingOrder({ id: o.id, code: o.code })}
+                            disabled={busyId !== null && busyId !== o.id}
+                          />
+                          <OrderCardAction
                             icon={<Trash2 size={16} />}
                             label="Quitar"
                             tone="danger"
@@ -1688,6 +1755,14 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
         confirmLabel="Sí, asignar igual"
         variant="warning"
       />
+      {trackingOrder && (
+        <SendTrackingModal
+          orderId={trackingOrder.id}
+          orderCode={trackingOrder.code}
+          open
+          onClose={() => setTrackingOrder(null)}
+        />
+      )}
     </>
   );
 }
@@ -1726,6 +1801,10 @@ export function RoutesPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [showNewRoute, setShowNewRoute] = useState(false);
   const [showImportExcel, setShowImportExcel] = useState(false);
+  const [layout, setLayout] = useState<RouteLayout>(() => {
+    try { return (localStorage.getItem(LAYOUT_KEY) as RouteLayout) || 'cards'; }
+    catch { return 'cards'; }
+  });
   const { width: detailPanelWidth, commit: commitPanelWidth } = usePanelWidth();
   const pendingWidth = useRef(detailPanelWidth);
   const handlePanelResize = useCallback((delta: number) => {
@@ -1906,6 +1985,38 @@ export function RoutesPage() {
           Exportar
         </Button>
 
+        {/* Toggle de layout */}
+        <div className="flex items-center rounded-lg border border-stone-300 dark:border-stone-600 overflow-hidden shrink-0" role="group" aria-label="Cambiar vista">
+          <button
+            type="button"
+            onClick={() => { setLayout('cards'); localStorage.setItem(LAYOUT_KEY, 'cards'); }}
+            aria-label="Vista tarjetas"
+            aria-pressed={layout === 'cards'}
+            className={clsx(
+              'flex items-center justify-center px-2.5 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
+              layout === 'cards'
+                ? 'bg-primary-600 text-white'
+                : 'bg-white dark:bg-stone-900 text-stone-500 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800',
+            )}
+          >
+            <LayoutGrid size={14} aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => { setLayout('table'); localStorage.setItem(LAYOUT_KEY, 'table'); }}
+            aria-label="Vista tabla"
+            aria-pressed={layout === 'table'}
+            className={clsx(
+              'flex items-center justify-center px-2.5 py-1.5 border-l border-stone-300 dark:border-stone-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
+              layout === 'table'
+                ? 'bg-primary-600 text-white'
+                : 'bg-white dark:bg-stone-900 text-stone-500 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800',
+            )}
+          >
+            <LayoutList size={14} aria-hidden />
+          </button>
+        </div>
+
         <div className="flex-1" />
 
         <Button
@@ -2003,7 +2114,8 @@ export function RoutesPage() {
                 />
               </div>
             ) : (
-              <div className="max-w-lg mx-auto w-full space-y-4">
+              <div className={clsx('w-full space-y-4', layout === 'cards' && 'max-w-lg mx-auto')}>
+                {/* Barra de resumen + sort */}
                 <div className="flex items-center justify-between gap-2 px-0.5">
                   <p className="text-xs text-stone-500 dark:text-stone-400">
                     <span className="font-semibold text-stone-700 dark:text-stone-200 tabular-nums">
@@ -2021,13 +2133,8 @@ export function RoutesPage() {
                       value={sortCol ?? ''}
                       onChange={(e) => {
                         const v = e.target.value as RouteSortKey | '';
-                        if (!v) {
-                          setSortCol(null);
-                          setSortDir(null);
-                        } else {
-                          setSortCol(v);
-                          setSortDir('desc');
-                        }
+                        if (!v) { setSortCol(null); setSortDir(null); }
+                        else { setSortCol(v); setSortDir('desc'); }
                       }}
                       className="text-xs rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-2 py-1 text-stone-700 dark:text-stone-200"
                       aria-label="Ordenar rutas"
@@ -2039,22 +2146,86 @@ export function RoutesPage() {
                     </select>
                   </div>
                 </div>
-                <ul className="space-y-2" role="list">
-                  {filteredRoutes.map((r) => {
-                    const agg = routeAggById.get(r.id) ?? { pedidos: 0, bultos: 0, vehiclesLabel: '' };
-                    return (
-                      <li key={r.id}>
-                        <RouteListItem
-                          route={r}
-                          agg={agg}
-                          fecha={formatRouteDay(routeDateKey(r))}
-                          selected={selectedRoute?.id === r.id}
-                          onSelect={() => setSelectedRoute(r)}
-                        />
-                      </li>
-                    );
-                  })}
-                </ul>
+
+                {/* ── Vista tarjetas ── */}
+                {layout === 'cards' && (
+                  <ul className="space-y-2" role="list">
+                    {filteredRoutes.map((r) => {
+                      const agg = routeAggById.get(r.id) ?? { pedidos: 0, bultos: 0, vehiclesLabel: '', driversLabel: '' };
+                      return (
+                        <li key={r.id}>
+                          <RouteListItem
+                            route={r}
+                            agg={agg}
+                            fecha={formatRouteDay(routeDateKey(r))}
+                            selected={selectedRoute?.id === r.id}
+                            onSelect={() => setSelectedRoute(r)}
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+
+                {/* ── Vista tabla ── */}
+                {layout === 'table' && (
+                  <div className="rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead className="bg-stone-50 dark:bg-stone-800/70 border-b border-stone-200 dark:border-stone-700">
+                          <tr>
+                            {[
+                              { label: 'Folio', col: 'code' as RouteSortKey },
+                              { label: 'Nombre', col: null },
+                              { label: 'Estado', col: 'status' as RouteSortKey },
+                              { label: 'Fecha', col: 'fecha' as RouteSortKey },
+                              { label: 'Pedidos', col: 'pedidos' as RouteSortKey },
+                              { label: 'Bultos', col: null },
+                              { label: 'Vehículo', col: null },
+                              { label: 'Chofer', col: null },
+                            ].map(({ label, col }) => (
+                              <th
+                                key={label}
+                                scope="col"
+                                onClick={col ? () => {
+                                  if (sortCol === col) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+                                  else { setSortCol(col); setSortDir('desc'); }
+                                } : undefined}
+                                className={clsx(
+                                  'px-4 py-2.5 text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide whitespace-nowrap',
+                                  col && 'cursor-pointer hover:text-stone-700 dark:hover:text-stone-200 select-none',
+                                  label === 'Pedidos' || label === 'Bultos' ? 'text-right' : '',
+                                )}
+                              >
+                                <span className="inline-flex items-center gap-1">
+                                  {label}
+                                  {col && sortCol === col && (
+                                    sortDir === 'asc' ? <ChevronUp size={11} aria-hidden /> : <ChevronDown size={11} aria-hidden />
+                                  )}
+                                </span>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-stone-900">
+                          {filteredRoutes.map((r) => {
+                            const agg = routeAggById.get(r.id) ?? { pedidos: 0, bultos: 0, vehiclesLabel: '', driversLabel: '' };
+                            return (
+                              <RouteTableRow
+                                key={r.id}
+                                route={r}
+                                agg={agg}
+                                fecha={formatRouteDay(routeDateKey(r))}
+                                selected={selectedRoute?.id === r.id}
+                                onSelect={() => setSelectedRoute(r)}
+                              />
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2120,6 +2291,7 @@ export function RoutesPage() {
           error={newRouteError}
         />
       </Modal>
+
     </div>
   );
 }
