@@ -9,6 +9,7 @@ import { useClientStore } from '../../store/useClientStore';
 import { OrderStatusBadge } from '../../components/ui/Badge';
 import type { Client } from '../../types';
 import { clsx } from 'clsx';
+import { chileRegionSelectOptions } from '../../lib/chileRegions';
 
 interface ClientFormData {
   companyName: string;
@@ -36,19 +37,6 @@ const emptyForm: ClientFormData = {
   active: true,
 };
 
-const regionOptions = [
-  { value: 'Metropolitana', label: 'Región Metropolitana' },
-  { value: 'Valparaíso', label: 'Valparaíso' },
-  { value: 'Biobío', label: 'Biobío' },
-  { value: 'Coquimbo', label: 'Coquimbo' },
-  { value: 'Maule', label: 'Maule' },
-  { value: 'Araucanía', label: 'La Araucanía' },
-  { value: 'Los Lagos', label: 'Los Lagos' },
-  { value: "O'Higgins", label: "O'Higgins" },
-  { value: 'Antofagasta', label: 'Antofagasta' },
-  { value: 'Atacama', label: 'Atacama' },
-];
-
 interface ClientFormProps {
   initial?: Partial<ClientFormData>;
   onSubmit: (data: ClientFormData) => void;
@@ -61,6 +49,7 @@ const EMPTY_INITIAL: Partial<ClientFormData> = {};
 function ClientForm({ initial = EMPTY_INITIAL, onSubmit, onCancel, submitLabel = 'Guardar' }: ClientFormProps) {
   const [form, setForm] = useState<ClientFormData>({ ...emptyForm, ...initial });
   const [errors, setErrors] = useState<Partial<ClientFormData>>({});
+  const regionOptions = chileRegionSelectOptions(form.region);
 
   const validate = () => {
     const newErrors: Partial<ClientFormData> = {};
@@ -99,7 +88,7 @@ function ClientForm({ initial = EMPTY_INITIAL, onSubmit, onCancel, submitLabel =
           label="Región"
           value={form.region}
           onChange={set('region')}
-          options={[{ value: '', label: 'Seleccionar...' }, ...regionOptions]}
+          options={[{ value: '', label: 'Seleccionar región…' }, ...regionOptions]}
         />
       </div>
       <Textarea label="Notas" placeholder="Instrucciones especiales, horarios, etc." value={form.notes} onChange={set('notes')} rows={3} />
@@ -117,7 +106,7 @@ function ClientForm({ initial = EMPTY_INITIAL, onSubmit, onCancel, submitLabel =
             form.active ? 'translate-x-5' : 'translate-x-0.5'
           )} />
         </button>
-        <span className="text-sm text-stone-600 dark:text-stone-300">Cliente activo</span>
+        <span className="text-sm text-stone-600 dark:text-stone-300">Cuenta activa</span>
       </div>
       <div className="flex justify-end gap-3 pt-2">
         <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
@@ -132,7 +121,7 @@ function ClientHistoryModal({ client, onClose }: { client: Client; onClose: () =
   const history = getClientHistory(client.id);
 
   return (
-    <Modal open onClose={onClose} title={`Historial — ${client.companyName}`} description="Historial de servicios del cliente" size="lg">
+    <Modal open onClose={onClose} title={`Historial — ${client.companyName}`} description="Historial de servicios de la cuenta" size="lg">
       {history.length === 0 ? (
         <p className="text-sm text-stone-400 dark:text-stone-500 text-center py-8">Sin historial disponible</p>
       ) : (
@@ -228,14 +217,14 @@ export function ClientsPage() {
           ))}
         </div>
         <Button onClick={() => setShowForm(true)} icon={<Plus size={16} />}>
-          Nuevo cliente
+          Nueva cuenta
         </Button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Total clientes', value: clients.length, color: 'text-stone-700 dark:text-stone-200', box: 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800' },
+          { label: 'Total cuentas', value: clients.length, color: 'text-stone-700 dark:text-stone-200', box: 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800' },
           { label: 'Activos', value: clients.filter(c => c.active).length, color: 'text-emerald-700 dark:text-emerald-300', box: 'bg-emerald-50 dark:bg-emerald-950/35 border-emerald-100 dark:border-emerald-900/50' },
           { label: 'Inactivos', value: clients.filter(c => !c.active).length, color: 'text-stone-500 dark:text-stone-400', box: 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800' },
         ].map((s) => (
@@ -250,9 +239,9 @@ export function ClientsPage() {
       {filtered.length === 0 ? (
         <EmptyState
           icon={<Building2 size={32} />}
-          title="No se encontraron clientes"
-          description="Ajusta los filtros o registra un nuevo cliente"
-          action={{ label: 'Nuevo cliente', onClick: () => setShowForm(true), icon: <Plus size={14} /> }}
+          title="No se encontraron cuentas"
+          description="Ajusta los filtros o registra una nueva cuenta"
+          action={{ label: 'Nueva cuenta', onClick: () => setShowForm(true), icon: <Plus size={14} /> }}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -315,12 +304,12 @@ export function ClientsPage() {
         </div>
       )}
 
-      <Modal open={showForm} onClose={() => setShowForm(false)} title="Registrar cliente" description="Completa los datos del nuevo cliente" size="xl">
-        <ClientForm onSubmit={handleAdd} onCancel={() => setShowForm(false)} submitLabel="Registrar cliente" />
+      <Modal open={showForm} onClose={() => setShowForm(false)} title="Registrar cuenta" description="Completa los datos de la nueva cuenta" size="xl">
+        <ClientForm onSubmit={handleAdd} onCancel={() => setShowForm(false)} submitLabel="Registrar cuenta" />
       </Modal>
 
       {editingClient && (
-        <Modal open onClose={() => setEditingClient(null)} title="Editar cliente" description={editingClient.companyName} size="xl">
+        <Modal open onClose={() => setEditingClient(null)} title="Editar cuenta" description={editingClient.companyName} size="xl">
           <ClientForm
             initial={editingClient}
             onSubmit={handleEdit}
@@ -338,8 +327,8 @@ export function ClientsPage() {
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => { if (deleteTarget) deleteClient(deleteTarget.id); setDeleteTarget(null); }}
-        title="Eliminar cliente"
-        message={`¿Seguro que deseas eliminar a "${deleteTarget?.companyName}"? Esta acción no se puede deshacer.`}
+        title="Eliminar cuenta"
+        message={`¿Seguro que deseas eliminar la cuenta "${deleteTarget?.companyName}"? Esta acción no se puede deshacer.`}
         confirmLabel="Eliminar"
       />
     </div>

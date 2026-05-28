@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { clsx } from 'clsx';
 import { Button } from '../ui/Button';
 import { Input, Select, Textarea } from '../ui/Input';
@@ -7,6 +7,8 @@ import type { OrderPriority } from '../../types';
 
 export interface OrderFormData {
   clientId: string;
+  /** Cliente final / destinatario del pedido (no la cuenta/mandante). */
+  destinatario: string;
   priority: OrderPriority;
   destStreet: string;
   destCity: string;
@@ -17,8 +19,9 @@ export interface OrderFormData {
   dispatchGuideUrl: string;
 }
 
-export const emptyOrderForm: OrderFormData = {
+const emptyOrderForm: OrderFormData = {
   clientId: '',
+  destinatario: '',
   priority: 'medium',
   destStreet: '',
   destCity: '',
@@ -69,6 +72,33 @@ export function OrderForm({
   const [form, setForm] = useState<OrderFormData>({ ...emptyOrderForm, ...effectiveInitial });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { clients } = useClientStore();
+  const regionOptions = useMemo(() => {
+    const base: { value: string; label: string }[] = [
+      { value: 'Arica y Parinacota', label: 'Arica y Parinacota' },
+      { value: 'Tarapacá', label: 'Tarapacá' },
+      { value: 'Antofagasta', label: 'Antofagasta' },
+      { value: 'Atacama', label: 'Atacama' },
+      { value: 'Coquimbo', label: 'Coquimbo' },
+      { value: 'Valparaíso', label: 'Valparaíso' },
+      { value: 'Metropolitana', label: 'Región Metropolitana' },
+      { value: "O'Higgins", label: "O'Higgins" },
+      { value: 'Maule', label: 'Maule' },
+      { value: 'Ñuble', label: 'Ñuble' },
+      { value: 'Biobío', label: 'Biobío' },
+      { value: 'Araucanía', label: 'La Araucanía' },
+      { value: 'Los Ríos', label: 'Los Ríos' },
+      { value: 'Los Lagos', label: 'Los Lagos' },
+      { value: 'Aysén', label: 'Aysén' },
+      { value: 'Magallanes', label: 'Magallanes' },
+    ];
+
+    const current = form.destRegion?.trim() || '';
+    const empty = { value: '', label: 'Seleccionar región…' };
+    if (!current) return [empty, ...base];
+    if (base.some((o) => o.value === current)) return [empty, ...base];
+    // Datos legacy: permitir el valor actual.
+    return [empty, { value: current, label: current }, ...base];
+  }, [form.destRegion]);
 
   const setField =
     (field: keyof OrderFormData) =>
@@ -79,7 +109,8 @@ export function OrderForm({
 
   const validate = () => {
     const errs: Record<string, string> = {};
-    if (!form.clientId) errs.clientId = 'Selecciona un cliente';
+    if (!form.clientId) errs.clientId = 'Selecciona una cuenta';
+    if (!form.destinatario.trim()) errs.destinatario = 'Requerido';
     if (!form.destStreet.trim()) errs.destStreet = 'Requerido';
     if (!form.destCity.trim()) errs.destCity = 'Requerido';
     if (!form.estimatedDelivery) errs.estimatedDelivery = 'Requerido';
@@ -154,23 +185,23 @@ export function OrderForm({
         <div className="grid grid-cols-2 gap-3">
           {lockedClientId ? (
             <Input
-              label="Cliente"
+              label="Cuenta (Mandante)"
               id="order-form-client-locked"
               value={lockedClientName ?? clients.find((c) => c.id === lockedClientId)?.companyName ?? lockedClientId}
               readOnly
               disabled
               containerClassName="col-span-2"
-              hint="El cliente está fijado por la ruta y no puede cambiarse aquí."
+              hint="La cuenta está fijada por la ruta y no puede cambiarse aquí."
             />
           ) : (
             <Select
-              label="Cliente"
+              label="Cuenta (Mandante)"
               value={form.clientId}
               onChange={setField('clientId')}
               options={clientOptions}
               error={errors.clientId}
               containerClassName="col-span-2"
-              hint="Si el cliente no está cerrado aún, elegí la cuenta provisional que uses en tu proceso; podés corregirlo después."
+              hint="Si la cuenta no está definida aún, elige la cuenta provisional que uses en tu proceso; puedes corregirlo después."
             />
           )}
           <Select label="Prioridad" value={form.priority} onChange={setField('priority')} options={priorityOptions} />
@@ -188,6 +219,17 @@ export function OrderForm({
         <h4 className={sectionTitle}>Dirección de entrega</h4>
         <div className="grid grid-cols-2 gap-3">
           <Input
+            label="Destinatario"
+            id="order-form-destinatario"
+            name="destinatario"
+            autoComplete="off"
+            placeholder="Nombre de quien recibe…"
+            value={form.destinatario}
+            onChange={setField('destinatario')}
+            error={errors.destinatario}
+            containerClassName="col-span-2"
+          />
+          <Input
             label="Dirección"
             placeholder="Calle y número"
             value={form.destStreet}
@@ -196,7 +238,13 @@ export function OrderForm({
             containerClassName="col-span-2"
           />
           <Input label="Ciudad" placeholder="Santiago" value={form.destCity} onChange={setField('destCity')} error={errors.destCity} />
-          <Input label="Región" value={form.destRegion} onChange={setField('destRegion')} />
+          <Select
+            label="Región"
+            id="order-form-region"
+            value={form.destRegion}
+            onChange={setField('destRegion')}
+            options={regionOptions}
+          />
         </div>
       </div>
 

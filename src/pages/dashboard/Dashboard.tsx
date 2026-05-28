@@ -346,7 +346,7 @@ export function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Rutas activas', value: kpis.activeRoutes, icon: <Map size={16} />, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/40' },
-          { label: 'Clientes', value: kpis.totalClients, icon: <Users size={16} />, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+          { label: 'Cuentas', value: kpis.totalClients, icon: <Users size={16} />, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
           { label: 'Efectividad', value: `${kpis.deliveryRate}%`, icon: <TrendingUp size={16} />, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/40' },
           { label: 'Tiempo prom.', value: kpis.avgDeliveryTime > 0 ? `${kpis.avgDeliveryTime} d` : '—', icon: <Clock size={16} />, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40' },
         ].map((item) => (

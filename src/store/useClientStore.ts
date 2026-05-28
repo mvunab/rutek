@@ -47,7 +47,11 @@ export const useClientStore = create<ClientStore>((set, get) => ({
     set({ loading: true });
     try {
       const data = await api.get<DbClient[]>('/clients');
-      set({ clients: data.map(toClient) });
+      set({
+        clients: data
+          .map(toClient)
+          .filter((c) => c.companyName !== '__SIN_CUENTA__'),
+      });
     } finally {
       set({ loading: false });
     }

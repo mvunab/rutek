@@ -18,7 +18,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { to: '/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard', roles: ['admin', 'operator'] },
-  { to: '/clientes', icon: <Users size={18} />, label: 'Clientes', roles: ['admin', 'operator'] },
+  { to: '/clientes', icon: <Users size={18} />, label: 'Cuentas', roles: ['admin', 'operator'] },
   { to: '/rutas', icon: <Map size={18} />, label: 'Rutas', roles: ['admin', 'operator', 'driver'] },
   { to: '/pedidos', icon: <Package size={18} />, label: 'Pedidos', roles: ['client'] },
   { to: '/usuarios', icon: <UserCircle size={18} />, label: 'Usuarios', roles: ['admin'] },

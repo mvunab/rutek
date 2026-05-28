@@ -47,7 +47,7 @@ export function OrderDetailModal({
 
         <div>
           <p className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">
-            Cliente
+            Destinatario
           </p>
           <p className="text-sm text-stone-800 dark:text-stone-100">{order.clientName}</p>
         </div>

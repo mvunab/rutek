@@ -21,7 +21,7 @@ const tenantNavItems: NavItem[] = [
   { to: '/dashboard',    icon: <LayoutDashboard size={15} />, label: 'Back Office',         roles: ['admin', 'operator'] },
   { to: '/rutas',        icon: <Truck size={15} />,           label: 'Rutas',             roles: ['admin', 'operator', 'driver'] },
   { to: '/pedidos',      icon: <Package size={15} />,         label: 'Pedidos',            roles: ['client'] },
-  { to: '/clientes',     icon: <Users size={15} />,           label: 'Clientes',            roles: ['admin', 'operator'] },
+  { to: '/clientes',     icon: <Users size={15} />,           label: 'Cuentas',             roles: ['admin', 'operator'] },
   { to: '/vehiculos',    icon: <Car size={15} />,             label: 'Vehículos',           roles: ['admin', 'operator'] },
   { to: '/usuarios',     icon: <UserCircle2 size={15} />,     label: 'Usuarios Sistema',    roles: ['admin'] },
 ];
@@ -62,10 +62,6 @@ export function TopNavbar() {
     logout();
     navigate('/login');
   };
-
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
 
   useEffect(() => {
     if (!mobileMenuOpen) return;

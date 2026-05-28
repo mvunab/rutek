@@ -7,7 +7,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   '/dashboard':     { title: 'Dashboard',         subtitle: 'Resumen operacional en tiempo real' },
-  '/clientes':      { title: 'Clientes',          subtitle: 'Administra y consulta tu cartera de clientes' },
+  '/clientes':      { title: 'Cuentas',           subtitle: 'Administra y consulta tus mandantes (cliente directo)' },
   '/pedidos': {
     title: 'Mis pedidos',
     subtitle: 'Seguimiento de tus envíos. El alta y la planificación en ruta las gestiona tu operador desde Rutas.',

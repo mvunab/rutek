@@ -23,7 +23,7 @@ const tenantNavItems: NavItem[] = [
   { to: '/dashboard',  icon: <LayoutDashboard size={18} />, label: 'Back Office',      roles: ['admin', 'operator'] },
   { to: '/rutas',      icon: <Truck size={18} />,           label: 'Rutas',            roles: ['admin', 'operator', 'driver'] },
   { to: '/pedidos',    icon: <Package size={18} />,         label: 'Pedidos',          roles: ['client'] },
-  { to: '/clientes',   icon: <Users size={18} />,           label: 'Clientes',         roles: ['admin', 'operator'] },
+  { to: '/clientes',   icon: <Users size={18} />,           label: 'Cuentas',          roles: ['admin', 'operator'] },
   { to: '/vehiculos',  icon: <Car size={18} />,             label: 'Vehículos',        roles: ['admin', 'operator'] },
   { to: '/usuarios',   icon: <UserCircle2 size={18} />,     label: 'Usuarios Sistema', roles: ['admin'] },
 ];

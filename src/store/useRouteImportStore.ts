@@ -43,7 +43,12 @@ interface RouteImportStore {
   fetchPreview: (file: File) => Promise<ImportPreview | null>;
   confirmImport: (
     file: File,
-    opts?: { routeName?: string; routeDate?: string; driverNameHint?: string },
+    opts?: {
+      routeName?: string;
+      routeDate?: string;
+      driverNameHint?: string;
+      clientId?: string;
+    },
   ) => Promise<ImportConfirmResult | null>;
   reset: () => void;
 }
@@ -94,6 +99,7 @@ export const useRouteImportStore = create<RouteImportStore>((set) => ({
       if (opts.routeName) params.set('route_name', opts.routeName);
       if (opts.routeDate) params.set('route_date', opts.routeDate);
       if (opts.driverNameHint) params.set('driver_name_hint', opts.driverNameHint);
+      if (opts.clientId) params.set('client_id', opts.clientId);
       const qs = params.toString() ? `?${params.toString()}` : '';
       const result = await api.postForm<ImportConfirmResult>(
         `/route-import/confirm${qs}`,

@@ -71,6 +71,9 @@ const NotFound = lazy(() =>
 const TrackingPage = lazy(() =>
   import('./pages/tracking/TrackingPage').then((m) => ({ default: m.TrackingPage })),
 );
+const RouteTrackingPage = lazy(() =>
+  import('./pages/tracking/RouteTrackingPage').then((m) => ({ default: m.RouteTrackingPage })),
+);
 
 function PageFallback() {
   return (
@@ -140,6 +143,14 @@ function App() {
             element={
               <AnimatedPage className="min-h-screen">
                 <TrackingPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/tracking/route/:token"
+            element={
+              <AnimatedPage className="min-h-screen">
+                <RouteTrackingPage />
               </AnimatedPage>
             }
           />

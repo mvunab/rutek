@@ -50,7 +50,9 @@ function mapRouteFromApi(row: Record<string, unknown>): Route {
 
 function routePatchToApi(data: PatchRouteInput): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  if (data.name !== undefined) out.name = data.name;
   if (data.status !== undefined) out.status = data.status;
+  if (data.clientId !== undefined) out.client_id = data.clientId;
   if (data.driverId !== undefined) out.driver_id = data.driverId;
   if (data.driverName !== undefined) out.driver_name = data.driverName;
   if (data.vehicleId !== undefined) out.vehicle_id = data.vehicleId;

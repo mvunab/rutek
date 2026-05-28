@@ -3,14 +3,18 @@ import { Mail, MessageCircle, Link2, ExternalLink, Copy, Check } from 'lucide-re
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { toast } from '../../store/useToastStore';
 
 type Channel = 'email' | 'whatsapp';
 
 interface Props {
-  orderId: string;
-  orderCode: string;
+  /** Para tracking por pedido */
+  orderId?: string;
+  orderCode?: string;
+  /** Para tracking por ruta (cuenta/mandante) */
+  routeId?: string;
+  routeCode?: string;
   open: boolean;
   onClose: () => void;
 }
@@ -20,12 +24,15 @@ interface SendResult {
   whatsappUrl: string | null;
 }
 
-export function SendTrackingModal({ orderId, orderCode, open, onClose }: Props) {
+export function SendTrackingModal({ orderId, orderCode, routeId, routeCode, open, onClose }: Props) {
   const [channel, setChannel] = useState<Channel>('whatsapp');
   const [recipient, setRecipient] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SendResult | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const mode: 'order' | 'route' =
+    routeId && routeCode ? 'route' : 'order';
 
   const handleClose = () => {
     setRecipient('');
@@ -36,18 +43,35 @@ export function SendTrackingModal({ orderId, orderCode, open, onClose }: Props) 
 
   const handleSend = async () => {
     if (!recipient.trim()) return;
+    if (mode === 'order' && !orderId) return;
+    if (mode === 'route' && !routeId) return;
     setLoading(true);
     try {
       const res = await api.post<SendResult>(
-        `/communications/orders/${orderId}/send-tracking`,
+        mode === 'route'
+          ? `/communications/routes/${routeId}/send-tracking`
+          : `/communications/orders/${orderId}/send-tracking`,
         { channel, recipient: recipient.trim() },
       );
       setResult(res);
       if (channel === 'email') {
         toast.info(`Email enviado a ${recipient.trim()}`);
       }
-    } catch {
-      toast.error('No se pudo enviar el link de seguimiento');
+    } catch (err) {
+      let msg = 'No se pudo enviar el link de seguimiento';
+      if (err instanceof ApiError) {
+        try {
+          const parsed = JSON.parse(err.body) as { message?: string | string[] };
+          const apiMsg = parsed.message;
+          if (typeof apiMsg === 'string' && apiMsg.length > 0) msg = apiMsg;
+          else if (Array.isArray(apiMsg) && apiMsg.length > 0) msg = apiMsg.join(' · ');
+        } catch {
+          if (err.body) msg = err.body;
+        }
+      } else if (err instanceof Error && err.message) {
+        msg = err.message;
+      }
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -65,7 +89,15 @@ export function SendTrackingModal({ orderId, orderCode, open, onClose }: Props) 
   };
 
   return (
-    <Modal open={open} onClose={handleClose} title={`Enviar seguimiento — ${orderCode}`}>
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title={
+        mode === 'route'
+          ? `Enviar seguimiento de ruta — ${routeCode}`
+          : `Enviar seguimiento — ${orderCode}`
+      }
+    >
       <div className="space-y-5 pt-1">
         {!result ? (
           <>

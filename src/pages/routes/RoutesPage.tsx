@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useRef, useCallback, type ReactNode, type
 import {
   Plus, Search, ChevronUp, ChevronDown,
   Download, RefreshCw, SlidersHorizontal, Package, UserCircle, Route as RouteIcon, Truck,
-  Pencil, Trash2, X, Copy, MapPin, Box, ArrowLeft, Check, FileSpreadsheet,
+  Pencil, Trash2, X, Copy, MapPin, Box, ArrowLeft, Check, FileSpreadsheet, Unlink,
   CheckCircle2, AlertCircle, Eye, LayoutGrid, LayoutList, Share2,
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -15,6 +15,7 @@ import type { Route, RouteStatus, Order } from '../../types';
 import { routeStatusLabel } from '../../lib/routeStatusLabels';
 import { clsx } from 'clsx';
 import { ApiError } from '../../lib/api';
+import { api } from '../../lib/api';
 import { useOrderStore } from '../../store/useOrderStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useClientStore } from '../../store/useClientStore';
@@ -113,6 +114,11 @@ function ImportExcelModal({
 }) {
   const { fetchPreview, confirmImport, preview, previewLoading, previewError, confirmLoading, confirmError, lastResult, reset } =
     useRouteImportStore();
+  const { clients, fetchClients } = useClientStore();
+  const { users, fetchUsers } = useUserStore();
+  const { vehicles, fetchVehicles } = useVehicleStore();
+  const { updateOrder, fetchOrders } = useOrderStore();
+  const { fetchRoutes } = useRouteStore();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -120,6 +126,27 @@ function ImportExcelModal({
   const [routeName, setRouteName] = useState('');
   const [routeDate, setRouteDate] = useState('');
   const [showAllRows, setShowAllRows] = useState(false);
+  const [accountClientId, setAccountClientId] = useState('');
+  const [rowDriverId, setRowDriverId] = useState<Record<number, string>>({});
+  const [rowVehicleId, setRowVehicleId] = useState<Record<number, string>>({});
+  const [assignRules, setAssignRules] = useState<
+    Array<{
+      id: string;
+      from: string;
+      to: string;
+      driverId: string;
+      vehicleId: string;
+    }>
+  >([]);
+  const [assignBusy, setAssignBusy] = useState(false);
+  const [assignProgress, setAssignProgress] = useState<{ done: number; total: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    void fetchClients();
+    void fetchUsers();
+    void fetchVehicles();
+  }, [open, fetchClients]);
 
   const handleClose = useCallback(() => {
     reset();
@@ -128,8 +155,16 @@ function ImportExcelModal({
     setRouteName('');
     setRouteDate('');
     setShowAllRows(false);
+    setAccountClientId('');
+    setRowDriverId({});
+    setRowVehicleId({});
+    setAssignRules([]);
+    setAssignBusy(false);
+    setAssignProgress(null);
     onClose();
   }, [reset, onClose]);
+
+  const filenameBase = (name: string) => name.replace(/\.(xlsx|xls)$/i, '').trim();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -139,7 +174,7 @@ function ImportExcelModal({
     setShowAllRows(false);
     const p = await fetchPreview(f);
     if (p) {
-      setRouteName('');
+      setRouteName(filenameBase(f.name));
       setRouteDate(p.route_date ?? '');
       setStep('preview');
       if (p.rows.length === 0) {
@@ -159,6 +194,7 @@ function ImportExcelModal({
       routeName: routeName.trim() || undefined,
       routeDate: routeDate || undefined,
       driverNameHint: preview?.driver_name_hint || undefined,
+      clientId: accountClientId.trim() || undefined,
     });
     if (!res) {
       const err = useRouteImportStore.getState().confirmError;
@@ -173,29 +209,116 @@ function ImportExcelModal({
       // Notificación de éxito
       toast.info(
         `Ruta ${res.route_code} importada`,
-        `${res.orders_created} pedido${res.orders_created !== 1 ? 's' : ''} creados · cliente: ${res.client_name}`,
+        `${res.orders_created} pedido${res.orders_created !== 1 ? 's' : ''} creados · cuenta: ${res.client_name || 'Sin asignar'}`,
       );
 
-      // Advertencia si el cliente fue creado con datos incompletos
+      // Advertencia si faltan destinatarios en el Excel
       const rowsWithoutClient = (preview?.rows ?? []).filter((r) => !r.client_name.trim());
       if (rowsWithoutClient.length > 0) {
         toast.warning(
-          'Pedidos sin cliente identificado',
-          `${rowsWithoutClient.length} fila${rowsWithoutClient.length !== 1 ? 's' : ''} no tenían cliente en el Excel. Se asignó el cliente principal de la ruta.`,
+        'Pedidos sin destinatario identificado',
+        `${rowsWithoutClient.length} fila${rowsWithoutClient.length !== 1 ? 's' : ''} no tenían destinatario en el Excel. Se asignó el destinatario principal de la ruta.`,
         );
       }
 
-      // Advertencia si el cliente fue creado nuevo (sin datos completos)
-      toast.warning(
-        'Cliente creado con datos incompletos',
-        `"${res.client_name}" fue creado automáticamente desde el Excel. Completa RUT, contacto y dirección en el módulo de Clientes.`,
-        8000,
-      );
+      // Aplicar asignación por pedido (chofer + vehículo) si se configuró en el modal.
+      const totalToAssign =
+        Object.keys(rowDriverId).length + Object.keys(rowVehicleId).length;
+      if (totalToAssign > 0) {
+        setAssignBusy(true);
+        try {
+          const createdOrders = await api.get<Record<string, unknown>[]>(
+            `/routes/${res.route_id}/orders`,
+          );
+          const byCode = new Map(
+            (Array.isArray(createdOrders) ? createdOrders : []).map((o) => [
+              String(o.code ?? ''),
+              { id: String(o.id ?? '') },
+            ]),
+          );
+
+          const driverById = new Map(
+            users
+              .filter((u) => u.role === 'driver')
+              .map((u) => [u.id, u.name]),
+          );
+          const vehicleById = new Map(
+            vehicles.map((v) => [v.id, v.plate]),
+          );
+
+          const total = previewRows.length;
+          setAssignProgress({ done: 0, total });
+
+          for (let i = 0; i < previewRows.length; i++) {
+            const orderCode = `${res.route_code}-${String(i + 1).padStart(3, '0')}`;
+            const orderId = byCode.get(orderCode)?.id;
+            if (!orderId) continue;
+
+            const dId = rowDriverId[i];
+            const vId = rowVehicleId[i];
+            if (!dId && !vId) {
+              setAssignProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
+              continue;
+            }
+
+            await updateOrder(orderId, {
+              ...(dId
+                ? { driverId: dId, driverName: driverById.get(dId) ?? null }
+                : {}),
+              ...(vId
+                ? { vehicleId: vId, vehiclePlate: vehicleById.get(vId) ?? null }
+                : {}),
+            });
+            setAssignProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
+          }
+
+          await fetchOrders();
+          await fetchRoutes();
+          toast.info('Asignación aplicada', 'Se guardaron las asignaciones de chofer y vehículo.');
+        } catch {
+          toast.error('Asignación incompleta', 'La ruta se importó, pero no se pudieron aplicar todas las asignaciones.');
+        } finally {
+          setAssignBusy(false);
+          setAssignProgress(null);
+        }
+      }
     }
   };
 
   const previewRows = preview?.rows ?? [];
   const visibleRows = showAllRows ? previewRows : previewRows.slice(0, 8);
+  const drivers = useMemo(
+    () =>
+      users
+        .filter((u) => u.role === 'driver' && u.active)
+        .toSorted((a, b) => a.name.localeCompare(b.name, 'es')),
+    [users],
+  );
+  const vehiclesSorted = useMemo(
+    () => vehicles.toSorted((a, b) => a.plate.localeCompare(b.plate, 'es')),
+    [vehicles],
+  );
+
+  const applyRules = useCallback(() => {
+    const total = previewRows.length;
+    if (total === 0) return;
+    const nextDriver: Record<number, string> = {};
+    const nextVehicle: Record<number, string> = {};
+
+    for (const r of assignRules) {
+      const from = Math.max(1, Math.floor(Number(r.from.trim()) || 1));
+      const to = Math.min(total, Math.floor(Number(r.to.trim()) || total));
+      if (to < from) continue;
+      for (let idx1 = from; idx1 <= to; idx1++) {
+        const i = idx1 - 1; // 0-based
+        if (r.driverId) nextDriver[i] = r.driverId;
+        if (r.vehicleId) nextVehicle[i] = r.vehicleId;
+      }
+    }
+
+    setRowDriverId(nextDriver);
+    setRowVehicleId(nextVehicle);
+  }, [assignRules, previewRows.length]);
 
   if (!open) return null;
 
@@ -272,7 +395,7 @@ function ImportExcelModal({
               </p>
               <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
                 <span translate="no" className="font-mono font-bold">{lastResult.route_code}</span>
-                {' '}· {lastResult.orders_created} pedidos creados · cliente: {lastResult.client_name}
+                {' '}· {lastResult.orders_created} pedidos creados · cuenta: {lastResult.client_name}
               </p>
             </div>
             <Button onClick={handleClose}>Cerrar</Button>
@@ -303,6 +426,22 @@ function ImportExcelModal({
 
             {/* Opciones de la ruta */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <Select
+                  label="Cuenta (Mandante)"
+                  value={accountClientId}
+                  onChange={(e) => setAccountClientId(e.target.value)}
+                  options={[
+                    { value: '', label: 'Sin cuenta (asignar después)…' },
+                    ...clients
+                      .filter((c) => c.active)
+                      .toSorted((a, b) => a.companyName.localeCompare(b.companyName, 'es'))
+                      .map((c) => ({ value: c.id, label: c.companyName })),
+                  ]}
+                  autoComplete="off"
+                  hint="Opcional. Si no seleccionas una cuenta, la ruta quedará sin cuenta y podrás asignarla después."
+                />
+              </div>
               <div>
                 <label className="block text-xs font-medium text-stone-700 dark:text-stone-300 mb-1.5">
                   Nombre de la ruta
@@ -327,6 +466,172 @@ function ImportExcelModal({
                   className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-2 text-sm text-stone-900 dark:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 />
               </div>
+            </div>
+
+            {/* Constructor de reglas de asignación */}
+            <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/70 dark:bg-stone-900/40 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-stone-600 dark:text-stone-300 uppercase tracking-wide">
+                  Reglas de asignación (por rangos)
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      if (previewRows.length === 0) return;
+                      setAssignRules([
+                        {
+                          id: `all-${Date.now()}`,
+                          from: '1',
+                          to: String(previewRows.length),
+                          driverId: '',
+                          vehicleId: '',
+                        },
+                      ]);
+                    }}
+                    disabled={previewRows.length === 0}
+                  >
+                    Regla 1..N
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      const total = previewRows.length || 1;
+                      setAssignRules((prev) => [
+                        ...prev,
+                        {
+                          id: `r-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                          from: '1',
+                          to: String(total),
+                          driverId: '',
+                          vehicleId: '',
+                        },
+                      ]);
+                    }}
+                    disabled={previewRows.length === 0}
+                  >
+                    Agregar regla
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={applyRules}
+                    disabled={previewRows.length === 0 || assignRules.length === 0}
+                  >
+                    Aplicar reglas
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setRowDriverId({});
+                      setRowVehicleId({});
+                      setAssignRules([]);
+                    }}
+                    disabled={previewRows.length === 0}
+                  >
+                    Limpiar
+                  </Button>
+                </div>
+              </div>
+              <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1">
+                Ejemplo: filas 1–10 chofer A, 11–24 chofer B. Las reglas más abajo sobrescriben.
+              </p>
+
+              {assignRules.length === 0 ? (
+                <p className="text-xs text-stone-400 dark:text-stone-500 mt-3">
+                  Sin reglas aún. Usa “Agregar regla” o “Aplicar a todos”.
+                </p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {assignRules.map((r) => (
+                    <div key={r.id} className="grid grid-cols-12 gap-2 items-center">
+                      <div className="col-span-2">
+                        <Input
+                          label="Desde"
+                          value={r.from}
+                          onChange={(e) =>
+                            setAssignRules((prev) =>
+                              prev.map((x) =>
+                                x.id === r.id ? { ...x, from: e.target.value } : x,
+                              ),
+                            )
+                          }
+                          name={`rule-from-${r.id}`}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Input
+                          label="Hasta"
+                          value={r.to}
+                          onChange={(e) =>
+                            setAssignRules((prev) =>
+                              prev.map((x) =>
+                                x.id === r.id
+                                  ? { ...x, to: e.target.value }
+                                  : x,
+                              ),
+                            )
+                          }
+                          name={`rule-to-${r.id}`}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <Select
+                          label="Chofer"
+                          value={r.driverId}
+                          onChange={(e) =>
+                            setAssignRules((prev) =>
+                              prev.map((x) => (x.id === r.id ? { ...x, driverId: e.target.value } : x)),
+                            )
+                          }
+                          options={[
+                            { value: '', label: 'Sin chofer' },
+                            ...drivers.map((d) => ({ value: d.id, label: d.name })),
+                          ]}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Select
+                          label="Vehículo"
+                          value={r.vehicleId}
+                          onChange={(e) =>
+                            setAssignRules((prev) =>
+                              prev.map((x) => (x.id === r.id ? { ...x, vehicleId: e.target.value } : x)),
+                            )
+                          }
+                          options={[
+                            { value: '', label: 'Sin vehículo' },
+                            ...vehiclesSorted.map((v) => ({
+                              value: v.id,
+                              label: `${v.plate} · ${v.brand} ${v.model}`,
+                            })),
+                          ]}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className="col-span-1 flex justify-end">
+                        <button
+                          type="button"
+                          className="mt-6 p-2 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                          aria-label="Eliminar regla"
+                          onClick={() => setAssignRules((prev) => prev.filter((x) => x.id !== r.id))}
+                        >
+                          <Trash2 size={16} aria-hidden />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {preview.driver_name_hint && (
@@ -359,7 +664,7 @@ function ImportExcelModal({
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="bg-stone-50 dark:bg-stone-800/70 border-b border-stone-200 dark:border-stone-700">
-                        {['Cliente', 'Entrega', 'OC', 'Factura', 'Tipo', 'Cajas', 'Unids'].map((h) => (
+                        {['Destinatario', 'Entrega', 'Chofer', 'Vehículo', 'OC', 'Factura', 'Tipo', 'Cajas', 'Unids'].map((h) => (
                           <th key={h} className="text-left px-3 py-2 font-semibold text-stone-600 dark:text-stone-300 whitespace-nowrap">
                             {h}
                           </th>
@@ -371,6 +676,38 @@ function ImportExcelModal({
                         <tr key={i} className="hover:bg-stone-50 dark:hover:bg-stone-800/40">
                           <td className="px-3 py-2 font-medium text-stone-800 dark:text-stone-200 whitespace-nowrap">{row.client_name}</td>
                           <td className="px-3 py-2 text-stone-600 dark:text-stone-400 max-w-[180px] truncate">{row.entrega}</td>
+                          <td className="px-3 py-2">
+                            <select
+                              className="w-44 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 px-2 py-1 text-xs text-stone-700 dark:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                              value={rowDriverId[i] ?? ''}
+                              onChange={(e) =>
+                                setRowDriverId((p) => ({ ...p, [i]: e.target.value }))
+                              }
+                            >
+                              <option value="">Sin chofer…</option>
+                              {drivers.map((d) => (
+                                <option key={d.id} value={d.id}>
+                                  {d.name}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              className="w-52 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 px-2 py-1 text-xs text-stone-700 dark:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                              value={rowVehicleId[i] ?? ''}
+                              onChange={(e) =>
+                                setRowVehicleId((p) => ({ ...p, [i]: e.target.value }))
+                              }
+                            >
+                              <option value="">Sin vehículo…</option>
+                              {vehiclesSorted.map((v) => (
+                                <option key={v.id} value={v.id}>
+                                  {v.plate} · {v.brand} {v.model}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
                           <td className="px-3 py-2 text-stone-500 dark:text-stone-500 whitespace-nowrap font-mono">{row.numero_oc || '—'}</td>
                           <td className="px-3 py-2 text-stone-500 dark:text-stone-500 whitespace-nowrap font-mono">{row.factura || '—'}</td>
                           <td className="px-3 py-2 text-stone-500 dark:text-stone-500">{row.tipo || '—'}</td>
@@ -392,10 +729,16 @@ function ImportExcelModal({
                 onClick={() => void handleConfirm()}
                 loading={confirmLoading}
                 icon={<FileSpreadsheet size={15} />}
+                disabled={assignBusy}
               >
                 Crear ruta y {previewRows.length} pedidos
               </Button>
             </div>
+            {assignProgress ? (
+              <p className="text-xs text-stone-500 dark:text-stone-400 text-right tabular-nums">
+                Aplicando asignaciones… {assignProgress.done}/{assignProgress.total}
+              </p>
+            ) : null}
           </>
         )}
       </div>
@@ -518,13 +861,15 @@ function RouteListItem({
           />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span translate="no" className="font-mono text-sm font-bold text-stone-900 dark:text-stone-50">
+          <p className="text-sm font-semibold text-stone-900 dark:text-stone-50 truncate">
+            {route.name}
+          </p>
+          <div className="flex items-center gap-2 flex-wrap mt-0.5 text-[11px] text-stone-500 dark:text-stone-400 tabular-nums">
+            <span translate="no" className="font-mono font-semibold">
               {route.code}
             </span>
             <RouteStatusBadge status={route.status} />
           </div>
-          <p className="text-sm text-stone-600 dark:text-stone-300 truncate mt-0.5">{route.name}</p>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[11px] text-stone-400 dark:text-stone-500 tabular-nums">
             <span>{fecha}</span>
             <span>{agg.pedidos} pedidos</span>
@@ -575,13 +920,11 @@ function RouteTableRow({
           : 'hover:bg-stone-50 dark:hover:bg-stone-800/50',
       )}
     >
-      <td className="px-4 py-2.5 whitespace-nowrap">
-        <span translate="no" className={clsx('font-mono text-xs font-bold', selected ? 'text-violet-700 dark:text-violet-300' : 'text-stone-700 dark:text-stone-200')}>
+      <td className="px-4 py-2.5 max-w-[260px]">
+        <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{route.name}</p>
+        <p translate="no" className={clsx('font-mono text-[11px] font-semibold tabular-nums mt-0.5', selected ? 'text-violet-700 dark:text-violet-300' : 'text-stone-500 dark:text-stone-400')}>
           {route.code}
-        </span>
-      </td>
-      <td className="px-4 py-2.5 max-w-[200px]">
-        <p className="text-sm text-stone-700 dark:text-stone-200 truncate">{route.name}</p>
+        </p>
       </td>
       <td className="px-4 py-2.5 whitespace-nowrap">
         <RouteStatusBadge status={route.status} />
@@ -687,6 +1030,7 @@ function summarizeRouteAssignees(
 function orderToFormData(order: Order): OrderFormData {
   return {
     clientId: order.clientId,
+    destinatario: order.clientName ?? '',
     priority: order.priority,
     destStreet: order.destination.street,
     destCity: order.destination.city,
@@ -750,7 +1094,7 @@ function RouteForm({
       setForm((p) => ({ ...p, [field]: e.target.value }));
 
   const clientOptions = [
-    { value: '', label: 'Sin cliente (se asigna al primer pedido)…' },
+    { value: '', label: 'Sin cuenta (se asigna al primer pedido)…' },
     ...clients
       .filter((c) => c.active)
       .toSorted((a, b) => a.companyName.localeCompare(b.companyName, 'es'))
@@ -780,12 +1124,12 @@ function RouteForm({
         </p>
       )}
       <Select
-        label="Cliente"
+        label="Cuenta (Mandante)"
         value={form.clientId}
         onChange={f('clientId')}
         options={clientOptions}
         autoComplete="off"
-        hint="Todos los pedidos de la ruta deben pertenecer al mismo cliente. Si no lo seleccionás ahora, se inferirá del primer pedido que agregues."
+        hint="Todos los pedidos de la ruta deben pertenecer a la misma cuenta (mandante). Si no la seleccionás ahora, se inferirá del primer pedido que agregues."
       />
       <Input
         label="Nombre de la ruta"
@@ -843,7 +1187,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
   const { user } = useAuthStore();
   const canManage = user?.role === 'admin' || user?.role === 'operator';
   const { orders, assignToRoute, detachOrderFromRoute, fetchOrders, addOrder, updateOrder } = useOrderStore();
-  const { fetchRoutes, addOrderToRoute, assignDriverToOrders, deleteRoute } = useRouteStore();
+  const { fetchRoutes, addOrderToRoute, assignDriverToOrders, deleteRoute, updateRoute } = useRouteStore();
   const { clients, fetchClients } = useClientStore();
   const { users, fetchUsers } = useUserStore();
   const { vehicles, fetchVehicles } = useVehicleStore();
@@ -855,13 +1199,15 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
   }, [fetchClients, fetchUsers, fetchVehicles]);
 
   const [pickOrderId, setPickOrderId] = useState('');
+  const [orphanSearch, setOrphanSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createFormKey, setCreateFormKey] = useState(0);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
-  const [trackingOrder, setTrackingOrder] = useState<{ id: string; code: string } | null>(null);
+  const [trackingRouteOpen, setTrackingRouteOpen] = useState(false);
+  const [removeOrderId, setRemoveOrderId] = useState<string | null>(null);
   // Asignación por pedido individual
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [orderDraftDriver, setOrderDraftDriver] = useState('');
@@ -895,21 +1241,38 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
     [orders],
   );
 
+  const filteredOrphans = useMemo(() => {
+    const term = orphanSearch.trim().toLowerCase();
+    if (!term) return orphanOrders;
+    return orphanOrders.filter((o) => {
+      const hay = [
+        o.code,
+        o.clientName,
+        o.destination.city,
+        o.status,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(term);
+    });
+  }, [orphanOrders, orphanSearch]);
+
   const totals = useMemo(() => {
     const bultos = assigned.reduce((s, o) => s + (Number(o.bultos) || 0), 0);
     return { pedidos: assigned.length, bultos };
   }, [assigned]);
 
   const orphanOptions = useMemo(() => {
-    const opts = orphanOrders.toSorted((a, b) => a.code.localeCompare(b.code, 'es'));
+    const opts = filteredOrphans.toSorted((a, b) => a.code.localeCompare(b.code, 'es'));
     return [
-      { value: '', label: 'Seleccionar pedido sin ruta (legacy)…' },
+      { value: '', label: 'Seleccionar pedido sin ruta…' },
       ...opts.map((o) => ({
         value: o.id,
-        label: `${o.code} · ${o.clientName?.trim() || 'Sin cliente'} · ${o.destination.city} · ${o.bultos} bultos`,
+        label: `${o.code} · ${o.destination.city} · ${o.bultos} bultos · ${o.clientName?.trim() || 'Destinatario por confirmar'}`,
       })),
     ];
-  }, [orphanOrders]);
+  }, [filteredOrphans]);
 
   const driversList = useMemo(
     () =>
@@ -979,17 +1342,13 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
   const handleCreateOrder = async (data: OrderFormData) => {
     const clientId = data.clientId?.trim();
     if (!clientId) {
-      setActionError('Selecciona un cliente para el pedido.');
+      setActionError('Selecciona una cuenta para el pedido.');
       return;
     }
-    const client = clients.find((c) => c.id === clientId);
-    const clientName =
-      client?.companyName?.trim() ||
-      assigned.find((o) => o.clientId === clientId)?.clientName?.trim() ||
-      '';
-    if (!clientName) {
+    const destinatario = data.destinatario?.trim() || '';
+    if (!destinatario) {
       setActionError(
-        'No se pudo resolver el nombre del cliente. Recarga la página o verifica que el cliente exista.',
+        'Indica el destinatario (cliente final) al que se le entrega este pedido.',
       );
       return;
     }
@@ -998,7 +1357,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
     try {
       const created = await addOrder({
         clientId,
-        clientName,
+        clientName: destinatario,
         status: 'pending',
         priority: data.priority,
         routeId: route.id,
@@ -1080,18 +1439,13 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
   const handleUpdateOrder = async (orderId: string, data: OrderFormData) => {
     const clientId = data.clientId?.trim();
     if (!clientId) {
-      setActionError('Selecciona un cliente para el pedido.');
+      setActionError('Selecciona una cuenta para el pedido.');
       return;
     }
-    const client = clients.find((c) => c.id === clientId);
-    const existing = assigned.find((x) => x.id === orderId);
-    const clientName =
-      client?.companyName?.trim() ||
-      existing?.clientName?.trim() ||
-      '';
-    if (!clientName) {
+    const destinatario = data.destinatario?.trim() || '';
+    if (!destinatario) {
       setActionError(
-        'No se pudo resolver el nombre del cliente. Recarga la página o verifica que el cliente exista.',
+        'Indica el destinatario (cliente final) al que se le entrega este pedido.',
       );
       return;
     }
@@ -1100,7 +1454,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
     try {
       await updateOrder(orderId, {
         clientId,
-        clientName,
+        clientName: destinatario,
         priority: data.priority,
         destination: {
           street: data.destStreet,
@@ -1247,6 +1601,9 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
   const [codeCopied, setCodeCopied] = useState(false);
   const [deleteRouteOpen, setDeleteRouteOpen] = useState(false);
   const [deleteRouteBusy, setDeleteRouteBusy] = useState(false);
+  const [editRouteOpen, setEditRouteOpen] = useState(false);
+  const [editRouteBusy, setEditRouteBusy] = useState(false);
+  const [editRouteError, setEditRouteError] = useState<string | null>(null);
   const copyRouteCode = async () => {
     try {
       await navigator.clipboard.writeText(route.code);
@@ -1276,6 +1633,24 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
     }
   };
 
+  const handleEditRouteSubmit = async (data: RouteFormData) => {
+    setEditRouteError(null);
+    setEditRouteBusy(true);
+    try {
+      await updateRoute(route.id, {
+        name: data.name.trim(),
+        notes: data.notes.trim() || undefined,
+        clientId: data.clientId ? data.clientId : null,
+      });
+      await fetchRoutes();
+      setEditRouteOpen(false);
+    } catch (e) {
+      setEditRouteError(e instanceof ApiError ? e.message : 'No se pudo guardar la ruta.');
+    } finally {
+      setEditRouteBusy(false);
+    }
+  };
+
   return (
     <>
       <div
@@ -1301,13 +1676,34 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
           {canManage ? (
             <button
               type="button"
-              onClick={() => setDeleteRouteOpen(true)}
-              disabled={deleteRouteBusy}
-              className="shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 dark:hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50"
-              aria-label="Eliminar ruta"
+              onClick={() => setTrackingRouteOpen(true)}
+              className="shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-violet-700 hover:bg-violet-50 dark:hover:bg-violet-950/40 dark:hover:text-violet-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+              aria-label="Enviar seguimiento de ruta"
+              title="Enviar seguimiento de ruta"
             >
-              <Trash2 size={18} aria-hidden />
+              <Share2 size={18} aria-hidden />
             </button>
+          ) : null}
+          {canManage ? (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setEditRouteOpen(true)}
+                className="shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 dark:hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                aria-label="Editar ruta"
+              >
+                <Pencil size={18} aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteRouteOpen(true)}
+                disabled={deleteRouteBusy}
+                className="shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 dark:hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50"
+                aria-label="Eliminar ruta"
+              >
+                <Trash2 size={18} aria-hidden />
+              </button>
+            </div>
           ) : null}
           <button
             type="button"
@@ -1360,7 +1756,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
             </div>
 
             <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-2.5 pt-2.5 border-t border-stone-200 dark:border-stone-800">
-              <RouteModalStat label="Cliente">{routeClientLabel}</RouteModalStat>
+              <RouteModalStat label="Cuenta">{routeClientLabel}</RouteModalStat>
               <RouteModalStat label="Fecha">{formatRouteDayElegant(fechaSrc)}</RouteModalStat>
               <RouteModalStat label="Choferes">
                 <span title="Asignación por pedido en esta ruta">
@@ -1431,7 +1827,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
           ) : (
             <ul className="space-y-2">
               {assigned.map((o) => {
-                const destLabel = [o.clientName?.trim() || 'Cliente por confirmar', o.destination.city]
+                const destLabel = [o.clientName?.trim() || 'Destinatario por confirmar', o.destination.city]
                   .filter(Boolean)
                   .join(' · ');
                 const isAssignOpen = expandedOrderId === o.id;
@@ -1512,17 +1908,11 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
                             disabled={busyId !== null && busyId !== o.id}
                           />
                           <OrderCardAction
-                            icon={<Share2 size={16} />}
-                            label="Enviar"
-                            onClick={() => setTrackingOrder({ id: o.id, code: o.code })}
-                            disabled={busyId !== null && busyId !== o.id}
-                          />
-                          <OrderCardAction
-                            icon={<Trash2 size={16} />}
+                            icon={<Unlink size={16} />}
                             label="Quitar"
                             tone="danger"
                             loading={busyId === o.id}
-                            onClick={() => void handleRemove(o.id)}
+                            onClick={() => setRemoveOrderId(o.id)}
                             disabled={busyId !== null && busyId !== o.id}
                           />
                         </div>
@@ -1668,17 +2058,36 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
 
               {orphanOrders.length > 0 ? (
                 <div className="rounded-2xl border border-dashed border-stone-200 dark:border-stone-700 p-5 space-y-3">
-                  <p className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">
-                    Vincular pedido huérfano
-                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">
+                        Vincular pedido sin ruta
+                      </p>
+                      <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
+                        {filteredOrphans.length}/{orphanOrders.length} disponibles
+                      </p>
+                    </div>
+                    <Input
+                      label="Buscar"
+                      value={orphanSearch}
+                      onChange={(e) => setOrphanSearch(e.target.value)}
+                      placeholder="Código, ciudad, destinatario…"
+                      name={`orphan-search-${route.id}`}
+                      autoComplete="off"
+                      containerClassName="max-w-xs w-full"
+                    />
+                  </div>
+
                   <div className="flex flex-col sm:flex-row gap-3 items-end">
                     <Select
                       id={`attach-orphan-route-${route.id}`}
-                      label="Pedido sin ruta"
+                      label="Pedido"
                       value={pickOrderId}
                       onChange={(e) => setPickOrderId(e.target.value)}
                       options={orphanOptions}
                       containerClassName="flex-1 w-full min-w-0"
+                      hint="Se moverá a esta ruta. No se elimina."
+                      autoComplete="off"
                     />
                     <Button
                       type="button"
@@ -1686,7 +2095,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
                       disabled={!pickOrderId || busyId !== null}
                       loading={busyId === 'add'}
                     >
-                      Vincular
+                      Vincular a la ruta
                     </Button>
                   </div>
                 </div>
@@ -1705,6 +2114,37 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
           onClose={() => setDetailOrder(null)}
           routeLabel={`${route.code} · ${route.name}`}
         />
+      ) : null}
+
+      {editRouteOpen ? (
+        <Modal
+          open
+          onClose={() => {
+            if (editRouteBusy) return;
+            setEditRouteOpen(false);
+            setEditRouteError(null);
+          }}
+          title="Editar ruta"
+          description={route.code}
+          size="xl"
+        >
+          <RouteForm
+            initial={{
+              code: route.code,
+              name: route.name,
+              notes: route.notes ?? '',
+              clientId: route.clientId ?? '',
+            }}
+            onSubmit={handleEditRouteSubmit}
+            onCancel={() => {
+              if (editRouteBusy) return;
+              setEditRouteOpen(false);
+              setEditRouteError(null);
+            }}
+            submitLabel={editRouteBusy ? 'Guardando…' : 'Guardar cambios'}
+            error={editRouteError}
+          />
+        </Modal>
       ) : null}
 
       <TypeToConfirmModal
@@ -1755,14 +2195,28 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
         confirmLabel="Sí, asignar igual"
         variant="warning"
       />
-      {trackingOrder && (
+      {trackingRouteOpen ? (
         <SendTrackingModal
-          orderId={trackingOrder.id}
-          orderCode={trackingOrder.code}
+          routeId={route.id}
+          routeCode={route.code}
           open
-          onClose={() => setTrackingOrder(null)}
+          onClose={() => setTrackingRouteOpen(false)}
         />
-      )}
+      ) : null}
+
+      <ConfirmModal
+        open={removeOrderId !== null}
+        onClose={() => setRemoveOrderId(null)}
+        onConfirm={() => {
+          const id = removeOrderId;
+          setRemoveOrderId(null);
+          if (id) void handleRemove(id);
+        }}
+        title="Quitar pedido de la ruta"
+        message="Esto solo desvincula el pedido de esta ruta. El pedido no se elimina."
+        confirmLabel="Quitar de la ruta"
+        variant="warning"
+      />
     </>
   );
 }
