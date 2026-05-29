@@ -487,16 +487,22 @@ function ImportExcelModal({
             </div>
 
             {/* Constructor de reglas de asignación */}
-            <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/70 dark:bg-stone-900/40 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-stone-600 dark:text-stone-300 uppercase tracking-wide">
-                  Reglas de asignación (por rangos)
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
+            <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/70 dark:bg-stone-900/40 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3 px-3 pt-2.5 pb-2 border-b border-stone-100 dark:border-stone-800">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-stone-700 dark:text-stone-200 uppercase tracking-wide leading-none">
+                    Asignación por rangos
+                  </p>
+                  <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-1 leading-snug">
+                    Ej: filas 1–10 → chofer A · 11–24 → chofer B. Si se solapan, gana la última.
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                  <button
                     type="button"
-                    size="sm"
-                    variant="secondary"
+                    disabled={previewRows.length === 0}
+                    title="Crear una regla que cubre todos los pedidos"
                     onClick={() => {
                       if (previewRows.length === 0) return;
                       setAssignRules([
@@ -509,14 +515,14 @@ function ImportExcelModal({
                         },
                       ]);
                     }}
-                    disabled={previewRows.length === 0}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-50 dark:hover:bg-stone-700 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
                   >
-                    Regla 1..N
-                  </Button>
-                  <Button
+                    <ListChecks size={13} aria-hidden />
+                    Todos
+                  </button>
+                  <button
                     type="button"
-                    size="sm"
-                    variant="secondary"
+                    disabled={previewRows.length === 0}
                     onClick={() => {
                       const total = previewRows.length || 1;
                       setAssignRules((prev) => [
@@ -530,78 +536,59 @@ function ImportExcelModal({
                         },
                       ]);
                     }}
-                    disabled={previewRows.length === 0}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
                   >
-                    Agregar regla
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={applyRules}
-                    disabled={previewRows.length === 0 || assignRules.length === 0}
-                  >
-                    Aplicar reglas
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setRowDriverId({});
-                      setRowVehicleId({});
-                      setAssignRules([]);
-                    }}
-                    disabled={previewRows.length === 0}
-                  >
-                    Limpiar
-                  </Button>
+                    <Plus size={13} aria-hidden />
+                    Agregar
+                  </button>
                 </div>
               </div>
-              <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1">
-                Ejemplo: filas 1–10 chofer A, 11–24 chofer B. Las reglas más abajo sobrescriben.
-              </p>
 
+              {/* Lista de reglas / empty state */}
               {assignRules.length === 0 ? (
-                <p className="text-xs text-stone-400 dark:text-stone-500 mt-3">
-                  Sin reglas aún. Usa “Agregar regla” o “Aplicar a todos”.
-                </p>
+                <div className="px-3 py-5 text-center">
+                  <p className="text-xs text-stone-400 dark:text-stone-500">
+                    Sin reglas aún — pulsa <span className="font-medium text-stone-500 dark:text-stone-400">&ldquo;Agregar&rdquo;</span> o <span className="font-medium text-stone-500 dark:text-stone-400">&ldquo;Todos&rdquo;</span> para empezar.
+                  </p>
+                </div>
               ) : (
-                <div className="mt-3 space-y-2">
-                  {assignRules.map((r) => (
-                    <div key={r.id} className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-2">
+                <div className="px-3 py-2 space-y-1.5">
+                  {assignRules.map((r, rIdx) => (
+                    <div
+                      key={r.id}
+                      className="flex items-end gap-2 bg-stone-50/80 dark:bg-stone-800/50 rounded-lg px-2 pt-2 pb-1.5"
+                    >
+                      <span className="shrink-0 mb-[18px] size-5 flex items-center justify-center rounded-full bg-stone-200 dark:bg-stone-700 text-[10px] font-bold text-stone-600 dark:text-stone-300 tabular-nums">
+                        {rIdx + 1}
+                      </span>
+                      <div className="w-[60px] shrink-0">
                         <Input
                           label="Desde"
                           value={r.from}
                           onChange={(e) =>
                             setAssignRules((prev) =>
-                              prev.map((x) =>
-                                x.id === r.id ? { ...x, from: e.target.value } : x,
-                              ),
+                              prev.map((x) => (x.id === r.id ? { ...x, from: e.target.value } : x)),
                             )
                           }
                           name={`rule-from-${r.id}`}
                           autoComplete="off"
                         />
                       </div>
-                      <div className="col-span-2">
+                      <span className="text-stone-400 dark:text-stone-500 text-sm mb-[18px]">–</span>
+                      <div className="w-[60px] shrink-0">
                         <Input
                           label="Hasta"
                           value={r.to}
                           onChange={(e) =>
                             setAssignRules((prev) =>
-                              prev.map((x) =>
-                                x.id === r.id
-                                  ? { ...x, to: e.target.value }
-                                  : x,
-                              ),
+                              prev.map((x) => (x.id === r.id ? { ...x, to: e.target.value } : x)),
                             )
                           }
                           name={`rule-to-${r.id}`}
                           autoComplete="off"
                         />
                       </div>
-                      <div className="col-span-4">
+                      <div className="flex-1 min-w-0">
                         <Select
                           label="Chofer"
                           value={r.driverId}
@@ -617,7 +604,7 @@ function ImportExcelModal({
                           autoComplete="off"
                         />
                       </div>
-                      <div className="col-span-3">
+                      <div className="flex-1 min-w-0">
                         <Select
                           label="Vehículo"
                           value={r.vehicleId}
@@ -636,18 +623,40 @@ function ImportExcelModal({
                           autoComplete="off"
                         />
                       </div>
-                      <div className="col-span-1 flex justify-end">
-                        <button
-                          type="button"
-                          className="mt-6 p-2 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                          aria-label="Eliminar regla"
-                          onClick={() => setAssignRules((prev) => prev.filter((x) => x.id !== r.id))}
-                        >
-                          <Trash2 size={16} aria-hidden />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        className="shrink-0 mb-[18px] p-1.5 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 transition-colors"
+                        aria-label="Eliminar regla"
+                        onClick={() => setAssignRules((prev) => prev.filter((x) => x.id !== r.id))}
+                      >
+                        <X size={14} aria-hidden />
+                      </button>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {assignRules.length > 0 && (
+                <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-stone-100 dark:border-stone-800">
+                  <button
+                    type="button"
+                    className="text-xs text-stone-400 hover:text-red-600 dark:hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded transition-colors"
+                    onClick={() => {
+                      setRowDriverId({});
+                      setRowVehicleId({});
+                      setAssignRules([]);
+                    }}
+                  >
+                    Limpiar todo
+                  </button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={applyRules}
+                    disabled={previewRows.length === 0 || assignRules.length === 0}
+                  >
+                    Aplicar reglas
+                  </Button>
                 </div>
               )}
             </div>
