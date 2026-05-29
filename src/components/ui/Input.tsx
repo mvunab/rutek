@@ -38,11 +38,11 @@ export function Input({
         <input
           id={inputId}
           className={clsx(
-            'w-full bg-stone-50 border rounded-lg px-3 py-2 text-sm text-stone-900',
+            'w-full bg-surface-muted border rounded-xl px-3 py-2 text-sm text-stone-900',
             'dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-500',
-            'placeholder:text-stone-400 transition-all duration-150',
-            'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-            error ? 'border-red-400 dark:border-red-500' : 'border-stone-300 dark:border-stone-600',
+            'placeholder:text-stone-400 transition-[box-shadow,background-color,border-color,color] duration-150',
+            'focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-300 focus:bg-surface',
+            error ? 'border-red-400 dark:border-red-500' : 'border-stone-200 dark:border-stone-600',
             leftIcon && 'pl-9',
             rightIcon && 'pr-9',
             className
@@ -90,11 +90,11 @@ export function Select({
       <select
         id={selectId}
         className={clsx(
-          'w-full bg-stone-50 border rounded-lg px-3 py-2 text-sm text-stone-900',
+          'w-full bg-surface-muted border rounded-xl px-3 py-2 text-sm text-stone-900',
           'dark:bg-stone-900 dark:text-stone-100 dark:border-stone-600',
-          'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-          'transition-all duration-150 cursor-pointer',
-          error ? 'border-red-400 dark:border-red-500' : 'border-stone-300',
+          'focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-300 focus:bg-surface',
+          'transition-[box-shadow,background-color,border-color,color] duration-150 cursor-pointer',
+          error ? 'border-red-400 dark:border-red-500' : 'border-stone-200',
           className
         )}
         {...props}
@@ -138,11 +138,11 @@ export function Textarea({
       <textarea
         id={areaId}
         className={clsx(
-          'w-full bg-stone-50 border rounded-lg px-3 py-2 text-sm text-stone-900',
+          'w-full bg-surface-muted border rounded-xl px-3 py-2 text-sm text-stone-900',
           'dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-500',
-          'placeholder:text-stone-400 resize-none transition-all duration-150',
-          'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-          error ? 'border-red-400 dark:border-red-500' : 'border-stone-300 dark:border-stone-600',
+          'placeholder:text-stone-400 resize-none transition-[box-shadow,background-color,border-color,color] duration-150',
+          'focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-300 focus:bg-surface',
+          error ? 'border-red-400 dark:border-red-500' : 'border-stone-200 dark:border-stone-600',
           className
         )}
         {...props}

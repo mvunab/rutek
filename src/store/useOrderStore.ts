@@ -34,6 +34,17 @@ const defaultFilters: OrderFilters = {
   search: '',
 };
 
+function coordFromApi(
+  latRaw: unknown,
+  lngRaw: unknown,
+): { coordinates?: { lat: number; lng: number } } {
+  const lat = latRaw != null ? Number(latRaw) : NaN;
+  const lng = lngRaw != null ? Number(lngRaw) : NaN;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return {};
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return {};
+  return { coordinates: { lat, lng } };
+}
+
 function isoDateOnlyFromDelivery(raw: string): string {
   const d = raw.includes('T') ? raw.split('T')[0] : raw.slice(0, 10);
   return d ?? raw;
@@ -64,11 +75,13 @@ function mapOrderFromApi(row: Record<string, unknown>): Order {
       street: String(row.origin_street ?? ''),
       city: String(row.origin_city ?? ''),
       region: String(row.origin_region ?? ''),
+      ...coordFromApi(row.origin_lat, row.origin_lng),
     },
     destination: {
       street: String(row.destination_street ?? ''),
       city: String(row.destination_city ?? ''),
       region: String(row.destination_region ?? ''),
+      ...coordFromApi(row.destination_lat, row.destination_lng),
     },
     items,
     totalWeight: Number(row.total_weight ?? 0),

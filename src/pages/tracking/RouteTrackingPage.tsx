@@ -102,7 +102,7 @@ export function RouteTrackingPage() {
   return (
     <div className="min-h-screen bg-stone-50 dark:bg-stone-950">
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-5">
-        <div className="flex flex-col rounded-2xl bg-white dark:bg-stone-900 p-6 shadow-[0_4px_12px_0_rgba(0,0,0,0.08)] space-y-4 overflow-hidden border border-stone-100 dark:border-stone-800">
+        <div className="flex flex-col glass-card p-6 space-y-4 overflow-hidden">
           <div className="flex w-full items-start justify-between gap-3">
             <div className="flex flex-col flex-1 min-w-0">
               <p className="text-2xl font-extrabold leading-tight text-stone-900 dark:text-stone-50">
@@ -170,12 +170,12 @@ export function RouteTrackingPage() {
         </div>
 
         {loading ? (
-          <div className="rounded-2xl bg-white dark:bg-stone-900 p-6 shadow-[0_4px_12px_0_rgba(0,0,0,0.08)] border border-stone-100 dark:border-stone-800 text-center">
+          <div className="glass-card p-6 text-center">
             <Loader2 className="size-6 animate-spin mx-auto text-stone-400" aria-hidden />
             <p className="text-sm text-stone-500 dark:text-stone-400 mt-3">Cargando…</p>
           </div>
         ) : error ? (
-          <div className="rounded-2xl bg-white dark:bg-stone-900 p-6 shadow-[0_4px_12px_0_rgba(0,0,0,0.08)] border border-red-200 dark:border-red-900 text-center">
+          <div className="glass-card p-6 text-center border-red-200 dark:border-red-900">
             <p className="text-sm font-medium text-red-800 dark:text-red-200">{error}</p>
             <p className="text-xs text-red-700 dark:text-red-300 mt-1">Solicita un nuevo link al operador.</p>
           </div>
@@ -185,7 +185,7 @@ export function RouteTrackingPage() {
               {grouped.map(([city, orders]) => (
                 <div
                   key={city}
-                  className="rounded-2xl bg-white dark:bg-stone-900 shadow-[0_4px_12px_0_rgba(0,0,0,0.08)] overflow-hidden border border-stone-100 dark:border-stone-800"
+                  className="glass-card overflow-hidden"
                 >
                   <div className="px-4 py-3 border-b border-stone-100 dark:border-stone-800 flex items-center gap-2">
                     <MapPin size={14} className="text-stone-400" aria-hidden />

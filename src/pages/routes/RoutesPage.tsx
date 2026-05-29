@@ -4,6 +4,7 @@ import {
   Download, RefreshCw, SlidersHorizontal, Package, UserCircle, Route as RouteIcon, Truck,
   Pencil, Trash2, X, Copy, MapPin, Box, ArrowLeft, Check, FileSpreadsheet, Unlink,
   CheckCircle2, AlertCircle, Eye, LayoutGrid, LayoutList, Share2,
+  CheckSquare, Square, ListChecks, Maximize2, Minimize2,
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { RouteStatusBadge } from '../../components/ui/Badge';
@@ -30,21 +31,36 @@ import { SendTrackingModal } from '../../components/communications/SendTrackingM
 // ─── Panel resize ─────────────────────────────────────────────────────────────
 
 const PANEL_WIDTH_KEY = 'rutek-route-panel-width';
-const PANEL_MIN = 280;
-const PANEL_MAX = 640;
-const PANEL_DEFAULT = 384; // ~24rem
+const PANEL_MIN = 300;
+const PANEL_DEFAULT = 440;
+
+/** ~58% del viewport, hasta 820px — permite pasar un poco más de la mitad. */
+function getPanelMaxPx(): number {
+  if (typeof window === 'undefined') return 760;
+  return Math.min(820, Math.max(520, Math.floor(window.innerWidth * 0.58)));
+}
+
+function clampPanelWidth(w: number): number {
+  return Math.min(getPanelMaxPx(), Math.max(PANEL_MIN, w));
+}
 
 function usePanelWidth() {
   const [width, setWidth] = useState<number>(() => {
     const stored = localStorage.getItem(PANEL_WIDTH_KEY);
     const n = stored ? parseInt(stored, 10) : NaN;
-    return isNaN(n) ? PANEL_DEFAULT : Math.min(PANEL_MAX, Math.max(PANEL_MIN, n));
+    return isNaN(n) ? PANEL_DEFAULT : clampPanelWidth(n);
   });
 
   const commit = useCallback((w: number) => {
-    const clamped = Math.min(PANEL_MAX, Math.max(PANEL_MIN, w));
+    const clamped = clampPanelWidth(w);
     setWidth(clamped);
     localStorage.setItem(PANEL_WIDTH_KEY, String(clamped));
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => setWidth((w) => clampPanelWidth(w));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   return { width, commit };
@@ -93,10 +109,12 @@ function PanelResizeHandle({ onResize }: { onResize: (delta: number) => void }) 
         if (e.key === 'ArrowRight') onResize(16);
       }}
     >
-      {/* línea visible */}
-      <div className="w-px h-full bg-stone-200 dark:bg-stone-800 group-hover:bg-primary-400 dark:group-hover:bg-primary-600 transition-colors" />
-      {/* pastilla central */}
-      <div className="absolute top-1/2 -translate-y-1/2 w-1 h-8 rounded-full bg-stone-300 dark:bg-stone-600 group-hover:bg-primary-400 dark:group-hover:bg-primary-500 transition-colors" />
+      <div className="w-px h-full bg-stone-200/80 dark:bg-stone-800 group-hover:bg-primary-400 dark:group-hover:bg-primary-500 transition-[background-color] duration-150" />
+      <div className="absolute top-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity duration-150">
+        <div className="w-0.5 h-3 rounded-full bg-stone-400 dark:bg-stone-500 group-hover:bg-primary-500" />
+        <div className="w-1 h-6 rounded-full bg-stone-300 dark:bg-stone-600 group-hover:bg-primary-400 dark:group-hover:bg-primary-500 transition-[background-color] duration-150" />
+        <div className="w-0.5 h-3 rounded-full bg-stone-400 dark:bg-stone-500 group-hover:bg-primary-500" />
+      </div>
     </div>
   );
 }
@@ -840,24 +858,25 @@ function RouteListItem({
       type="button"
       onClick={onSelect}
       className={clsx(
-        'w-full text-left rounded-xl border px-4 py-3.5 transition-all',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-stone-950',
+        'w-full text-left rounded-xl px-4 py-3.5 transition-colors glass shadow-sm',
+        'hover:bg-white/90 dark:hover:bg-stone-900/90 hover:shadow-md',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-stone-950',
         selected
-          ? 'bg-white dark:bg-stone-900 border-violet-400 dark:border-violet-600 ring-2 ring-violet-400/30 dark:ring-violet-500/40 shadow-md'
-          : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-600 hover:shadow-sm',
+          ? 'border-primary-400/80 dark:border-primary-500/70 ring-2 ring-primary-400/20 dark:ring-primary-500/25 shadow-md'
+          : 'border-stone-200/80 dark:border-stone-700/70',
       )}
     >
       <div className="flex items-start gap-3">
         <div
           className={clsx(
             'size-11 shrink-0 rounded-xl flex items-center justify-center',
-            selected ? 'bg-violet-100 dark:bg-violet-950/60' : 'bg-stone-100 dark:bg-stone-800',
+            selected ? 'bg-primary-50/90 dark:bg-primary-950/40' : 'bg-stone-100/70 dark:bg-stone-800/60',
           )}
           aria-hidden
         >
           <RouteIcon
             size={20}
-            className={selected ? 'text-violet-600 dark:text-violet-400' : 'text-stone-500 dark:text-stone-400'}
+            className={selected ? 'text-primary-600 dark:text-primary-400' : 'text-stone-500 dark:text-stone-400'}
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -884,8 +903,8 @@ function RouteListItem({
         <ChevronDown
           size={18}
           className={clsx(
-            'shrink-0 text-stone-300 dark:text-stone-600 transition-transform',
-            selected && 'rotate-180 text-violet-500',
+            'shrink-0 text-stone-300 dark:text-stone-600 transition-transform duration-200',
+            selected && 'rotate-180 text-primary-600 dark:text-primary-400',
           )}
           aria-hidden
         />
@@ -916,34 +935,42 @@ function RouteTableRow({
       className={clsx(
         'cursor-pointer transition-colors border-b border-stone-100 dark:border-stone-800',
         selected
-          ? 'bg-violet-50 dark:bg-violet-950/30'
+          ? 'bg-primary-50/80 dark:bg-primary-950/25 shadow-[inset_3px_0_0_0] shadow-primary-500 dark:shadow-primary-400'
           : 'hover:bg-stone-50 dark:hover:bg-stone-800/50',
       )}
     >
-      <td className="px-4 py-2.5 max-w-[260px]">
-        <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{route.name}</p>
-        <p translate="no" className={clsx('font-mono text-[11px] font-semibold tabular-nums mt-0.5', selected ? 'text-violet-700 dark:text-violet-300' : 'text-stone-500 dark:text-stone-400')}>
+      <td className="px-4 py-2.5 align-middle">
+        <span
+          translate="no"
+          className={clsx(
+            'font-mono text-xs font-semibold tabular-nums block truncate',
+            selected ? 'text-primary-700 dark:text-primary-300' : 'text-stone-600 dark:text-stone-400',
+          )}
+        >
           {route.code}
-        </p>
+        </span>
       </td>
-      <td className="px-4 py-2.5 whitespace-nowrap">
+      <td className="px-4 py-2.5 align-middle min-w-0">
+        <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{route.name}</p>
+      </td>
+      <td className="px-4 py-2.5 align-middle whitespace-nowrap">
         <RouteStatusBadge status={route.status} />
       </td>
-      <td className="px-4 py-2.5 whitespace-nowrap text-xs text-stone-500 dark:text-stone-400 tabular-nums">
+      <td className="px-4 py-2.5 align-middle whitespace-nowrap text-xs text-stone-500 dark:text-stone-400 tabular-nums">
         {fecha}
       </td>
-      <td className="px-4 py-2.5 whitespace-nowrap text-xs text-stone-600 dark:text-stone-300 tabular-nums text-right">
+      <td className="px-4 py-2.5 align-middle whitespace-nowrap text-xs text-stone-600 dark:text-stone-300 tabular-nums text-right">
         {agg.pedidos}
       </td>
-      <td className="px-4 py-2.5 whitespace-nowrap text-xs text-stone-600 dark:text-stone-300 tabular-nums text-right">
+      <td className="px-4 py-2.5 align-middle whitespace-nowrap text-xs text-stone-600 dark:text-stone-300 tabular-nums text-right">
         {agg.bultos}
       </td>
-      <td className="px-4 py-2.5 max-w-[130px]">
+      <td className="px-4 py-2.5 align-middle min-w-0">
         <span translate="no" className="text-xs text-stone-500 dark:text-stone-400 font-mono truncate block">
           {agg.vehiclesLabel || '—'}
         </span>
       </td>
-      <td className="px-4 py-2.5 max-w-[140px]">
+      <td className="px-4 py-2.5 align-middle min-w-0">
         <span className="text-xs text-stone-500 dark:text-stone-400 truncate block">
           {agg.driversLabel || '—'}
         </span>
@@ -959,7 +986,7 @@ function OrderCardAction({
   active = false,
   loading = false,
   disabled = false,
-  tone = 'violet',
+  tone = 'default',
 }: {
   icon: ReactNode;
   label: string;
@@ -967,7 +994,7 @@ function OrderCardAction({
   active?: boolean;
   loading?: boolean;
   disabled?: boolean;
-  tone?: 'violet' | 'danger';
+  tone?: 'default' | 'danger';
 }) {
   return (
     <button
@@ -976,17 +1003,19 @@ function OrderCardAction({
       disabled={disabled || loading}
       aria-label={label}
       className={clsx(
-        'inline-flex items-center justify-center gap-1 min-w-[4.25rem] rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+        'glass-btn inline-flex flex-1 items-center justify-center gap-1.5 min-h-[2rem] rounded-lg px-2 py-1.5 text-xs font-medium',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-stone-950',
         tone === 'danger'
-          ? 'bg-red-50 text-red-700 hover:bg-red-100 focus-visible:ring-red-400 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/60'
+          ? 'glass-btn--danger focus-visible:ring-red-400'
           : active
-            ? 'bg-violet-200 text-violet-900 focus-visible:ring-violet-500 dark:bg-violet-900/60 dark:text-violet-100'
-            : 'bg-violet-100/90 text-violet-800 hover:bg-violet-200/90 focus-visible:ring-violet-400 dark:bg-violet-950/50 dark:text-violet-200 dark:hover:bg-violet-900/50',
+            ? 'glass-btn--active focus-visible:ring-[#FF7B00]/50'
+            : 'focus-visible:ring-[#FF7B00]/45',
         (disabled || loading) && 'opacity-50 cursor-not-allowed',
       )}
     >
-      <span aria-hidden="true">{icon}</span>
+      <span className="shrink-0" aria-hidden="true">
+        {icon}
+      </span>
       <span>{loading ? '…' : label}</span>
     </button>
   );
@@ -1170,20 +1199,53 @@ function RouteForm({
 
 function RouteDetailPlaceholder() {
   return (
-    <div className="flex flex-1 min-h-0 flex-col items-center justify-center px-6 py-20 text-center gap-3">
-      <RouteIcon size={40} className="text-stone-300 dark:text-stone-600" aria-hidden />
-      <div className="space-y-1.5">
-        <p className="text-sm font-medium text-stone-500 dark:text-stone-400">Selecciona una ruta</p>
-        <p className="text-[11px] text-stone-400 dark:text-stone-500 max-w-[200px] text-pretty">
-          El detalle y los pedidos aparecerán aquí.
-        </p>
+    <div className="flex flex-1 min-h-0 flex-col items-center justify-center p-6">
+      <div className="glass-card w-full max-w-sm p-8 text-center space-y-5">
+        <div
+          className="mx-auto size-14 rounded-2xl bg-stone-100 dark:bg-stone-800/80 border border-stone-200/80 dark:border-stone-700 flex items-center justify-center"
+          aria-hidden
+        >
+          <RouteIcon size={28} className="text-stone-500 dark:text-stone-400" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-base font-semibold text-stone-800 dark:text-stone-100">
+            Selecciona una ruta
+          </h2>
+          <p className="text-sm text-stone-500 dark:text-stone-400 text-pretty leading-relaxed">
+            El detalle, pedidos y asignaciones aparecerán en este panel.
+          </p>
+        </div>
+        <ul className="text-left text-xs text-stone-500 dark:text-stone-400 space-y-2.5 pt-1">
+          <li className="flex items-start gap-2">
+            <LayoutList size={14} className="shrink-0 mt-0.5 text-primary-500" aria-hidden />
+            <span>Haz clic en una ruta del listado central.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Package size={14} className="shrink-0 mt-0.5 text-primary-500" aria-hidden />
+            <span>Gestiona pedidos, choferes y vehículos por entrega.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="shrink-0 mt-0.5 w-3.5 h-3.5 rounded-sm border border-stone-300 dark:border-stone-600" aria-hidden />
+            <span>Arrastra el borde izquierdo para ampliar este panel.</span>
+          </li>
+        </ul>
       </div>
     </div>
   );
 }
 
 /** Panel lateral: detalle de ruta y gestión de pedidos (estilo container). */
-function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () => void }) {
+function RouteDetailSidePanel({
+  route,
+  onClose,
+  fullscreen,
+  onToggleFullscreen,
+}: {
+  route: Route;
+  onClose: () => void;
+  fullscreen?: boolean;
+  onToggleFullscreen?: () => void;
+}) {
   const { user } = useAuthStore();
   const canManage = user?.role === 'admin' || user?.role === 'operator';
   const { orders, assignToRoute, detachOrderFromRoute, fetchOrders, addOrder, updateOrder } = useOrderStore();
@@ -1220,7 +1282,15 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
     orderId: string;
     plate: string;
     otherCodes: string[];
+    bulk?: boolean;
+    bulkOrderIds?: string[];
   } | null>(null);
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkDraftDriver, setBulkDraftDriver] = useState('');
+  const [bulkDraftPeoneta, setBulkDraftPeoneta] = useState('');
+  const [bulkDraftVehicle, setBulkDraftVehicle] = useState('');
+  const [bulkAssignBusy, setBulkAssignBusy] = useState(false);
 
   const assigned = useMemo(
     () =>
@@ -1422,6 +1492,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
   };
 
   const handleOpenOrderAssign = (o: Order) => {
+    if (bulkAssignOpen) closeBulkAssign();
     setEditingOrderId(null);
     setExpandedOrderId(o.id);
     setOrderDraftDriver(o.driverId ?? '');
@@ -1495,6 +1566,108 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
     setOrderDraftPeoneta('');
     setOrderDraftVehicle('');
     setOrderApplyToAll(false);
+  };
+
+  const closeBulkAssign = () => {
+    setBulkAssignOpen(false);
+    setBulkSelectedIds(new Set());
+    setBulkDraftDriver('');
+    setBulkDraftPeoneta('');
+    setBulkDraftVehicle('');
+  };
+
+  const openBulkAssign = () => {
+    handleCancelOrderAssign();
+    setEditingOrderId(null);
+    setBulkAssignOpen(true);
+    setBulkSelectedIds(new Set(assigned.map((o) => o.id)));
+  };
+
+  const toggleBulkOrder = (orderId: string) => {
+    setBulkSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  const selectAllBulk = () => setBulkSelectedIds(new Set(assigned.map((o) => o.id)));
+  const selectNoneBulk = () => setBulkSelectedIds(new Set());
+
+  const performBulkAssignment = async (orderIds: string[]) => {
+    setBulkAssignBusy(true);
+    setActionError(null);
+    try {
+      const d = bulkDraftDriver ? driversList.find((u) => u.id === bulkDraftDriver) : null;
+      const pe = bulkDraftPeoneta ? peonetasList.find((u) => u.id === bulkDraftPeoneta) : null;
+      const v = bulkDraftVehicle ? vehiclesSorted.find((x) => x.id === bulkDraftVehicle) : null;
+
+      await assignDriverToOrders(route.id, {
+        driverId: d ? d.id : null,
+        driverName: d ? d.name : null,
+        peonetaId: pe ? pe.id : null,
+        peonetaName: pe ? pe.name : null,
+        vehicleId: v ? v.id : null,
+        vehiclePlate: v ? v.plate : null,
+        orderIds,
+      });
+      await fetchOrders();
+      closeBulkAssign();
+      toast.info(
+        orderIds.length === assigned.length
+          ? 'Asignación aplicada a toda la ruta'
+          : `Asignación aplicada a ${orderIds.length} pedido${orderIds.length === 1 ? '' : 's'}`,
+      );
+    } catch {
+      setActionError('No se pudo aplicar la asignación masiva.');
+    } finally {
+      setBulkAssignBusy(false);
+    }
+  };
+
+  const handleBulkApplySelected = () => {
+    const ids = [...bulkSelectedIds];
+    if (ids.length === 0) {
+      setActionError('Selecciona al menos un pedido.');
+      return;
+    }
+    if (!bulkDraftDriver && !bulkDraftPeoneta && !bulkDraftVehicle) {
+      setActionError('Elige chofer, peoneta o vehículo para aplicar.');
+      return;
+    }
+    const v = bulkDraftVehicle ? vehiclesSorted.find((x) => x.id === bulkDraftVehicle) : null;
+    if (v && ids.length > 1) {
+      setSameVehicleConfirm({
+        orderId: ids[0]!,
+        plate: v.plate,
+        otherCodes: assigned.filter((o) => ids.includes(o.id)).map((o) => o.code),
+        bulk: true,
+        bulkOrderIds: ids,
+      });
+      return;
+    }
+    void performBulkAssignment(ids);
+  };
+
+  const handleBulkApplyAllRoute = () => {
+    if (!bulkDraftDriver && !bulkDraftPeoneta && !bulkDraftVehicle) {
+      setActionError('Elige chofer, peoneta o vehículo para aplicar.');
+      return;
+    }
+    const allIds = assigned.map((o) => o.id);
+    const v = bulkDraftVehicle ? vehiclesSorted.find((x) => x.id === bulkDraftVehicle) : null;
+    if (v && assigned.length > 1) {
+      setSameVehicleConfirm({
+        orderId: assigned[0]!.id,
+        plate: v.plate,
+        otherCodes: assigned.map((o) => o.code),
+        bulk: true,
+        bulkOrderIds: allIds,
+      });
+      return;
+    }
+    void performBulkAssignment(allIds);
   };
 
   const getSameVehicleConflict = (
@@ -1654,30 +1827,42 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
   return (
     <>
       <div
-        className="flex flex-col h-full min-h-0 w-full overflow-hidden bg-stone-50 dark:bg-[#0d0d0d]"
+        className="flex flex-col h-full min-h-0 w-full overflow-hidden bg-white/30 dark:bg-stone-950/20 backdrop-blur-md"
         role="complementary"
         aria-label={`Detalle de ruta ${route.code}`}
       >
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-[#111] shrink-0 shadow-sm dark:shadow-none">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-stone-200/70 dark:border-stone-800/70 bg-white/60 dark:bg-stone-950/35 backdrop-blur-md shrink-0 shadow-sm">
           <button
             type="button"
             onClick={onClose}
-            className="lg:hidden p-2 -ml-1 rounded-lg text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+            className="lg:hidden p-2 -ml-1 rounded-lg text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             aria-label="Volver al listado"
           >
             <ArrowLeft size={20} aria-hidden />
           </button>
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Package size={16} className="text-violet-500 shrink-0" aria-hidden />
+            <Package size={16} className="text-primary-600 dark:text-primary-400 shrink-0" aria-hidden />
             <span className="text-sm font-semibold text-stone-800 dark:text-stone-100 truncate">
               Detalle de ruta
             </span>
           </div>
+          {onToggleFullscreen ? (
+            <button
+              type="button"
+              onClick={onToggleFullscreen}
+              className="hidden lg:flex shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 dark:hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              aria-label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+              title={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+              aria-pressed={fullscreen}
+            >
+              {fullscreen ? <Minimize2 size={18} aria-hidden /> : <Maximize2 size={18} aria-hidden />}
+            </button>
+          ) : null}
           {canManage ? (
             <button
               type="button"
               onClick={() => setTrackingRouteOpen(true)}
-              className="shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-violet-700 hover:bg-violet-50 dark:hover:bg-violet-950/40 dark:hover:text-violet-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+              className="shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 dark:hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
               aria-label="Enviar seguimiento de ruta"
               title="Enviar seguimiento de ruta"
             >
@@ -1689,7 +1874,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
               <button
                 type="button"
                 onClick={() => setEditRouteOpen(true)}
-                className="shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 dark:hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                className="shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 dark:hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 aria-label="Editar ruta"
               >
                 <Pencil size={18} aria-hidden />
@@ -1708,7 +1893,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
           <button
             type="button"
             onClick={onClose}
-            className="hidden lg:flex shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800 dark:hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            className="hidden lg:flex shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800 dark:hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             aria-label="Cerrar panel"
           >
             <X size={18} aria-hidden />
@@ -1809,7 +1994,105 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
             <h3 className="text-[10px] font-semibold text-stone-500 dark:text-stone-500 uppercase tracking-wider">
               Pedidos en ruta
             </h3>
+            {canManage && assigned.length > 0 ? (
+              <Button
+                type="button"
+                variant={bulkAssignOpen ? 'primary' : 'secondary'}
+                size="sm"
+                icon={<ListChecks size={14} aria-hidden />}
+                onClick={() => (bulkAssignOpen ? closeBulkAssign() : openBulkAssign())}
+                disabled={bulkAssignBusy || orderAssignBusy !== null}
+                aria-pressed={bulkAssignOpen}
+              >
+                {bulkAssignOpen ? 'Salir masivo' : 'Asignación masiva'}
+              </Button>
+            ) : null}
           </div>
+
+          {bulkAssignOpen && assigned.length > 0 ? (
+            <div className="rounded-xl border border-stone-200/90 dark:border-stone-700 bg-stone-50/80 dark:bg-stone-900/50 px-3 py-3 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-stone-800 dark:text-stone-200">
+                  Asignación masiva
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={selectAllBulk}
+                    disabled={bulkAssignBusy}
+                  >
+                    Todos
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={selectNoneBulk}
+                    disabled={bulkAssignBusy}
+                  >
+                    Ninguno
+                  </Button>
+                </div>
+              </div>
+              <p className="text-[11px] text-stone-600 dark:text-stone-400 tabular-nums">
+                {bulkSelectedIds.size} de {assigned.length} seleccionado
+                {bulkSelectedIds.size === 1 ? '' : 's'}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Select
+                  id="bulk-driver"
+                  label="Chofer"
+                  value={bulkDraftDriver}
+                  onChange={(e) => setBulkDraftDriver(e.target.value)}
+                  options={driverSelectOpts}
+                  disabled={bulkAssignBusy}
+                  autoComplete="off"
+                />
+                <Select
+                  id="bulk-peoneta"
+                  label="Peoneta"
+                  value={bulkDraftPeoneta}
+                  onChange={(e) => setBulkDraftPeoneta(e.target.value)}
+                  options={peonetaSelectOpts}
+                  disabled={bulkAssignBusy}
+                  autoComplete="off"
+                />
+                <Select
+                  id="bulk-vehicle"
+                  label="Vehículo"
+                  value={bulkDraftVehicle}
+                  onChange={(e) => setBulkDraftVehicle(e.target.value)}
+                  options={vehicleSelectOpts}
+                  disabled={bulkAssignBusy}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  loading={bulkAssignBusy}
+                  disabled={bulkAssignBusy || bulkSelectedIds.size === 0}
+                  onClick={handleBulkApplySelected}
+                >
+                  Aplicar a {bulkSelectedIds.size} seleccionado
+                  {bulkSelectedIds.size === 1 ? '' : 's'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={bulkAssignBusy}
+                  onClick={handleBulkApplyAllRoute}
+                >
+                  Aplicar a toda la ruta
+                </Button>
+                <Button type="button" variant="ghost" disabled={bulkAssignBusy} onClick={closeBulkAssign}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           {actionError ? (
             <p
@@ -1827,72 +2110,116 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
           ) : (
             <ul className="space-y-2">
               {assigned.map((o) => {
-                const destLabel = [o.clientName?.trim() || 'Destinatario por confirmar', o.destination.city]
-                  .filter(Boolean)
-                  .join(' · ');
+                const destinatario = o.clientName?.trim() || 'Por confirmar';
+                const city = o.destination.city?.trim() || '—';
                 const isAssignOpen = expandedOrderId === o.id;
                 const isEditOpen = editingOrderId === o.id;
                 const vehicleWarn = isAssignOpen ? getSameVehicleConflict(o.id) : null;
+                const hasAssignment =
+                  Boolean(o.driverName?.trim()) ||
+                  Boolean(o.peonetaName?.trim()) ||
+                  Boolean(o.vehiclePlate?.trim());
+
+                const isBulkSelected = bulkSelectedIds.has(o.id);
 
                 return (
                   <li
                     key={o.id}
-                    className={clsx(containerCard, 'overflow-hidden')}
+                    className={clsx(
+                      'glass-card-order overflow-hidden',
+                      bulkAssignOpen && isBulkSelected && 'ring-2 ring-primary-500/50 dark:ring-primary-400/45',
+                    )}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3 py-2.5">
-                      <div className="size-8 shrink-0 rounded-md bg-stone-100 border border-stone-200 dark:bg-stone-800 dark:border-stone-700 flex items-center justify-center" aria-hidden>
-                        <Package size={14} className="text-stone-500 dark:text-stone-500" />
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-0.5">
-                        <p translate="no" className="font-mono text-sm font-bold text-stone-900 dark:text-white">
+                    <div className="p-3 space-y-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        {bulkAssignOpen ? (
                           <button
                             type="button"
-                            onClick={() => {
-                              setEditingOrderId(null);
-                              setDetailOrder(o);
-                            }}
-                            className="hover:text-violet-600 dark:hover:text-violet-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 rounded"
-                            title="Ver detalle del pedido"
+                            role="checkbox"
+                            aria-checked={isBulkSelected}
+                            aria-label={`Seleccionar pedido ${o.code}`}
+                            onClick={() => toggleBulkOrder(o.id)}
+                            className="shrink-0 mt-0.5 p-0.5 rounded-md text-primary-600 dark:text-primary-400 hover:bg-stone-100 dark:hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                           >
-                            {o.code}
+                            {isBulkSelected ? (
+                              <CheckSquare size={20} aria-hidden />
+                            ) : (
+                              <Square size={20} className="text-stone-400" aria-hidden />
+                            )}
                           </button>
-                        </p>
-                        <p className="text-[11px] text-stone-500 dark:text-stone-500 truncate flex items-center gap-1">
-                          <MapPin size={10} className="shrink-0" aria-hidden />
-                          {destLabel}
-                        </p>
-                        <p className="text-sm font-semibold text-stone-700 dark:text-stone-200 tabular-nums pt-0.5">
-                          {o.bultos} bultos
-                        </p>
-                        <div className="flex flex-wrap gap-1.5 pt-1.5">
-                          {o.driverName ? (
-                            <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
-                              <UserCircle size={12} aria-hidden /> {o.driverName}
+                        ) : null}
+                        <div
+                          className="size-9 shrink-0 rounded-xl glass-icon-chip flex items-center justify-center"
+                          aria-hidden
+                        >
+                          <Package size={16} className="text-stone-600 dark:text-stone-300" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <button
+                              type="button"
+                              translate="no"
+                              onClick={() => {
+                                setEditingOrderId(null);
+                                setDetailOrder(o);
+                              }}
+                              className="font-mono text-sm font-bold text-stone-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+                              title="Ver detalle del pedido"
+                            >
+                              {o.code}
+                            </button>
+                            <span className="shrink-0 rounded-lg bg-stone-100/90 dark:bg-stone-800/90 px-2 py-0.5 text-xs font-semibold text-stone-700 dark:text-stone-200 tabular-nums">
+                              {o.bultos} bulto{o.bultos === 1 ? '' : 's'}
+                            </span>
+                          </div>
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-500 mt-1.5">
+                            Destinatario
+                          </p>
+                          <p className="text-sm font-medium text-stone-800 dark:text-stone-100 truncate">
+                            {destinatario}
+                          </p>
+                          <p className="text-xs text-stone-500 dark:text-stone-400 flex items-center gap-1 mt-0.5 min-w-0">
+                            <MapPin size={12} className="shrink-0" aria-hidden />
+                            <span className="truncate">{city}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {hasAssignment || orderAssignSaved === o.id ? (
+                        <div className="flex flex-wrap gap-1.5 pl-12">
+                          {o.driverName?.trim() ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50/90 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:text-blue-200">
+                              <UserCircle size={11} aria-hidden />
+                              <span className="truncate max-w-[8rem]">{o.driverName.trim()}</span>
                             </span>
                           ) : null}
-                          {o.peonetaName ? (
-                            <span className="inline-flex items-center gap-1 rounded-lg bg-violet-50 dark:bg-violet-950/40 px-2.5 py-1 text-xs font-medium text-violet-700 dark:text-violet-300">
-                              {o.peonetaName}
+                          {o.peonetaName?.trim() ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-stone-100/90 dark:bg-stone-800/90 border border-stone-200/80 dark:border-stone-600/70 px-2 py-0.5 text-[11px] font-medium text-stone-700 dark:text-stone-200">
+                              <span className="truncate max-w-[8rem]">{o.peonetaName.trim()}</span>
                             </span>
                           ) : null}
                           {o.vehiclePlate?.trim() ? (
                             <span
                               translate="no"
-                              className="inline-flex items-center gap-1 rounded-lg bg-stone-100 dark:bg-stone-800 px-2.5 py-1 text-xs font-mono font-medium text-stone-700 dark:text-stone-200"
+                              className="inline-flex items-center gap-1 rounded-md bg-stone-100/90 dark:bg-stone-800/90 border border-stone-200/80 dark:border-stone-700 px-2 py-0.5 text-[11px] font-mono font-medium text-stone-700 dark:text-stone-200"
                             >
-                              <Truck size={12} aria-hidden /> {o.vehiclePlate.trim()}
+                              <Truck size={11} aria-hidden />
+                              {o.vehiclePlate.trim()}
                             </span>
                           ) : null}
                           {orderAssignSaved === o.id ? (
-                            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">✓ Guardado</span>
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                              <Check size={11} aria-hidden />
+                              Guardado
+                            </span>
                           ) : null}
                         </div>
-                      </div>
+                      ) : null}
 
-                      {canManage ? (
-                        <div className="flex flex-row flex-wrap sm:flex-nowrap items-center gap-2 shrink-0 sm:pl-2">
+                      {canManage && !bulkAssignOpen ? (
+                        <div className="flex gap-2 pt-1 border-t border-stone-200/70 dark:border-stone-800/70">
                           <OrderCardAction
-                            icon={<UserCircle size={16} />}
+                            icon={<UserCircle size={15} />}
                             label="Asignar"
                             active={isAssignOpen}
                             onClick={() =>
@@ -1901,14 +2228,14 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
                             disabled={busyId !== null && busyId !== o.id}
                           />
                           <OrderCardAction
-                            icon={<Pencil size={16} />}
+                            icon={<Pencil size={15} />}
                             label="Editar"
                             active={isEditOpen}
                             onClick={() => handleOpenOrderEdit(o)}
                             disabled={busyId !== null && busyId !== o.id}
                           />
                           <OrderCardAction
-                            icon={<Unlink size={16} />}
+                            icon={<Unlink size={15} />}
                             label="Quitar"
                             tone="danger"
                             loading={busyId === o.id}
@@ -1916,8 +2243,12 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
                             disabled={busyId !== null && busyId !== o.id}
                           />
                         </div>
+                      ) : canManage && bulkAssignOpen ? (
+                        <p className="text-[11px] text-stone-500 dark:text-stone-400 pt-1 border-t border-stone-200/70 dark:border-stone-800/70">
+                          Marca los pedidos y usa el panel de arriba para asignar.
+                        </p>
                       ) : (
-                        <Button type="button" variant="secondary" size="sm" onClick={() => setDetailOrder(o)}>
+                        <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => setDetailOrder(o)}>
                           Ver detalle
                         </Button>
                       )}
@@ -1973,7 +2304,7 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
                             checked={orderApplyToAll}
                             onChange={(e) => setOrderApplyToAll(e.target.checked)}
                             disabled={orderAssignBusy !== null}
-                            className="h-4 w-4 rounded border-stone-300 dark:border-stone-600 accent-violet-600"
+                            className="h-4 w-4 rounded border-stone-300 dark:border-stone-600 accent-primary-600"
                           />
                           Aplicar a todos los pedidos de esta ruta
                         </label>
@@ -2023,15 +2354,15 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
           )}
 
           {canManage ? (
-            <div className="space-y-3 pt-2 border-t border-stone-200 dark:border-stone-800">
+            <div className="space-y-3 pt-3 mt-1 rounded-xl border border-stone-200/90 dark:border-stone-700 bg-stone-50/70 dark:bg-stone-900/45 px-3 py-3 shadow-sm dark:shadow-none">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-xs font-semibold text-stone-800 dark:text-stone-200">Nuevo pedido</h3>
-                  <p className="text-[11px] text-stone-500 mt-0.5">Vinculado a esta ruta.</p>
+                  <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Nuevo pedido</h3>
+                  <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Vinculado a esta ruta.</p>
                 </div>
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant={showCreateForm ? 'secondary' : 'primary'}
                   size="sm"
                   icon={showCreateForm ? <ChevronUp size={18} aria-hidden /> : <Plus size={18} aria-hidden />}
                   aria-expanded={showCreateForm}
@@ -2180,16 +2511,25 @@ function RouteDetailSidePanel({ route, onClose }: { route: Route; onClose: () =>
         open={sameVehicleConfirm !== null}
         onClose={() => setSameVehicleConfirm(null)}
         onConfirm={() => {
-          const id = sameVehicleConfirm?.orderId;
+          const conf = sameVehicleConfirm;
           setSameVehicleConfirm(null);
-          if (id) void performSaveOrderAssignment(id);
+          if (!conf) return;
+          if (conf.bulk && conf.bulkOrderIds?.length) {
+            void performBulkAssignment(conf.bulkOrderIds);
+            return;
+          }
+          if (conf.orderId) void performSaveOrderAssignment(conf.orderId);
         }}
         title="Mismo vehículo en varios pedidos"
         message={
           sameVehicleConfirm
-            ? orderApplyToAll
-              ? `¿Estás seguro de asignar el mismo vehículo (${sameVehicleConfirm.plate}) a los ${sameVehicleConfirm.otherCodes.length} pedidos de esta ruta?`
-              : `¿Estás seguro de asignar el mismo vehículo (${sameVehicleConfirm.plate})? Ya está en el pedido ${sameVehicleConfirm.otherCodes.join(', ')}.`
+            ? sameVehicleConfirm.bulk
+              ? sameVehicleConfirm.bulkOrderIds?.length === assigned.length
+                ? `¿Asignar el mismo vehículo (${sameVehicleConfirm.plate}) a los ${assigned.length} pedidos de esta ruta?`
+                : `¿Asignar el mismo vehículo (${sameVehicleConfirm.plate}) a ${sameVehicleConfirm.bulkOrderIds?.length ?? 0} pedidos seleccionados?`
+              : orderApplyToAll
+                ? `¿Estás seguro de asignar el mismo vehículo (${sameVehicleConfirm.plate}) a los ${sameVehicleConfirm.otherCodes.length} pedidos de esta ruta?`
+                : `¿Estás seguro de asignar el mismo vehículo (${sameVehicleConfirm.plate})? Ya está en el pedido ${sameVehicleConfirm.otherCodes.join(', ')}.`
             : ''
         }
         confirmLabel="Sí, asignar igual"
@@ -2261,12 +2601,31 @@ export function RoutesPage() {
   });
   const { width: detailPanelWidth, commit: commitPanelWidth } = usePanelWidth();
   const pendingWidth = useRef(detailPanelWidth);
+  useEffect(() => {
+    pendingWidth.current = detailPanelWidth;
+  }, [detailPanelWidth]);
+
   const handlePanelResize = useCallback((delta: number) => {
-    pendingWidth.current = Math.min(PANEL_MAX, Math.max(PANEL_MIN, pendingWidth.current + delta));
+    pendingWidth.current = clampPanelWidth(pendingWidth.current + delta);
     commitPanelWidth(pendingWidth.current);
   }, [commitPanelWidth]);
   const [newRouteError, setNewRouteError] = useState<string | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
+  const [detailPanelFullscreen, setDetailPanelFullscreen] = useState(false);
+
+  const closeDetailPanel = useCallback(() => {
+    setDetailPanelFullscreen(false);
+    setSelectedRoute(null);
+  }, []);
+
+  useEffect(() => {
+    if (!detailPanelFullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDetailPanelFullscreen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [detailPanelFullscreen]);
 
   useEffect(() => {
     setSelectedRoute((prev) => {
@@ -2391,11 +2750,12 @@ export function RoutesPage() {
   );
 
   const panelOpen = selectedRoute !== null;
+  const panelFullscreenActive = panelOpen && detailPanelFullscreen;
 
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full overflow-hidden -mx-6 -mb-6 -mt-1">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 flex-wrap px-6 pt-1 pb-3 shrink-0 border-b border-stone-200/80 dark:border-stone-800/80 bg-stone-50/80 dark:bg-stone-950/80">
+      <div className="flex items-center gap-2 flex-wrap px-6 pt-1 pb-3 shrink-0 border-b border-stone-200/80 dark:border-stone-800/80 glass backdrop-blur-md">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" aria-hidden />
           <input
@@ -2405,7 +2765,7 @@ export function RoutesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoComplete="off"
-            className="w-full pl-8 pr-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
+            className="w-full pl-8 pr-3 py-2 bg-white/70 dark:bg-stone-950/40 border border-stone-300/80 dark:border-stone-700/70 rounded-lg text-sm text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm backdrop-blur-md"
           />
         </div>
 
@@ -2488,7 +2848,7 @@ export function RoutesPage() {
       </div>
 
       {showFilters ? (
-        <div className="mx-6 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-4 shadow-sm space-y-3 shrink-0">
+        <div className="mx-6 rounded-xl glass backdrop-blur-md p-4 shadow-sm space-y-3 shrink-0">
           <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Estado de la ruta</p>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -2548,8 +2908,9 @@ export function RoutesPage() {
         {/* Listado centrado */}
         <div
           className={clsx(
-            'flex flex-col min-w-0 flex-1 transition-opacity',
-            panelOpen && 'max-lg:hidden',
+            'flex flex-col min-w-0 flex-1',
+            panelOpen && !detailPanelFullscreen && 'max-lg:hidden',
+            panelFullscreenActive && 'hidden',
           )}
         >
           <div className="route-list-scroll flex-1 min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y px-4 sm:px-6 lg:px-8 py-4">
@@ -2625,19 +2986,29 @@ export function RoutesPage() {
                 {layout === 'table' && (
                   <div className="rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden shadow-sm">
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left">
+                      <table className="w-full min-w-[880px] text-left table-fixed">
+                        <colgroup>
+                          <col className="w-[7.5rem]" />
+                          <col className="w-auto" />
+                          <col className="w-[7.5rem]" />
+                          <col className="w-[6.5rem]" />
+                          <col className="w-[4.5rem]" />
+                          <col className="w-[4.5rem]" />
+                          <col className="w-[6.5rem]" />
+                          <col className="w-[8rem]" />
+                        </colgroup>
                         <thead className="bg-stone-50 dark:bg-stone-800/70 border-b border-stone-200 dark:border-stone-700">
                           <tr>
                             {[
-                              { label: 'Folio', col: 'code' as RouteSortKey },
-                              { label: 'Nombre', col: null },
-                              { label: 'Estado', col: 'status' as RouteSortKey },
-                              { label: 'Fecha', col: 'fecha' as RouteSortKey },
-                              { label: 'Pedidos', col: 'pedidos' as RouteSortKey },
-                              { label: 'Bultos', col: null },
-                              { label: 'Vehículo', col: null },
-                              { label: 'Chofer', col: null },
-                            ].map(({ label, col }) => (
+                              { label: 'Folio', col: 'code' as RouteSortKey, align: 'left' as const },
+                              { label: 'Nombre', col: 'name' as RouteSortKey, align: 'left' as const },
+                              { label: 'Estado', col: 'status' as RouteSortKey, align: 'left' as const },
+                              { label: 'Fecha', col: 'fecha' as RouteSortKey, align: 'left' as const },
+                              { label: 'Pedidos', col: 'pedidos' as RouteSortKey, align: 'right' as const },
+                              { label: 'Bultos', col: 'bultos' as RouteSortKey, align: 'right' as const },
+                              { label: 'Vehículo', col: 'vehiclePlate' as RouteSortKey, align: 'left' as const },
+                              { label: 'Chofer', col: 'driverName' as RouteSortKey, align: 'left' as const },
+                            ].map(({ label, col, align }) => (
                               <th
                                 key={label}
                                 scope="col"
@@ -2648,7 +3019,7 @@ export function RoutesPage() {
                                 className={clsx(
                                   'px-4 py-2.5 text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide whitespace-nowrap',
                                   col && 'cursor-pointer hover:text-stone-700 dark:hover:text-stone-200 select-none',
-                                  label === 'Pedidos' || label === 'Bultos' ? 'text-right' : '',
+                                  align === 'right' ? 'text-right' : 'text-left',
                                 )}
                               >
                                 <span className="inline-flex items-center gap-1">
@@ -2685,32 +3056,44 @@ export function RoutesPage() {
           </div>
         </div>
 
-        {/* Handle de resize (solo desktop) */}
-        <PanelResizeHandle onResize={handlePanelResize} />
+        {/* Handle de resize (solo desktop, no en pantalla completa) */}
+        {!panelFullscreenActive ? (
+          <PanelResizeHandle onResize={handlePanelResize} />
+        ) : null}
 
         {/* Columna derecha: misma caja en vacío o con detalle; scroll solo dentro del panel */}
         <div
-          style={{ width: detailPanelWidth }}
+          style={panelFullscreenActive ? undefined : { width: detailPanelWidth }}
           className={clsx(
             'flex flex-col min-h-0 max-h-full shrink-0 overflow-hidden',
-            selectedRoute
-              ? [
-                  'w-full max-lg:fixed max-lg:inset-0 max-lg:z-50 max-lg:h-dvh max-lg:max-h-dvh',
-                  'lg:h-full lg:relative',
-                  'lg:border-stone-200/90 dark:lg:border-stone-800',
-                ]
-              : [
-                  'hidden lg:flex lg:h-full',
-                  'lg:border-dashed lg:border-stone-200 dark:lg:border-stone-800',
-                  'lg:bg-stone-100/80 lg:border-stone-200 dark:lg:bg-stone-900/30 dark:lg:border-stone-800',
-                ],
+            panelFullscreenActive
+              ? 'absolute inset-0 z-20 h-full w-full max-w-none bg-white/95 dark:bg-stone-950/95 backdrop-blur-md'
+              : selectedRoute
+                ? [
+                    'w-full max-lg:fixed max-lg:inset-0 max-lg:z-50 max-lg:h-dvh max-lg:max-h-dvh',
+                    'lg:h-full lg:relative',
+                    'lg:border-l lg:border-stone-200/70 dark:lg:border-stone-800/70',
+                    'lg:bg-white/35 dark:lg:bg-stone-950/25 backdrop-blur-md',
+                  ]
+                : [
+                    'hidden lg:flex lg:h-full',
+                    'lg:border-l lg:border-dashed lg:border-stone-200/70 dark:lg:border-stone-800/70',
+                    'lg:bg-white/20 dark:lg:bg-stone-950/10 backdrop-blur-md',
+                  ],
           )}
         >
           {selectedRoute ? (
-            <RouteDetailSidePanel
-              route={selectedRoute}
-              onClose={() => setSelectedRoute(null)}
-            />
+            <div
+              key={selectedRoute.id}
+              className="flex flex-col h-full min-h-0 w-full min-w-0 max-lg:animate-route-panel-enter-mobile lg:animate-route-panel-enter motion-reduce:animate-none"
+            >
+              <RouteDetailSidePanel
+                route={selectedRoute}
+                onClose={closeDetailPanel}
+                fullscreen={detailPanelFullscreen}
+                onToggleFullscreen={() => setDetailPanelFullscreen((v) => !v)}
+              />
+            </div>
           ) : (
             <RouteDetailPlaceholder />
           )}

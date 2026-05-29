@@ -37,7 +37,7 @@ export function AppLayout() {
   const isRoutesPage = location.pathname === '/rutas';
 
   return (
-    <div className="flex h-screen bg-stone-50 dark:bg-stone-950 overflow-hidden">
+    <div className="flex h-screen bg-canvas dark:bg-stone-950 overflow-hidden">
       {/* Skip link — accesibilidad teclado */}
       <a
         href="#main-content"
@@ -54,7 +54,7 @@ export function AppLayout() {
       {/* Content column */}
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
         {/* Mobile top bar */}
-        <div className="lg:hidden flex items-center gap-3 px-4 h-14 bg-white dark:bg-stone-900 border-b border-stone-200 dark:border-stone-800 flex-shrink-0">
+        <div className="lg:hidden flex items-center gap-3 px-4 h-14 bg-surface dark:bg-stone-900 border-b border-stone-200/80 dark:border-stone-800 flex-shrink-0 shadow-card dark:shadow-none">
           <button
             type="button"
             onClick={() => setMobileSidebarOpen(true)}
@@ -79,10 +79,10 @@ export function AppLayout() {
           className="flex flex-col flex-1 min-h-0 animate-page-enter motion-reduce:animate-none"
         >
           {/* Page title bar */}
-          <div className="bg-white dark:bg-stone-900 border-b border-stone-100 dark:border-stone-800 px-6 py-3 flex-shrink-0">
+          <div className="mx-6 mt-4 flex-shrink-0 bg-surface dark:bg-stone-900 rounded-2xl shadow-card border border-stone-200/60 dark:border-stone-800 dark:shadow-none px-6 py-3 lg:mx-4 lg:mt-3">
             <h1 className="text-base font-semibold text-stone-900 dark:text-stone-100">{pageInfo.title}</h1>
             {pageInfo.subtitle && (
-              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">{pageInfo.subtitle}</p>
+              <p className="text-xs text-stone-500 dark:text-stone-500 mt-0.5">{pageInfo.subtitle}</p>
             )}
           </div>
 
@@ -90,7 +90,7 @@ export function AppLayout() {
             id="main-content"
             tabIndex={-1}
             className={clsx(
-              'flex-1 min-h-0 p-6 bg-stone-50 dark:bg-stone-950 focus:outline-none',
+              'flex-1 min-h-0 px-6 pb-6 pt-4 bg-canvas dark:bg-stone-950 focus:outline-none',
               isRoutesPage ? 'overflow-hidden flex flex-col' : 'overflow-y-auto',
             )}
           >

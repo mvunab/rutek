@@ -75,6 +75,8 @@ export type AssignDriverToRouteInput = {
   /** UUID del vehículo (opcional). */
   vehicleId?: string | null;
   vehiclePlate?: string | null;
+  /** Si se indica, solo esos pedidos de la ruta (asignación masiva parcial). */
+  orderIds?: string[];
 };
 
 interface RouteStore {
@@ -193,6 +195,7 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
       if (input.peonetaName !== undefined) body.peoneta_name = input.peonetaName;
       if (input.vehicleId !== undefined) body.vehicle_id = input.vehicleId;
       if (input.vehiclePlate !== undefined) body.vehicle_plate = input.vehiclePlate;
+      if (input.orderIds?.length) body.order_ids = input.orderIds;
       await api.patch(`/routes/${routeId}/assign-driver`, body);
       // No llama fetchRoutes aquí — el caller es responsable de refrescar.
     } catch (err) {

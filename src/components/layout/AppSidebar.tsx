@@ -117,8 +117,11 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
 
   const accentBg = inSuperAdmin ? 'bg-violet-600' : 'bg-primary-700';
   const activeItemCls = inSuperAdmin
-    ? 'bg-violet-600 text-white shadow-sm'
-    : 'bg-primary-700 text-white shadow-sm';
+    ? 'bg-violet-50 text-violet-900 dark:bg-violet-600 dark:text-white dark:shadow-sm'
+    : 'bg-surface-muted text-stone-900 dark:bg-primary-700 dark:text-white dark:shadow-sm';
+  const activeIconCls = inSuperAdmin
+    ? 'text-violet-600 dark:text-white'
+    : 'text-primary-600 dark:text-white';
 
   const renderNav = (isMobile: boolean) => {
     const showLabels = isMobile || !collapsed;
@@ -209,7 +212,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
                     showLabels ? 'gap-3 px-3 py-2.5' : 'justify-center py-3',
                     isActive
                       ? activeItemCls
-                      : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800',
+                      : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-surface-hover dark:hover:bg-stone-800',
                   )}
                 >
                   {({ isActive }) => (
@@ -218,7 +221,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
                         aria-hidden="true"
                         className={clsx(
                           'flex-shrink-0 transition-colors duration-150',
-                          !isActive && 'text-stone-400 dark:text-stone-500',
+                          isActive ? activeIconCls : 'text-stone-400 dark:text-stone-500',
                         )}
                       >
                         {item.icon}
@@ -257,7 +260,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
                   'w-full flex items-center rounded-lg text-sm font-medium',
                   'transition-colors duration-150',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset',
-                  'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800',
+                  'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-surface-hover dark:hover:bg-stone-800',
                   showLabels ? 'gap-3 px-3 py-2.5' : 'justify-center py-3',
                 )}
               >
@@ -293,8 +296,8 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset',
                   showLabels ? 'gap-3 px-3 py-2.5' : 'justify-center py-3',
                   isActive
-                    ? 'bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100'
-                    : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800',
+                    ? 'bg-surface-muted text-stone-900 dark:bg-stone-800 dark:text-stone-100'
+                    : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-surface-hover dark:hover:bg-stone-800',
                 )}
               >
                 <Settings size={18} className="flex-shrink-0" aria-hidden="true" />
@@ -361,8 +364,11 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
       {/* ── Desktop sidebar ── */}
       <aside
         className={clsx(
-          'hidden lg:flex flex-col h-full flex-shrink-0 overflow-hidden',
-          'bg-white dark:bg-stone-900 border-r border-stone-200 dark:border-stone-800',
+          'hidden lg:flex flex-col flex-shrink-0 overflow-hidden',
+          'my-3 ml-3 h-[calc(100vh-1.5rem)]',
+          'bg-surface dark:bg-stone-900',
+          'rounded-2xl shadow-sidebar',
+          'dark:shadow-none dark:border dark:border-stone-800 dark:rounded-none dark:my-0 dark:ml-0 dark:h-full dark:border-r',
           'transition-[width] duration-200 ease-in-out',
           collapsed ? 'w-[68px]' : 'w-60',
         )}
@@ -388,7 +394,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
         aria-label="Menú lateral"
         className={clsx(
           'fixed inset-y-0 left-0 z-50 w-72 flex flex-col lg:hidden',
-          'bg-white dark:bg-stone-900 border-r border-stone-200 dark:border-stone-800',
+          'bg-surface dark:bg-stone-900',
           'transition-transform duration-200',
           mobileOpen ? 'translate-x-0 ease-out' : '-translate-x-full ease-in',
         )}

@@ -21,10 +21,10 @@ export function Card({ children, className, padding = 'md', hover, onClick }: Ca
     <div
       onClick={onClick}
       className={clsx(
-        'bg-white border border-stone-200 rounded-xl shadow-sm',
-        'dark:bg-stone-900 dark:border-stone-800',
+        'bg-surface border border-stone-200/80 rounded-2xl shadow-card',
+        'dark:bg-stone-900 dark:border-stone-800 dark:shadow-none',
         paddingClasses[padding],
-        hover && 'hover:border-stone-300 hover:shadow-md dark:hover:border-stone-600 transition-all duration-150 cursor-pointer',
+        hover && 'hover:border-stone-300 hover:shadow-soft dark:hover:border-stone-600 transition-[box-shadow,border-color] duration-150 cursor-pointer',
         onClick && 'cursor-pointer',
         className
       )}

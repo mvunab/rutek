@@ -17,9 +17,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const variantClasses: Record<ButtonVariant, string> = {
   primary: 'bg-primary-600 hover:bg-primary-700 text-white shadow-sm disabled:bg-primary-300',
   secondary:
-    'bg-white hover:bg-stone-50 text-stone-700 border border-stone-300 shadow-sm disabled:opacity-50 dark:bg-stone-900 dark:hover:bg-stone-800 dark:text-stone-200 dark:border-stone-600',
+    'bg-surface hover:bg-surface-hover text-stone-700 border border-stone-200 shadow-card disabled:opacity-50 dark:bg-stone-900 dark:hover:bg-stone-800 dark:text-stone-200 dark:border-stone-600 dark:shadow-none',
   ghost:
-    'hover:bg-stone-100 text-stone-600 hover:text-stone-900 disabled:text-stone-300 dark:hover:bg-stone-800 dark:text-stone-300 dark:hover:text-stone-100',
+    'hover:bg-surface-hover text-stone-600 hover:text-stone-900 disabled:text-stone-300 dark:hover:bg-stone-800 dark:text-stone-300 dark:hover:text-stone-100',
   danger:
     'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 disabled:opacity-50 dark:bg-red-950/40 dark:hover:bg-red-950/60 dark:border-red-900 dark:text-red-300',
   success:
