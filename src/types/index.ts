@@ -1,3 +1,35 @@
+// ─── Excel Format Config ──────────────────────────────────────────────────────
+export interface ExcelColumnMapping {
+  clientName?: number | null;
+  entrega?: number | null;
+  numeroOC?: number | null;
+  factura?: number | null;
+  refFactura?: number | null;
+  tipo?: number | null;
+  cajas?: number | null;
+  unidades?: number | null;
+}
+
+export interface ExcelCellPosition {
+  row: number;
+  col: number;
+}
+
+export interface ExcelFormatConfig {
+  id: string;
+  name: string;
+  active: boolean;
+  headerRow: number;
+  dataStartRow: number;
+  detection?: { row: number; col: number; value: string } | null;
+  columns: ExcelColumnMapping;
+  metadata?: {
+    routeNumber?: ExcelCellPosition | null;
+    date?: ExcelCellPosition | null;
+    driver?: ExcelCellPosition | null;
+  } | null;
+}
+
 // ─── Tenant / Multi-tenant ───────────────────────────────────────────────────
 export interface Tenant {
   id: string;
