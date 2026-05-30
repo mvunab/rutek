@@ -826,72 +826,120 @@ function ExcelFormatsSection() {
               <div className="overflow-x-auto rounded-lg border border-stone-200 dark:border-stone-700">
                 <table className="text-[11px] min-w-full">
                   <thead>
-                    <tr className="bg-stone-100 dark:bg-stone-800">
-                      <th className="px-2 py-1.5 font-semibold text-stone-500 dark:text-stone-400 text-left w-8">Fila</th>
-                      {rawHeaders.rows[0]?.map((_, ci) => (
-                        <th key={ci} className="px-2 py-1.5 font-semibold text-stone-500 dark:text-stone-400 text-left whitespace-nowrap">
-                          {colLetter(ci)}
-                        </th>
-                      ))}
+                    <tr className="bg-stone-100 dark:bg-stone-800/80 border-b border-stone-200 dark:border-stone-700">
+                      <th className="px-2 py-2 font-bold text-stone-500 dark:text-stone-400 text-left w-8">Fila</th>
+                      {rawHeaders.rows[0]?.map((_, ci) => {
+                        // Buscar si esta columna está mapeada a algún campo
+                        const mappedField = (Object.entries(editorForm.columns) as [keyof ExcelColumnMapping, number | null | undefined][])
+                          .find(([, v]) => v === ci)?.[0];
+                        const fieldInfo = mappedField
+                          ? SYSTEM_FIELDS.find((f) => f.key === mappedField)
+                          : null;
+                        return (
+                          <th key={ci} className="px-2 py-1.5 text-left whitespace-nowrap">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-bold text-stone-600 dark:text-stone-300">{colLetter(ci)}</span>
+                              {fieldInfo ? (
+                                <span className="inline-block px-1 py-px rounded text-[9px] font-semibold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300 leading-tight truncate max-w-[80px]">
+                                  {fieldInfo.label}
+                                </span>
+                              ) : null}
+                            </div>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
-                    {rawHeaders.rows.slice(0, 10).map((row, ri) => (
-                      <tr
-                        key={ri}
-                        className={`${
-                          ri === editorForm.headerRow
-                            ? 'bg-orange-50 dark:bg-orange-950/30 font-semibold'
-                            : ri === editorForm.dataStartRow
-                            ? 'bg-blue-50/50 dark:bg-blue-950/20'
-                            : ''
-                        }`}
-                      >
-                        <td className="px-2 py-1 text-stone-400 dark:text-stone-500 tabular-nums">{ri + 1}</td>
-                        {row.map((cell, ci) => (
-                          <td key={ci} className="px-2 py-1 text-stone-700 dark:text-stone-300 truncate max-w-[140px]">
-                            {cell ?? <span className="text-stone-300 dark:text-stone-600">—</span>}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
+                    {rawHeaders.rows.slice(0, 10).map((row, ri) => {
+                      const isHeader = ri === editorForm.headerRow;
+                      const isData = ri === editorForm.dataStartRow;
+                      return (
+                        <tr
+                          key={ri}
+                          className={
+                            isHeader
+                              ? 'bg-orange-100 dark:bg-orange-900/40 font-semibold border-l-2 border-orange-400 dark:border-orange-500'
+                              : isData
+                              ? 'bg-sky-100/70 dark:bg-sky-900/30 border-l-2 border-sky-400 dark:border-sky-500'
+                              : ''
+                          }
+                        >
+                          <td className="px-2 py-1 tabular-nums font-medium text-stone-500 dark:text-stone-400">{ri + 1}</td>
+                          {row.map((cell, ci) => {
+                            const mappedField = (Object.entries(editorForm.columns) as [keyof ExcelColumnMapping, number | null | undefined][])
+                              .find(([, v]) => v === ci)?.[0];
+                            return (
+                              <td
+                                key={ci}
+                                className={`px-2 py-1 truncate max-w-[140px] ${
+                                  mappedField
+                                    ? 'text-violet-700 dark:text-violet-300 font-medium'
+                                    : 'text-stone-700 dark:text-stone-300'
+                                }`}
+                              >
+                                {cell ?? <span className="text-stone-300 dark:text-stone-600">—</span>}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
-                <p className="text-[10px] text-stone-400 px-2 py-1 border-t border-stone-100 dark:border-stone-800">
-                  <span className="inline-block w-3 h-3 bg-orange-100 dark:bg-orange-950/40 rounded mr-1 align-middle" />Fila encabezado
-                  <span className="inline-block w-3 h-3 bg-blue-50 dark:bg-blue-950/30 rounded mr-1 ml-3 align-middle" />Primera fila de datos
-                </p>
+                <div className="flex items-center gap-4 px-3 py-1.5 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/50">
+                  <span className="flex items-center gap-1.5 text-[10px] text-stone-500 dark:text-stone-400">
+                    <span className="inline-block w-2.5 h-2.5 rounded-sm bg-orange-400 dark:bg-orange-500" />
+                    Encabezado
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-stone-500 dark:text-stone-400">
+                    <span className="inline-block w-2.5 h-2.5 rounded-sm bg-sky-400 dark:bg-sky-500" />
+                    Primera fila datos
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-stone-500 dark:text-stone-400">
+                    <span className="inline-block w-2.5 h-2.5 rounded-sm bg-violet-400 dark:bg-violet-500" />
+                    Columna mapeada
+                  </span>
+                </div>
               </div>
             )}
 
             {/* Filas de inicio */}
             <div>
-              <p className="text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase tracking-wide mb-2">
+              <p className="text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase tracking-wide mb-3">
                 2. Posición de datos
               </p>
-              <div className="flex flex-wrap gap-3">
-                <Input
-                  label="Fila encabezado (n°)"
-                  type="number"
-                  value={String(editorForm.headerRow + 1)}
-                  onChange={(e) => {
-                    const v = Math.max(1, parseInt(e.target.value) || 1);
-                    setEditorForm((f) => ({ ...f, headerRow: v - 1, dataStartRow: Math.max(v, f.dataStartRow) }));
-                  }}
-                  autoComplete="off"
-                  containerClassName="w-36"
-                />
-                <Input
-                  label="Primera fila de datos (n°)"
-                  type="number"
-                  value={String(editorForm.dataStartRow + 1)}
-                  onChange={(e) => {
-                    const v = Math.max(1, parseInt(e.target.value) || 1);
-                    setEditorForm((f) => ({ ...f, dataStartRow: v - 1 }));
-                  }}
-                  autoComplete="off"
-                  containerClassName="w-36"
-                />
+              <div className="flex flex-wrap gap-4 items-stretch">
+                {/* Encabezado */}
+                <div className="flex items-center gap-2 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800/60 rounded-xl px-3 py-2 min-w-[180px]">
+                  <span className="shrink-0 w-2 self-stretch rounded-full bg-orange-400 dark:bg-orange-500" />
+                  <Input
+                    label="Fila encabezado"
+                    type="number"
+                    value={String(editorForm.headerRow + 1)}
+                    onChange={(e) => {
+                      const v = Math.max(1, parseInt(e.target.value) || 1);
+                      setEditorForm((f) => ({ ...f, headerRow: v - 1, dataStartRow: Math.max(v, f.dataStartRow) }));
+                    }}
+                    autoComplete="off"
+                    containerClassName="flex-1"
+                  />
+                </div>
+                {/* Primera fila de datos */}
+                <div className="flex items-center gap-2 bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800/60 rounded-xl px-3 py-2 min-w-[180px]">
+                  <span className="shrink-0 w-2 self-stretch rounded-full bg-sky-400 dark:bg-sky-500" />
+                  <Input
+                    label="Primera fila de datos"
+                    type="number"
+                    value={String(editorForm.dataStartRow + 1)}
+                    onChange={(e) => {
+                      const v = Math.max(1, parseInt(e.target.value) || 1);
+                      setEditorForm((f) => ({ ...f, dataStartRow: v - 1 }));
+                    }}
+                    autoComplete="off"
+                    containerClassName="flex-1"
+                  />
+                </div>
               </div>
             </div>
 
