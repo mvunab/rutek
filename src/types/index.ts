@@ -154,6 +154,13 @@ export interface Order {
   vehiclePlate?: string | null;
 }
 
+export interface OrderStatusEvent {
+  status: OrderStatus;
+  changedAt: string;
+  changedBy?: string | null;
+  note?: string | null;
+}
+
 export interface Address {
   street: string;
   city: string;

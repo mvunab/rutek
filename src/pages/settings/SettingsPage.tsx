@@ -40,6 +40,8 @@ export function SettingsPage() {
   const { theme, setTheme } = useUiStore();
   const [form, setForm] = useState<CompanyForm>(emptyForm);
   const [savedCompany, setSavedCompany] = useState(false);
+  const [savingCompany, setSavingCompany] = useState(false);
+  const [companyError, setCompanyError] = useState('');
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
   const [savedPw, setSavedPw] = useState(false);
   const [pwError, setPwError] = useState('');
@@ -102,10 +104,12 @@ export function SettingsPage() {
   const set = <K extends keyof CompanyForm>(key: K, value: CompanyForm[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  const handleCompanySubmit = (e: React.FormEvent) => {
+  const handleCompanySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tenant) return;
-    updateTenant({
+    setCompanyError('');
+    setSavingCompany(true);
+    const payload = {
       name: form.name.trim(),
       legalName: form.legalName.trim() || undefined,
       rut: form.rut.trim(),
@@ -115,9 +119,17 @@ export function SettingsPage() {
       city: form.city.trim() || undefined,
       region: form.region.trim() || undefined,
       plan: form.plan,
-    });
-    setSavedCompany(true);
-    window.setTimeout(() => setSavedCompany(false), 2500);
+    };
+    try {
+      await api.patch('/tenant/profile', payload);
+    } catch {
+      setCompanyError('No se pudieron guardar los datos en el servidor. Los cambios se aplicaron localmente.');
+    } finally {
+      updateTenant(payload);
+      setSavingCompany(false);
+      setSavedCompany(true);
+      window.setTimeout(() => setSavedCompany(false), 2500);
+    }
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -299,12 +311,12 @@ export function SettingsPage() {
               Configuración de empresa
             </h2>
             <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
-              Datos de tu organización visibles en la plataforma (demo en memoria).
+              Datos de tu organización visibles en la plataforma.
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleCompanySubmit} className="space-y-4">
+        <form onSubmit={(e) => void handleCompanySubmit(e)} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Nombre comercial"
@@ -372,8 +384,14 @@ export function SettingsPage() {
             />
           </div>
 
+          {companyError && (
+            <p className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-1.5" role="alert">
+              <AlertCircle size={14} aria-hidden />
+              {companyError}
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Button type="submit">Guardar cambios</Button>
+            <Button type="submit" loading={savingCompany}>Guardar cambios</Button>
             {savedCompany && (
               <span
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400"

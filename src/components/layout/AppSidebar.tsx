@@ -2,7 +2,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Truck, Package, Map, UserCircle2,
   Users, Bell, LogOut, Settings, ChevronLeft,
-  Shield, Building2, FileClock, Car, X,
+  Shield, Building2, FileClock, Car, X, Images,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useEffect, useMemo, useState } from 'react';
@@ -26,6 +26,8 @@ const tenantNavItems: NavItem[] = [
   { to: '/clientes',   icon: <Users size={18} />,           label: 'Cuentas',          roles: ['admin', 'operator'] },
   { to: '/vehiculos',  icon: <Car size={18} />,             label: 'Vehículos',        roles: ['admin', 'operator'] },
   { to: '/usuarios',   icon: <UserCircle2 size={18} />,     label: 'Usuarios Sistema', roles: ['admin'] },
+  { to: '/fotos',      icon: <Images size={18} />,          label: 'Fotos de Ruta',    roles: ['admin', 'operator'] },
+  { to: '/mis-rutas',  icon: <Truck size={18} />,           label: 'Mis Rutas',         roles: ['peoneta'] },
 ];
 
 const superAdminNavItems: NavItem[] = [

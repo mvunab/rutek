@@ -20,6 +20,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   '/fotos':         { title: 'Admin. Fotos',      subtitle: 'Fotografías de inspección y entrega desde la app móvil' },
   '/configuracion': { title: 'Configuración',     subtitle: 'Tema de la interfaz y datos de la empresa' },
   '/vehiculos':     { title: 'Vehículos',         subtitle: 'Flota, VIN, mantención y vencimientos de documentación con alertas' },
+  '/mis-rutas':     { title: 'Mis Rutas',          subtitle: 'Pedidos que tienes asignados en las rutas de hoy' },
 };
 
 export function AppLayout() {

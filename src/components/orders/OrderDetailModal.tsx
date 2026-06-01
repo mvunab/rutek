@@ -1,7 +1,101 @@
-import { ExternalLink } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ExternalLink, Clock, CheckCircle2, TruckIcon, XCircle, CircleDot } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { OrderStatusBadge, PriorityBadge } from '../ui/Badge';
-import type { Order } from '../../types';
+import type { Order, OrderStatusEvent } from '../../types';
+import { api } from '../../lib/api';
+import { resolveOrderStatusLabel } from '../../lib/orderStatusLabels';
+import { useAuthStore } from '../../store/useAuthStore';
+
+function statusIcon(status: string) {
+  if (status === 'delivered') return <CheckCircle2 size={14} className="text-emerald-500" aria-hidden />;
+  if (status === 'in_transit') return <TruckIcon size={14} className="text-violet-500" aria-hidden />;
+  if (status === 'rejected') return <XCircle size={14} className="text-red-500" aria-hidden />;
+  if (status === 'pending') return <Clock size={14} className="text-stone-400" aria-hidden />;
+  return <CircleDot size={14} className="text-primary-500" aria-hidden />;
+}
+
+function statusDotColor(status: string) {
+  if (status === 'delivered') return 'bg-emerald-500';
+  if (status === 'in_transit') return 'bg-violet-500';
+  if (status === 'rejected') return 'bg-red-500';
+  if (status === 'pending') return 'bg-stone-300 dark:bg-stone-600';
+  return 'bg-primary-500';
+}
+
+function OrderStatusTimeline({ orderId }: { orderId: string }) {
+  const { tenant } = useAuthStore();
+  const [history, setHistory] = useState<OrderStatusEvent[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api.get<OrderStatusEvent[]>(`/orders/${orderId}/history`)
+      .then((data) => { if (!cancelled) setHistory(Array.isArray(data) ? data : []); })
+      .catch(() => { if (!cancelled) setHistory(null); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [orderId]);
+
+  if (loading) {
+    return (
+      <p className="text-xs text-stone-400 dark:text-stone-500 animate-pulse">
+        Cargando historial…
+      </p>
+    );
+  }
+
+  if (!history || history.length === 0) return null;
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-3">
+        Historial de estados
+      </p>
+      <ol className="relative border-l border-stone-200 dark:border-stone-700 space-y-0" aria-label="Historial de cambios de estado">
+        {history.map((evt, i) => {
+          const isLast = i === history.length - 1;
+          const label = resolveOrderStatusLabel(evt.status, tenant);
+          const date = evt.changedAt
+            ? new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(evt.changedAt))
+            : null;
+          return (
+            <li key={i} className="ml-4 pb-5 last:pb-0">
+              <span
+                className={`absolute -left-[5px] mt-1 flex size-2.5 items-center justify-center rounded-full ring-2 ring-white dark:ring-stone-900 ${isLast ? statusDotColor(evt.status) : 'bg-stone-300 dark:bg-stone-600'}`}
+                aria-hidden
+              />
+              <div className="flex items-start gap-2">
+                {statusIcon(evt.status)}
+                <div className="min-w-0">
+                  <p className={`text-sm font-medium ${isLast ? 'text-stone-900 dark:text-stone-100' : 'text-stone-500 dark:text-stone-400'}`}>
+                    {label}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                    {date && (
+                      <time dateTime={evt.changedAt} className="text-xs text-stone-400 dark:text-stone-500 tabular-nums">
+                        {date}
+                      </time>
+                    )}
+                    {evt.changedBy && (
+                      <span className="text-xs text-stone-400 dark:text-stone-500">
+                        · {evt.changedBy}
+                      </span>
+                    )}
+                  </div>
+                  {evt.note && (
+                    <p className="mt-1 text-xs text-stone-500 dark:text-stone-400 italic">{evt.note}</p>
+                  )}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
 
 export function OrderDetailModal({
   order,
@@ -115,6 +209,8 @@ export function OrderDetailModal({
             <p className="text-xs text-stone-700 dark:text-stone-300">{order.notes}</p>
           </div>
         )}
+
+        <OrderStatusTimeline orderId={order.id} />
 
         <div className="grid grid-cols-2 gap-3">
           <div className="text-center p-3 bg-stone-50 dark:bg-stone-800/70 rounded-lg border border-stone-200 dark:border-stone-700">

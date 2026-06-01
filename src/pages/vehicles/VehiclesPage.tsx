@@ -224,6 +224,20 @@ export function VehiclesPage() {
     [vehicles, complianceByVehicleId],
   );
 
+  const vehiclesWithAlerts = useMemo(
+    () =>
+      vehicles
+        .filter((v) => (complianceByVehicleId.get(v.id)?.alertCount ?? 0) > 0)
+        .map((v) => ({ vehicle: v, compliance: complianceByVehicleId.get(v.id)! }))
+        .sort((a, b) => {
+          const rank = { expired: 0, warning: 1, ok: 2, none: 3 };
+          return rank[a.compliance.worst] - rank[b.compliance.worst];
+        }),
+    [vehicles, complianceByVehicleId],
+  );
+
+  const [alertsExpanded, setAlertsExpanded] = useState(false);
+
   const filtered = useMemo(() => {
     let rows = vehicles.filter((v) => {
       if (estadoFilter === 'active' && !v.available) return false;
@@ -450,18 +464,66 @@ export function VehiclesPage() {
       )}
 
 
-      {fleetAlertCount > 0 ? (
+      {fleetAlertCount > 0 && (
         <div
-          className="flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
-          role="status"
+          className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 overflow-hidden"
+          role="region"
+          aria-label="Alertas de vencimiento de flota"
         >
-          <AlertTriangle size={18} className="shrink-0 mt-0.5" aria-hidden />
-          <p>
-            <strong className="font-semibold tabular-nums">{fleetAlertCount}</strong>{' '}
-            {fleetAlertCount === 1 ? 'vehículo tiene' : 'vehículos tienen'} mantención o documentación por vencer o vencida.
-          </p>
+          <button
+            type="button"
+            onClick={() => setAlertsExpanded((v) => !v)}
+            className="w-full flex items-center gap-3 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-inset"
+            aria-expanded={alertsExpanded}
+          >
+            <AlertTriangle size={18} className="shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+            <p className="flex-1 text-sm text-amber-900 dark:text-amber-100">
+              <strong className="font-semibold tabular-nums">{fleetAlertCount}</strong>{' '}
+              {fleetAlertCount === 1 ? 'vehículo tiene' : 'vehículos tienen'} mantención o documentación por vencer o vencida.
+            </p>
+            <span className="text-xs text-amber-700 dark:text-amber-300 shrink-0">
+              {alertsExpanded ? 'Ocultar' : 'Ver detalle'}
+            </span>
+            {alertsExpanded
+              ? <ChevronUp size={14} className="shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+              : <ChevronDown size={14} className="shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+            }
+          </button>
+
+          {alertsExpanded && (
+            <div className="border-t border-amber-200 dark:border-amber-900 divide-y divide-amber-100 dark:divide-amber-900/60">
+              {vehiclesWithAlerts.map(({ vehicle, compliance }) => (
+                <div key={vehicle.id} className="px-4 py-3 flex flex-wrap items-start gap-x-4 gap-y-1">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-stone-900 dark:text-stone-100" translate="no">
+                      {vehicle.plate}
+                    </p>
+                    <p className="text-xs text-stone-500 dark:text-stone-400 truncate">
+                      {vehicle.brand} {vehicle.model} {vehicle.year}
+                    </p>
+                  </div>
+                  <ul className="flex flex-wrap gap-2 mt-0.5" aria-label={`Alertas de ${vehicle.plate}`}>
+                    {compliance.items.map((item) => (
+                      <li
+                        key={item.kind}
+                        className={clsx(
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium',
+                          item.status === 'expired'
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                            : 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200',
+                        )}
+                      >
+                        <AlertTriangle size={10} aria-hidden />
+                        {formatComplianceHint(item)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      ) : null}
+      )}
 
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-300">

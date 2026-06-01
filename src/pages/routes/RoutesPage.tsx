@@ -2601,6 +2601,7 @@ export function RoutesPage() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
   const [filterRouteStatus, setFilterRouteStatus] = useState<RouteStatus | 'all'>('all');
+  const [filterDateRange, setFilterDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
   const [showFilters, setShowFilters] = useState(false);
   const [showNewRoute, setShowNewRoute] = useState(false);
   const [showImportExcel, setShowImportExcel] = useState(false);
@@ -2648,8 +2649,16 @@ export function RoutesPage() {
     typeof r.startTime === 'string' && r.startTime.includes('T') ? r.startTime : r.createdAt;
 
   const filteredRoutes = useMemo(() => {
+    const cutoff = filterDateRange !== 'all'
+      ? new Date(Date.now() - parseInt(filterDateRange) * 86_400_000)
+      : null;
+
     let data = routes.filter((r) => {
       if (filterRouteStatus !== 'all' && r.status !== filterRouteStatus) return false;
+      if (cutoff) {
+        const dateStr = routeDateKey(r);
+        if (!dateStr || new Date(dateStr) < cutoff) return false;
+      }
       if (search) {
         const t = search.toLowerCase();
         const pedidosEnRuta = orders.filter((o) => o.routeId === r.id);
@@ -2718,14 +2727,14 @@ export function RoutesPage() {
       });
     }
     return data;
-  }, [routes, orders, filterRouteStatus, search, sortCol, sortDir, routeAggById]);
+  }, [routes, orders, filterRouteStatus, filterDateRange, search, sortCol, sortDir, routeAggById]);
 
   const statusCounts = useMemo(
     () => Object.fromEntries(ROUTE_STATUSES.map((s) => [s, routes.filter((r) => r.status === s).length])),
     [routes],
   );
 
-  const hasActiveFilters = filterRouteStatus !== 'all';
+  const hasActiveFilters = filterRouteStatus !== 'all' || filterDateRange !== '30d';
 
   const handleAddRoute = async (data: RouteFormData) => {
     setNewRouteError(null);
@@ -2857,57 +2866,96 @@ export function RoutesPage() {
       </div>
 
       {showFilters ? (
-        <div className="mx-6 rounded-xl glass backdrop-blur-md p-4 shadow-sm space-y-3 shrink-0">
-          <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Estado de la ruta</p>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setFilterRouteStatus('all')}
-              className={clsx(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
-                filterRouteStatus === 'all'
-                  ? 'bg-primary-50 dark:bg-primary-950/45 text-primary-800 dark:text-primary-200 border-primary-200 dark:border-primary-800'
-                  : 'bg-stone-50 dark:bg-stone-800/50 border-stone-200 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-stone-300',
+        <div className="mx-6 rounded-xl glass backdrop-blur-md p-4 shadow-sm space-y-4 shrink-0">
+          {/* Filtro por estado */}
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Estado de la ruta</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setFilterRouteStatus('all')}
+                className={clsx(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
+                  filterRouteStatus === 'all'
+                    ? 'bg-primary-50 dark:bg-primary-950/45 text-primary-800 dark:text-primary-200 border-primary-200 dark:border-primary-800'
+                    : 'bg-stone-50 dark:bg-stone-800/50 border-stone-200 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-stone-300',
+                )}
+              >
+                Todos
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-stone-200/80 dark:bg-stone-700 tabular-nums">
+                  {routes.length}
+                </span>
+              </button>
+              {ROUTE_STATUSES.map((s) => {
+                const active = filterRouteStatus === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setFilterRouteStatus(active ? 'all' : s)}
+                    className={clsx(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
+                      active
+                        ? 'bg-primary-50 dark:bg-primary-950/45 text-primary-800 dark:text-primary-200 border-primary-200 dark:border-primary-800'
+                        : 'bg-stone-50 dark:bg-stone-800/50 border-stone-200 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-stone-300',
+                    )}
+                  >
+                    <span className={clsx('size-1.5 rounded-full', routeStatusDot[s])} aria-hidden />
+                    {routeStatusLabel(s)}
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-stone-200/80 dark:bg-stone-700 tabular-nums">
+                      {statusCounts[s] ?? 0}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Filtro por rango de fechas */}
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
+              Período
+              {filterDateRange === '30d' && (
+                <span className="ml-1.5 normal-case font-normal text-stone-400">(por defecto)</span>
               )}
-            >
-              Todos
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-stone-200/80 dark:bg-stone-700 tabular-nums">
-                {routes.length}
-              </span>
-            </button>
-            {ROUTE_STATUSES.map((s) => {
-              const active = filterRouteStatus === s;
-              return (
+            </p>
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Rango de fechas">
+              {(
+                [
+                  { value: '7d',  label: 'Últimos 7 días' },
+                  { value: '30d', label: 'Últimos 30 días' },
+                  { value: '90d', label: 'Últimos 90 días' },
+                  { value: 'all', label: 'Todo el historial' },
+                ] as const
+              ).map(({ value, label }) => (
                 <button
-                  key={s}
+                  key={value}
                   type="button"
-                  onClick={() => setFilterRouteStatus(active ? 'all' : s)}
+                  onClick={() => setFilterDateRange(value)}
                   className={clsx(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
-                    active
+                    'px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
+                    filterDateRange === value
                       ? 'bg-primary-50 dark:bg-primary-950/45 text-primary-800 dark:text-primary-200 border-primary-200 dark:border-primary-800'
                       : 'bg-stone-50 dark:bg-stone-800/50 border-stone-200 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-stone-300',
                   )}
                 >
-                  <span className={clsx('size-1.5 rounded-full', routeStatusDot[s])} aria-hidden />
-                  {routeStatusLabel(s)}
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-stone-200/80 dark:bg-stone-700 tabular-nums">
-                    {statusCounts[s] ?? 0}
-                  </span>
+                  {label}
                 </button>
-              );
-            })}
+              ))}
+            </div>
           </div>
-          <div className="flex justify-end">
+
+          <div className="flex justify-end border-t border-stone-100 dark:border-stone-800 pt-3">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
                 setFilterRouteStatus('all');
+                setFilterDateRange('30d');
                 setShowFilters(false);
               }}
             >
-              Limpiar filtros
+              Restablecer filtros
             </Button>
           </div>
         </div>
@@ -2941,14 +2989,27 @@ export function RoutesPage() {
               <div className={clsx('w-full space-y-4', layout === 'cards' && 'max-w-lg mx-auto')}>
                 {/* Barra de resumen + sort */}
                 <div className="flex items-center justify-between gap-2 px-0.5">
-                  <p className="text-xs text-stone-500 dark:text-stone-400">
-                    <span className="font-semibold text-stone-700 dark:text-stone-200 tabular-nums">
-                      {filteredRoutes.length}
-                    </span>{' '}
-                    de{' '}
-                    <span className="tabular-nums">{routes.length}</span> rutas ·{' '}
-                    <span className="tabular-nums">{totalBultos}</span> bultos
-                  </p>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <p className="text-xs text-stone-500 dark:text-stone-400">
+                      <span className="font-semibold text-stone-700 dark:text-stone-200 tabular-nums">
+                        {filteredRoutes.length}
+                      </span>{' '}
+                      de{' '}
+                      <span className="tabular-nums">{routes.length}</span> rutas ·{' '}
+                      <span className="tabular-nums">{totalBultos}</span> bultos
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowFilters(true)}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
+                      aria-label="Cambiar período de fecha"
+                    >
+                      {filterDateRange === '7d' && '7 días'}
+                      {filterDateRange === '30d' && '30 días'}
+                      {filterDateRange === '90d' && '90 días'}
+                      {filterDateRange === 'all' && 'Todo el historial'}
+                    </button>
+                  </div>
                   <div className="flex items-center gap-1">
                     <span className="text-[10px] text-stone-400 uppercase tracking-wide hidden sm:inline">
                       Ordenar

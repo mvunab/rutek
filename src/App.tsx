@@ -68,6 +68,9 @@ const AuditPage = lazy(() =>
 const NotFound = lazy(() =>
   import('./pages/NotFound').then((m) => ({ default: m.NotFound })),
 );
+const PeonetaDashboardPage = lazy(() =>
+  import('./pages/peonetas/PeonetaDashboardPage').then((m) => ({ default: m.PeonetaDashboardPage })),
+);
 const TrackingPage = lazy(() =>
   import('./pages/tracking/TrackingPage').then((m) => ({ default: m.TrackingPage })),
 );
@@ -208,6 +211,14 @@ function App() {
               <Route
                 path="peonetas"
                 element={<Navigate to="/usuarios" replace />}
+              />
+              <Route
+                path="mis-rutas"
+                element={
+                  <ProtectedRoute>
+                    <PeonetaDashboardPage />
+                  </ProtectedRoute>
+                }
               />
               <Route
                 path="vehiculos"
