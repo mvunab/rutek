@@ -301,18 +301,22 @@ export type PhotoType = 'entrega' | 'recepcion' | 'dano' | 'firma' | 'otro';
 export interface RoutePhoto {
   id: string;
   tenantId: string;
-  routeCode: string;         // Nº Ruta display (ej. "1992")
+  routeCode: string;
   routeId: string;
+  routeName?: string;
+  routeStatus?: string;
+  orderId: string;
+  orderCode: string;
+  orderStatus?: string;
   driverName: string;
   vehiclePlate: string;
-  fecha: string;             // dd/mm/yy
+  fecha: string;
   hora: string;
-  photoUrl: string;          // URL de la imagen
+  photoUrl: string;
   thumbnailUrl: string;
   type: PhotoType;
   description: string;
   clientName: string;
-  orderCode: string;
 }
 
 // ─── Filters ─────────────────────────────────────────────────────────────────

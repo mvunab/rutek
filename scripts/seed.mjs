@@ -90,6 +90,39 @@ async function tryUpload(label, path, fieldName, buffer, mimeType, fileName, ext
   catch (e) { fail(`${label} — ${e.message}: ${String(e.body).slice(0, 160)}`); return null; }
 }
 
+/** Marca pedido entregado y sube inspección: 2 evidencias + firma (galería /fotos). */
+async function deliverWithInspections({ orderId, label }) {
+  await tryPatch(`  Entregar: ${label}`, `/orders/${orderId}/deliver`, {
+    rut: '12.345.678-9',
+    receptor: 'Recepción — inspección conforme',
+  });
+  const shots = [
+    { color: PHOTO_COLORS.entrega, file: 'inspeccion-bultos.png', desc: 'Bultos y embalaje en bodega' },
+    { color: PHOTO_COLORS.recepcion, file: 'inspeccion-guia.png', desc: 'Guía firmada — recepción' },
+  ];
+  for (const s of shots) {
+    const [r, g, b] = s.color;
+    await tryUpload(
+      `  Inspección: ${label} (${s.file})`,
+      `/orders/${orderId}/photos`,
+      'file',
+      makePNG(r, g, b),
+      'image/png',
+      s.file,
+      { description: s.desc },
+    );
+  }
+  const [rs, gs, bs] = PHOTO_COLORS.firma;
+  await tryUpload(
+    `  Firma inspección: ${label}`,
+    `/orders/${orderId}/signature`,
+    'file',
+    makePNG(rs, gs, bs),
+    'image/png',
+    'firma.png',
+  );
+}
+
 // ─── Fecha helpers ────────────────────────────────────────────────────────────
 
 const isoDate = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -213,7 +246,7 @@ async function login(email, password) {
 
 // ─── Helper: crear orden con route_id ─────────────────────────────────────────
 
-function orderBody({ clientId, clientName, status, priority, street, city, bultos, notes, routeId, driverId, driverName, peonetaId, peonetaName, vehicleId, vehiclePlate, estimatedOffset = 0 }) {
+function orderBody({ clientId, clientName, status, priority, street, city, bultos, notes, routeId, estimatedOffset = 0 }) {
   const code = `ENT-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
   return {
     code, status, priority,
@@ -232,10 +265,18 @@ function orderBody({ clientId, clientName, status, priority, street, city, bulto
     route_id: routeId,
     bultos,
     ...(notes ? { notes } : {}),
-    ...(driverId ? { driver_id: driverId, driver_name: driverName } : {}),
-    ...(peonetaId ? { peoneta_id: peonetaId, peoneta_name: peonetaName } : {}),
-    ...(vehicleId ? { vehicle_id: vehicleId, vehicle_plate: vehiclePlate } : {}),
   };
+}
+
+/** Asigna chofer/peoneta/vehículo a todos los pedidos ya creados en la ruta. */
+async function assignRouteCrew(routeId, { driver, peoneta, vehicle }) {
+  if (!driver?.id) return;
+  await tryPatch('  Asignar chofer/peoneta a ruta', `/routes/${routeId}/assign-driver`, {
+    driver_id: driver.id,
+    driver_name: driver.name,
+    ...(peoneta?.id ? { peoneta_id: peoneta.id, peoneta_name: peoneta.name } : {}),
+    ...(vehicle?.id ? { vehicle_id: vehicle.id, vehicle_plate: vehicle.plate } : {}),
+  });
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -376,26 +417,14 @@ async function main() {
   if (r1?.id) {
     for (const d of r1deliveries) {
       const o = await tryPost(`  Pedido ${d.clientName}`, '/orders',
-        orderBody({ ...d, clientId:ripley?.id, routeId:r1.id, status:'in_transit', estimatedOffset:-1,
-          driverId:driver1?.id, driverName:driver1?.name,
-          peonetaId:peoneta1?.id, peonetaName:peoneta1?.name,
-          vehicleId:van?.id, vehiclePlate:van?.plate }));
+        orderBody({ ...d, clientId:ripley?.id, routeId:r1.id, status:'in_transit', estimatedOffset:-1 }));
       if (o?.id) r1OrderIds.push({ id:o.id, name:d.clientName });
     }
     // Pedido rechazado
     const oRej = await tryPost(`  Pedido ${r1rejected.clientName} [rechazar]`, '/orders',
-      orderBody({ ...r1rejected, clientId:ripley?.id, routeId:r1.id, status:'in_transit', estimatedOffset:-1,
-        driverId:driver1?.id, driverName:driver1?.name,
-        vehicleId:van?.id, vehiclePlate:van?.plate }));
+      orderBody({ ...r1rejected, clientId:ripley?.id, routeId:r1.id, status:'in_transit', estimatedOffset:-1 }));
 
-    // Assign driver masivo (peoneta incluida)
-    if (driver1?.id) {
-      await tryPatch('  Asignar chofer/peoneta a ruta 1001', `/routes/${r1.id}/assign-driver`, {
-        driver_id:   driver1.id,   driver_name:   driver1.name,
-        peoneta_id:  peoneta1?.id, peoneta_name:  peoneta1?.name,
-        vehicle_id:  van?.id,      vehicle_plate: van?.plate,
-      });
-    }
+    await assignRouteCrew(r1.id, { driver: driver1, peoneta: peoneta1, vehicle: van });
 
     // Entregar todos los pedidos de r1
     for (const { id, name } of r1OrderIds) {
@@ -447,19 +476,9 @@ async function main() {
   ];
 
   if (r2?.id) {
-    if (driver2?.id) {
-      await tryPatch('  Asignar chofer/peoneta a ruta 1002', `/routes/${r2.id}/assign-driver`, {
-        driver_id: driver2.id, driver_name: driver2.name,
-        peoneta_id: peoneta2?.id, peoneta_name: peoneta2?.name,
-        vehicle_id: camion?.id,   vehicle_plate: camion?.plate,
-      });
-    }
     for (const item of r2items) {
       const o = await tryPost(`  Pedido ${item.clientName}`, '/orders',
-        orderBody({ ...item, clientId:falabella?.id, routeId:r2.id, status:'in_transit',
-          driverId:driver2?.id, driverName:driver2?.name,
-          peonetaId:peoneta2?.id, peonetaName:peoneta2?.name,
-          vehicleId:camion?.id, vehiclePlate:camion?.plate }));
+        orderBody({ ...item, clientId:falabella?.id, routeId:r2.id, status:'in_transit' }));
       if (o?.id && item.deliver) {
         await tryPatch(`  Entregar: ${item.clientName}`, `/orders/${o.id}/deliver`, { rut:'9.876.543-2', receptor:'Jefe Bodega' });
         const [r, g, b] = PHOTO_COLORS.entrega;
@@ -469,6 +488,49 @@ async function main() {
         await tryUpload(`  Firma: ${item.clientName}`, `/orders/${o.id}/signature`, 'file',
           makePNG(rs, gs, bs), 'image/png', 'firma.png');
       }
+    }
+    await assignRouteCrew(r2.id, { driver: driver2, peoneta: peoneta2, vehicle: camion });
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // RUTA 1006 — ENTREGADA: 2 pedidos + inspecciones (demo galería /fotos)
+  // ──────────────────────────────────────────────────────────
+  h1('Ruta 1006 — Entregada (2 pedidos con inspecciones)');
+  const r6 = await tryPost('Crear ruta 1006 entregada', '/routes', {
+    name: 'Ruta Entregada — Demo inspecciones',
+    code: '1006',
+    notes: 'Ruta cerrada: 2 entregas con fotos de inspección (prueba /fotos)',
+    ...(ripley ? { client_id: ripley.id } : {}),
+    ...(driver1 ? { driver_id: driver1.id, driver_name: driver1.name } : {}),
+    ...(van ? { vehicle_id: van.id, vehicle_plate: van.plate } : {}),
+    start_time: isoDaysAgo(2),
+    end_time: isoDaysAgo(2),
+  });
+
+  const r6items = [
+    { clientName: 'Ripley Mall Marina', street: 'Av. Libertad 1348', city: 'Viña del Mar', bultos: 6, priority: 'high' },
+    { clientName: 'Ripley Mall Vivo Imperio', street: 'Av. Pdte. Kennedy 5413', city: 'Las Condes', bultos: 9, priority: 'medium' },
+  ];
+
+  if (r6?.id) {
+    const r6Delivered = [];
+    for (const item of r6items) {
+      const o = await tryPost(`  Pedido ${item.clientName}`, '/orders',
+        orderBody({
+          ...item,
+          clientId: ripley?.id,
+          routeId: r6.id,
+          status: 'in_transit',
+          estimatedOffset: -2,
+        }));
+      if (o?.id) {
+        await deliverWithInspections({ orderId: o.id, label: item.clientName });
+        r6Delivered.push(item.clientName);
+      }
+    }
+    await assignRouteCrew(r6.id, { driver: driver1, peoneta: peoneta1, vehicle: van });
+    if (r6Delivered.length > 0) {
+      ok(`Ruta 1006: ${r6Delivered.length} pedidos entregados con inspecciones (${r6Delivered.join(', ')})`);
     }
   }
 
@@ -493,17 +555,11 @@ async function main() {
   ];
 
   if (r3?.id) {
-    if (driver1?.id) {
-      await tryPatch('  Pre-asignar chofer a ruta 1003', `/routes/${r3.id}/assign-driver`, {
-        driver_id: driver1.id, driver_name: driver1.name,
-        peoneta_id: peoneta1?.id, peoneta_name: peoneta1?.name,
-        vehicle_id: crafter?.id,  vehicle_plate: crafter?.plate,
-      });
-    }
     for (const item of r3items) {
       await tryPost(`  Pedido ${item.clientName}`, '/orders',
         orderBody({ ...item, clientId:sodimac?.id, routeId:r3.id, status:'pending', estimatedOffset:1 }));
     }
+    await assignRouteCrew(r3.id, { driver: driver1, peoneta: peoneta1, vehicle: crafter });
   }
 
   // ──────────────────────────────────────────────────────────
@@ -529,19 +585,9 @@ async function main() {
   ];
 
   if (r4?.id) {
-    if (driver1?.id) {
-      await tryPatch('  Asignar chofer a ruta 1004', `/routes/${r4.id}/assign-driver`, {
-        driver_id: driver1.id, driver_name: driver1.name,
-        peoneta_id: peoneta2?.id, peoneta_name: peoneta2?.name,
-        vehicle_id: crafter?.id,  vehicle_plate: crafter?.plate,
-      });
-    }
     for (const item of r4items) {
       const o = await tryPost(`  Pedido ${item.clientName}`, '/orders',
-        orderBody({ ...item, clientId:falabella?.id, routeId:r4.id, status:'in_transit', estimatedOffset:-3,
-          driverId:driver1?.id, driverName:driver1?.name,
-          peonetaId:peoneta2?.id, peonetaName:peoneta2?.name,
-          vehicleId:crafter?.id, vehiclePlate:crafter?.plate }));
+        orderBody({ ...item, clientId:falabella?.id, routeId:r4.id, status:'in_transit', estimatedOffset:-3 }));
       if (o?.id) {
         await tryPatch(`  Entregar: ${item.clientName}`, `/orders/${o.id}/deliver`, { rut:'15.678.901-3', receptor:'Encargado Bodega' });
         const [r, g, b] = PHOTO_COLORS.entrega;
@@ -556,6 +602,7 @@ async function main() {
           makePNG(rs, gs, bs), 'image/png', 'firma.png');
       }
     }
+    await assignRouteCrew(r4.id, { driver: driver1, peoneta: peoneta2, vehicle: crafter });
   }
 
   // ──────────────────────────────────────────────────────────
@@ -583,13 +630,13 @@ async function main() {
   // Los pedidos SIEMPRE requieren route_id, así que creamos una ruta "cola" y la dejamos pendiente
   h1('Fase 8: Cola de pedidos sin ruta efectiva');
   const rCola = await tryPost('Crear ruta cola (sin iniciar)', '/routes', {
-    name: 'Cola sin asignar — Pendientes',
-    notes: 'Pedidos en espera de asignación a ruta real',
+    name: 'Cola sin asignar — Pendientes Ripley',
+    notes: 'Pedidos Ripley en espera de asignación a ruta real',
+    ...(ripley ? { client_id: ripley.id } : {}),
   });
   if (rCola?.id) {
     const colas = [
       { clientName:'Ripley Mall Mirage',     clientId:ripley?.id,   street:'Av. E. Frei 6600',    city:'Maipú',    bultos:16, priority:'high',   notes:'',                          status:'pending' },
-      { clientName:'SODIMAC Recoleta',       clientId:sodimac?.id,  street:'Av. Recoleta 2222',   city:'Recoleta', bultos:25, priority:'medium', notes:'Espera confirmación horario', status:'pending' },
       { clientName:'Ripley Express Vitacura',clientId:ripley?.id,   street:'Av. Vitacura 5250',   city:'Vitacura', bultos:5,  priority:'urgent', notes:'Entrega antes de las 14:00',  status:'pending' },
     ];
     for (const item of colas) {
@@ -598,32 +645,7 @@ async function main() {
     }
   }
 
-  // ── Fotos de ruta (galería /fotos) ──
-  h1('Fase 9: Fotos de ruta (galería /fotos)');
-  for (const [routeId, routeCode, routeDriver, items] of [
-    [r1?.id, '1001', driver1?.name, [
-      { type:'entrega',   clientName:'Ripley Mall Costanera',       orderCode:'ENT-001', desc:'Entrega completa tienda Costanera' },
-      { type:'recepcion', clientName:'Ripley Patio Bellavista',     orderCode:'ENT-002', desc:'Recepcionado por encargado turno' },
-      { type:'firma',     clientName:'Ripley Mall Arauco Quilicura',orderCode:'ENT-003', desc:'Firma receptor conforme' },
-    ]],
-    [r4?.id, '1004', driver1?.name, [
-      { type:'entrega',   clientName:'Falabella La Dehesa',    orderCode:'ENT-010', desc:'Entrega en bodega principal' },
-      { type:'recepcion', clientName:'Falabella Apoquindo',    orderCode:'ENT-011', desc:'Recibido por Jefa de Piso' },
-      { type:'dano',      clientName:'Falabella Movistar Arena',orderCode:'ENT-012',desc:'Caja exterior con golpe menor — mercadería OK' },
-      { type:'firma',     clientName:'Falabella El Golf',      orderCode:'ENT-013', desc:'Firma encargado bodega' },
-    ]],
-  ]) {
-    if (!routeId) continue;
-    for (const { type, clientName, orderCode, desc } of items) {
-      const [r, g, b] = PHOTO_COLORS[type] ?? PHOTO_COLORS.otro;
-      await tryUpload(
-        `  [${type}] ${clientName}`,
-        '/route-photos', 'file',
-        makePNG(r, g, b), 'image/png', `${type}.png`,
-        { route_id: routeId, type, description: desc, client_name: clientName, order_code: orderCode },
-      );
-    }
-  }
+  // Galería /fotos: ruta 1006 (2 pedidos entregados + inspecciones), 1002 y 1004 también tienen evidencias.
 
   // ── Resumen ──
   console.log(`\n${c.bold}${c.green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);

@@ -95,6 +95,22 @@
            dark:bg-stone-950/35 dark:border-stone-700/75
            dark:shadow-[0_8px_30px_rgba(0,0,0,0.25)];
   }
+  .glass-card-order--delivered {
+    @apply bg-emerald-50/95 border-emerald-300/90
+           dark:bg-emerald-950/35 dark:border-emerald-800/70;
+    box-shadow:
+      inset 4px 0 0 0 rgb(16 185 129),
+      0 4px 14px rgba(16, 185, 129, 0.08);
+  }
+  .glass-card-order--rejected {
+    @apply bg-red-50/90 border-red-200/90
+           dark:bg-red-950/25 dark:border-red-900/55;
+    box-shadow: inset 4px 0 0 0 rgb(239 68 68);
+  }
+  .glass-card-order--in-transit {
+    @apply border-violet-300/80 dark:border-violet-800/60;
+    box-shadow: inset 4px 0 0 0 rgb(139 92 246);
+  }
   /**
    * Botón compacto estilo glass (borde sólido; sin conic en tamaños pequeños).
    */

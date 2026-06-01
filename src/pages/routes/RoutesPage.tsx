@@ -3,11 +3,11 @@ import {
   Plus, Search, ChevronUp, ChevronDown,
   Download, RefreshCw, SlidersHorizontal, Package, UserCircle, Route as RouteIcon, Truck,
   Pencil, Trash2, X, Copy, MapPin, Box, ArrowLeft, Check, FileSpreadsheet, Unlink,
-  CheckCircle2, AlertCircle, Eye, LayoutGrid, LayoutList, Share2,
+  CheckCircle2, XCircle, AlertCircle, Eye, LayoutGrid, LayoutList, Share2,
   CheckSquare, Square, ListChecks, Maximize2, Minimize2,
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { RouteStatusBadge } from '../../components/ui/Badge';
+import { OrderStatusBadge, RouteStatusBadge } from '../../components/ui/Badge';
 import { ConfirmModal, Modal, TypeToConfirmModal } from '../../components/ui/Modal';
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -857,11 +857,15 @@ function RouteListItem({
   onSelect,
 }: {
   route: Route;
-  agg: { pedidos: number; bultos: number; vehiclesLabel: string };
+  agg: { pedidos: number; bultos: number; delivered: number; vehiclesLabel: string };
   fecha: string;
   selected: boolean;
   onSelect: () => void;
 }) {
+  const deliveryPct =
+    agg.pedidos > 0 ? Math.round((agg.delivered / agg.pedidos) * 100) : 0;
+  const hasDeliveries = agg.delivered > 0;
+
   return (
     <button
       type="button"
@@ -902,12 +906,33 @@ function RouteListItem({
             <span>{fecha}</span>
             <span>{agg.pedidos} pedidos</span>
             <span>{agg.bultos} bultos</span>
+            {hasDeliveries ? (
+              <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400">
+                <CheckCircle2 size={12} aria-hidden />
+                {agg.delivered}/{agg.pedidos} entregados
+              </span>
+            ) : null}
             {agg.vehiclesLabel ? (
               <span translate="no" className="font-mono">
                 {agg.vehiclesLabel}
               </span>
             ) : null}
           </div>
+          {agg.pedidos > 0 ? (
+            <div
+              className="mt-2 h-1 rounded-full bg-stone-200/90 dark:bg-stone-800 overflow-hidden"
+              role="progressbar"
+              aria-valuenow={deliveryPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`${agg.delivered} de ${agg.pedidos} pedidos entregados`}
+            >
+              <div
+                className="h-full rounded-full bg-emerald-500 transition-[width] duration-300 motion-reduce:transition-none"
+                style={{ width: `${deliveryPct}%` }}
+              />
+            </div>
+          ) : null}
         </div>
         <ChevronDown
           size={18}
@@ -933,7 +958,7 @@ function RouteTableRow({
   onSelect,
 }: {
   route: Route;
-  agg: { pedidos: number; bultos: number; vehiclesLabel: string; driversLabel: string };
+  agg: { pedidos: number; bultos: number; delivered: number; vehiclesLabel: string; driversLabel: string };
   fecha: string;
   selected: boolean;
   onSelect: () => void;
@@ -968,8 +993,14 @@ function RouteTableRow({
       <td className="px-4 py-2.5 align-middle whitespace-nowrap text-xs text-stone-500 dark:text-stone-400 tabular-nums">
         {fecha}
       </td>
-      <td className="px-4 py-2.5 align-middle whitespace-nowrap text-xs text-stone-600 dark:text-stone-300 tabular-nums text-right">
-        {agg.pedidos}
+      <td className="px-4 py-2.5 align-middle whitespace-nowrap text-xs tabular-nums text-right">
+        <span className="text-stone-600 dark:text-stone-300">{agg.pedidos}</span>
+        {agg.delivered > 0 ? (
+          <span className="mt-0.5 flex items-center justify-end gap-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+            <CheckCircle2 size={11} aria-hidden />
+            {agg.delivered} entreg.
+          </span>
+        ) : null}
       </td>
       <td className="px-4 py-2.5 align-middle whitespace-nowrap text-xs text-stone-600 dark:text-stone-300 tabular-nums text-right">
         {agg.bultos}
@@ -1762,6 +1793,9 @@ function RouteDetailSidePanel({
       : route.createdAt;
 
   const deliveredCount = assigned.filter((o) => o.status === 'delivered').length;
+  const rejectedCount = assigned.filter((o) => o.status === 'rejected').length;
+  const deliveryProgressPct =
+    assigned.length > 0 ? Math.round((deliveredCount / assigned.length) * 100) : 0;
 
   const routeClientLabel = useMemo(() => {
     if (route.clientId) {
@@ -1983,11 +2017,43 @@ function RouteDetailSidePanel({
               </span>
               <span>
                 <span className="text-stone-500">Entregados </span>
-                <span className="font-semibold text-stone-800 dark:text-stone-200">
+                <span
+                  className={clsx(
+                    'font-semibold tabular-nums inline-flex items-center gap-1',
+                    deliveredCount > 0
+                      ? 'text-emerald-700 dark:text-emerald-400'
+                      : 'text-stone-800 dark:text-stone-200',
+                  )}
+                >
+                  {deliveredCount > 0 ? <CheckCircle2 size={12} aria-hidden /> : null}
                   {deliveredCount}/{assigned.length}
                 </span>
               </span>
+              {rejectedCount > 0 ? (
+                <span>
+                  <span className="text-stone-500">Rechazados </span>
+                  <span className="font-semibold text-red-700 dark:text-red-400 tabular-nums">
+                    {rejectedCount}
+                  </span>
+                </span>
+              ) : null}
             </p>
+
+            {assigned.length > 0 ? (
+              <div
+                className="mt-2 h-1.5 rounded-full bg-stone-200 dark:bg-stone-800 overflow-hidden"
+                role="progressbar"
+                aria-valuenow={deliveryProgressPct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Progreso de entrega: ${deliveredCount} de ${assigned.length} pedidos`}
+              >
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-[width] duration-300 motion-reduce:transition-none"
+                  style={{ width: `${deliveryProgressPct}%` }}
+                />
+              </div>
+            ) : null}
 
             {route.notes?.trim() ? (
               <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200/80 px-2.5 py-2 flex gap-1.5 dark:bg-amber-950/40 dark:border-amber-800/50">
@@ -2130,12 +2196,19 @@ function RouteDetailSidePanel({
                   Boolean(o.vehiclePlate?.trim());
 
                 const isBulkSelected = bulkSelectedIds.has(o.id);
+                const isDelivered = o.status === 'delivered';
+                const isRejected = o.status === 'rejected';
+                const isInTransit = o.status === 'in_transit';
+                const showStatusOnCard = isDelivered || isRejected || isInTransit;
 
                 return (
                   <li
                     key={o.id}
                     className={clsx(
                       'glass-card-order overflow-hidden',
+                      isDelivered && 'glass-card-order--delivered',
+                      isRejected && 'glass-card-order--rejected',
+                      isInTransit && 'glass-card-order--in-transit',
                       bulkAssignOpen && isBulkSelected && 'ring-2 ring-primary-500/50 dark:ring-primary-400/45',
                     )}
                   >
@@ -2158,10 +2231,21 @@ function RouteDetailSidePanel({
                           </button>
                         ) : null}
                         <div
-                          className="size-9 shrink-0 rounded-xl glass-icon-chip flex items-center justify-center"
+                          className={clsx(
+                            'size-9 shrink-0 rounded-xl flex items-center justify-center',
+                            isDelivered && 'bg-emerald-100/90 dark:bg-emerald-950/50',
+                            isRejected && 'bg-red-100/90 dark:bg-red-950/40',
+                            !isDelivered && !isRejected && 'glass-icon-chip',
+                          )}
                           aria-hidden
                         >
-                          <Package size={16} className="text-stone-600 dark:text-stone-300" />
+                          {isDelivered ? (
+                            <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400" />
+                          ) : isRejected ? (
+                            <XCircle size={18} className="text-red-600 dark:text-red-400" />
+                          ) : (
+                            <Package size={16} className="text-stone-600 dark:text-stone-300" />
+                          )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
@@ -2172,14 +2256,31 @@ function RouteDetailSidePanel({
                                 setEditingOrderId(null);
                                 setDetailOrder(o);
                               }}
-                              className="font-mono text-sm font-bold text-stone-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+                              className={clsx(
+                                'font-mono text-sm font-bold hover:text-primary-600 dark:hover:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded',
+                                isDelivered
+                                  ? 'text-emerald-900 dark:text-emerald-100'
+                                  : 'text-stone-900 dark:text-white',
+                              )}
                               title="Ver detalle del pedido"
                             >
                               {o.code}
                             </button>
-                            <span className="shrink-0 rounded-lg bg-stone-100/90 dark:bg-stone-800/90 px-2 py-0.5 text-xs font-semibold text-stone-700 dark:text-stone-200 tabular-nums">
-                              {o.bultos} bulto{o.bultos === 1 ? '' : 's'}
-                            </span>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              {showStatusOnCard ? (
+                                <OrderStatusBadge status={o.status} />
+                              ) : null}
+                              <span
+                                className={clsx(
+                                  'rounded-lg px-2 py-0.5 text-xs font-semibold tabular-nums',
+                                  isDelivered
+                                    ? 'bg-emerald-100/90 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200'
+                                    : 'bg-stone-100/90 text-stone-700 dark:bg-stone-800/90 dark:text-stone-200',
+                                )}
+                              >
+                                {o.bultos} bulto{o.bultos === 1 ? '' : 's'}
+                              </span>
+                            </div>
                           </div>
                           <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-500 mt-1.5">
                             Destinatario
@@ -2583,13 +2684,14 @@ export function RoutesPage() {
   const routeAggById = useMemo(() => {
     const map = new Map<
       string,
-      { pedidos: number; bultos: number; vehiclesLabel: string; driversLabel: string }
+      { pedidos: number; bultos: number; delivered: number; vehiclesLabel: string; driversLabel: string }
     >();
     for (const r of routes) {
       const pedidosEnRuta = orders.filter((o) => o.routeId === r.id);
       map.set(r.id, {
         pedidos: pedidosEnRuta.length,
         bultos: pedidosEnRuta.reduce((s, o) => s + (Number(o.bultos) || 0), 0),
+        delivered: pedidosEnRuta.filter((o) => o.status === 'delivered').length,
         vehiclesLabel: summarizeRouteVehicles(pedidosEnRuta, r.vehiclePlate),
         driversLabel: summarizeRouteAssignees(pedidosEnRuta, 'driverName'),
       });
@@ -2681,8 +2783,8 @@ export function RoutesPage() {
 
     if (sortCol && sortDir) {
       data = data.toSorted((a, b) => {
-        const aggA = routeAggById.get(a.id) ?? { pedidos: 0, bultos: 0, vehiclesLabel: '', driversLabel: '' };
-        const aggB = routeAggById.get(b.id) ?? { pedidos: 0, bultos: 0, vehiclesLabel: '', driversLabel: '' };
+        const aggA = routeAggById.get(a.id) ?? { pedidos: 0, bultos: 0, delivered: 0, vehiclesLabel: '', driversLabel: '' };
+        const aggB = routeAggById.get(b.id) ?? { pedidos: 0, bultos: 0, delivered: 0, vehiclesLabel: '', driversLabel: '' };
         let av: string | number = '';
         let bv: string | number = '';
         switch (sortCol) {
@@ -3036,7 +3138,7 @@ export function RoutesPage() {
                 {layout === 'cards' && (
                   <ul className="space-y-2" role="list">
                     {filteredRoutes.map((r) => {
-                      const agg = routeAggById.get(r.id) ?? { pedidos: 0, bultos: 0, vehiclesLabel: '', driversLabel: '' };
+                      const agg = routeAggById.get(r.id) ?? { pedidos: 0, bultos: 0, delivered: 0, vehiclesLabel: '', driversLabel: '' };
                       return (
                         <li key={r.id}>
                           <RouteListItem
@@ -3104,7 +3206,7 @@ export function RoutesPage() {
                         </thead>
                         <tbody className="bg-white dark:bg-stone-900">
                           {filteredRoutes.map((r) => {
-                            const agg = routeAggById.get(r.id) ?? { pedidos: 0, bultos: 0, vehiclesLabel: '', driversLabel: '' };
+                            const agg = routeAggById.get(r.id) ?? { pedidos: 0, bultos: 0, delivered: 0, vehiclesLabel: '', driversLabel: '' };
                             return (
                               <RouteTableRow
                                 key={r.id}
