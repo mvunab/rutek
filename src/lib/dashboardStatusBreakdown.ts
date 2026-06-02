@@ -1,7 +1,8 @@
 import { resolveOrderStatusLabel } from './orderStatusLabels';
 import { normalizeRouteStatus, routeStatusLabel } from './routeStatusLabels';
+import { orderStatusColors, routeStatusColors } from './statusColors';
 import type { StatusBreakdownRow } from '../components/dashboard/EntityStatusBreakdown';
-import type { DashboardStats, Order, Route, RouteStatus, Tenant } from '../types';
+import type { ChartDataPoint, DashboardStats, Order, Route, RouteStatus, Tenant } from '../types';
 
 function isThisMonth(iso: string): boolean {
   const d = new Date(iso);
@@ -90,13 +91,6 @@ const ROUTE_STATUS_ORDER: RouteStatus[] = [
   'cancelled',
 ];
 
-const ROUTE_BAR: Record<RouteStatus, { bar: string; dot: string }> = {
-  not_started: { bar: 'bg-blue-500', dot: 'bg-blue-500' },
-  in_progress: { bar: 'bg-amber-500', dot: 'bg-amber-500' },
-  completed: { bar: 'bg-emerald-500', dot: 'bg-emerald-500' },
-  cancelled: { bar: 'bg-red-500', dot: 'bg-red-500' },
-};
-
 const BUILTIN_ORDER_STATUS_ORDER = [
   'pending',
   'in_transit',
@@ -106,22 +100,6 @@ const BUILTIN_ORDER_STATUS_ORDER = [
   'cancelled',
   'returned',
 ] as const;
-
-const ORDER_BAR: Record<string, { bar: string; dot: string }> = {
-  pending: { bar: 'bg-amber-500', dot: 'bg-amber-500' },
-  in_transit: { bar: 'bg-violet-500', dot: 'bg-violet-500' },
-  delivered: { bar: 'bg-emerald-500', dot: 'bg-emerald-500' },
-  rejected: { bar: 'bg-red-500', dot: 'bg-red-500' },
-  confirmed: { bar: 'bg-blue-500', dot: 'bg-blue-500' },
-  cancelled: { bar: 'bg-stone-400', dot: 'bg-stone-400' },
-  returned: { bar: 'bg-stone-500', dot: 'bg-stone-500' },
-};
-
-const ORDER_BAR_DEFAULT = { bar: 'bg-stone-400', dot: 'bg-stone-400' };
-
-function orderBarClasses(slug: string) {
-  return ORDER_BAR[slug] ?? ORDER_BAR_DEFAULT;
-}
 
 export function buildRouteStatusBreakdown(routes: Route[]): StatusBreakdownRow[] {
   const counts: Record<RouteStatus, number> = {
@@ -137,13 +115,14 @@ export function buildRouteStatusBreakdown(routes: Route[]): StatusBreakdownRow[]
   }
 
   return ROUTE_STATUS_ORDER.map((key) => {
-    const colors = ROUTE_BAR[key];
+    const colors = routeStatusColors(key);
     return {
       key,
       label: routeStatusLabel(key),
       count: counts[key],
       barClass: colors.bar,
       dotClass: colors.dot,
+      fill: colors.fill,
     };
   });
 }
@@ -167,13 +146,14 @@ export function buildOrderStatusBreakdown(
   });
 
   return keys.map((key) => {
-    const colors = orderBarClasses(key);
+    const colors = orderStatusColors(key);
     return {
       key,
       label: resolveOrderStatusLabel(key, tenant),
       count: counts.get(key) ?? 0,
       barClass: colors.bar,
       dotClass: colors.dot,
+      fill: colors.fill,
     };
   });
 }
@@ -182,9 +162,94 @@ export function buildOrderStatusBreakdown(
 export function orderStatusToChartPoints(
   orders: Order[],
   tenant?: Tenant | null,
-): { label: string; value: number }[] {
+): ChartDataPoint[] {
   return buildOrderStatusBreakdown(orders, tenant).map((row) => ({
+    key: row.key,
     label: row.label,
     value: row.count,
+    fill: row.fill,
   }));
+}
+
+/** Aplica colores por `key` a puntos del API (p. ej. `/dashboard/stats`). */
+export function enrichStatusChartPoints(
+  points: ChartDataPoint[],
+): ChartDataPoint[] {
+  return points.map((p) => ({
+    ...p,
+    fill: p.fill ?? (p.key ? orderStatusColors(p.key).fill : undefined),
+  }));
+}
+
+function startOfLocalDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function isSameLocalDay(a: Date, b: Date): boolean {
+  return startOfLocalDay(a).getTime() === startOfLocalDay(b).getTime();
+}
+
+function deliveryDay(order: Order): Date | null {
+  if (order.status !== 'delivered') return null;
+  const raw = order.actualDelivery?.trim() || order.updatedAt?.trim() || '';
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Serie últimos 7 días (creados vs entregados) cuando `/dashboard/stats` no existe o viene vacío.
+ */
+export function buildOrdersWeeklyChart(orders: Order[]): ChartDataPoint[] {
+  const today = startOfLocalDay(new Date());
+  const points: ChartDataPoint[] = [];
+
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const day = new Date(today);
+    day.setDate(day.getDate() - offset);
+
+    let created = 0;
+    let delivered = 0;
+
+    for (const o of orders) {
+      const c = new Date(o.createdAt);
+      if (!Number.isNaN(c.getTime()) && isSameLocalDay(c, day)) created += 1;
+
+      const del = deliveryDay(o);
+      if (del && isSameLocalDay(del, day)) delivered += 1;
+    }
+
+    points.push({
+      label: day.toLocaleDateString('es-CL', { weekday: 'short' }),
+      value: created,
+      value2: delivered,
+    });
+  }
+
+  return points;
+}
+
+export function ordersWeeklyChartHasActivity(points: ChartDataPoint[]): boolean {
+  return points.some((p) => (p.value ?? 0) > 0 || (p.value2 ?? 0) > 0);
+}
+
+/** Inicio del día local hace `daysAgo` días (0 = hoy). */
+export function startOfDaysAgo(daysAgo: number, now = new Date()): Date {
+  const d = startOfLocalDay(now);
+  d.setDate(d.getDate() - daysAgo);
+  return d;
+}
+
+/** Pedidos creados en los últimos 7 días calendario (incluye hoy), más recientes primero. */
+export function recentOrdersLast7Days(orders: Order[], limit = 12): Order[] {
+  const floor = startOfDaysAgo(6);
+  return orders
+    .filter((o) => {
+      const created = new Date(o.createdAt);
+      return !Number.isNaN(created.getTime()) && created.getTime() >= floor.getTime();
+    })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit);
 }

@@ -9,7 +9,12 @@ import { Input, Select } from '../../components/ui/Input';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useUiStore } from '../../store/useUiStore';
 import type { Tenant, ExcelFormatConfig, ExcelColumnMapping } from '../../types';
-import { api } from '../../lib/api';
+import {
+  maxMappedColumnIndex,
+  normalizeExcelFormat,
+  normalizeExcelFormatsList,
+} from '../../lib/excelFormat';
+import { api, ApiError } from '../../lib/api';
 
 type CompanyForm = {
   name: string;
@@ -558,8 +563,8 @@ function ExcelFormatsSection() {
     setLoading(true);
     setError('');
     try {
-      const data = await api.get<ExcelFormatConfig[]>('/tenant/excel-formats');
-      setFormats(data);
+      const data = await api.get<unknown>('/tenant/excel-formats');
+      setFormats(normalizeExcelFormatsList(data));
     } catch {
       setError('No se pudieron cargar los formatos.');
     } finally {
@@ -574,7 +579,7 @@ function ExcelFormatsSection() {
   };
 
   const openEdit = (fmt: ExcelFormatConfig) => {
-    setEditorForm({ ...fmt });
+    setEditorForm(normalizeExcelFormat(fmt as unknown as Record<string, unknown>));
     setRawHeaders(null);
     setEditingId(fmt.id);
   };
@@ -615,14 +620,33 @@ function ExcelFormatsSection() {
   const handleSave = async () => {
     if (!editorForm.name.trim()) return;
     setSaving(true);
+    setError('');
     try {
-      const body = { ...editorForm };
-      if (editingId !== 'new') body.id = editingId as string;
-      const updated = await api.put<ExcelFormatConfig[]>('/tenant/excel-formats', body);
-      setFormats(updated);
+      const body = {
+        ...(editingId !== 'new' ? { id: editingId as string } : {}),
+        name: editorForm.name.trim(),
+        active: editorForm.active,
+        headerRow: editorForm.headerRow,
+        dataStartRow: editorForm.dataStartRow,
+        detection: editorForm.detection ?? null,
+        columns: editorForm.columns ?? {},
+        metadata: editorForm.metadata ?? null,
+      };
+      const updated = await api.put<unknown>('/tenant/excel-formats', body);
+      setFormats(normalizeExcelFormatsList(updated));
       closeEditor();
-    } catch {
-      setError('No se pudo guardar el formato.');
+    } catch (err) {
+      let msg = 'No se pudo guardar el formato.';
+      if (err instanceof ApiError) {
+        try {
+          const p = JSON.parse(err.body) as { message?: string | string[] };
+          if (typeof p.message === 'string') msg = p.message;
+          else if (Array.isArray(p.message)) msg = p.message.join(' · ');
+        } catch {
+          if (err.body) msg = err.body;
+        }
+      }
+      setError(msg);
     } finally {
       setSaving(false);
     }
@@ -630,8 +654,8 @@ function ExcelFormatsSection() {
 
   const handleDelete = async (id: string) => {
     try {
-      const updated = await api.del<ExcelFormatConfig[]>(`/tenant/excel-formats/${id}`);
-      setFormats(updated);
+      const updated = await api.del<unknown>(`/tenant/excel-formats/${id}`);
+      setFormats(normalizeExcelFormatsList(updated));
     } catch {
       setError('No se pudo eliminar el formato.');
     }
@@ -639,14 +663,24 @@ function ExcelFormatsSection() {
 
   const handleActivate = async (id: string) => {
     try {
-      const updated = await api.post<ExcelFormatConfig[]>(`/tenant/excel-formats/${id}/activate`, {});
-      setFormats(updated);
+      const updated = await api.post<unknown>(`/tenant/excel-formats/${id}/activate`, {});
+      setFormats(normalizeExcelFormatsList(updated));
     } catch {
       setError('No se pudo activar el formato.');
     }
   };
 
-  const headerCols = rawHeaders ? rawHeaders.rows[editorForm.headerRow] ?? [] : [];
+  const headerColsFromFile = rawHeaders ? rawHeaders.rows[editorForm.headerRow] ?? [] : [];
+  const headerColsFallbackLen = Math.max(
+    headerColsFromFile.length - 1,
+    maxMappedColumnIndex(editorForm.columns),
+  );
+  const headerCols =
+    headerColsFromFile.length > 0
+      ? headerColsFromFile
+      : headerColsFallbackLen >= 0
+        ? Array.from({ length: headerColsFallbackLen + 1 }, (_, ci) => `Columna ${colLetter(ci)}`)
+        : [];
 
   const setCol = (field: keyof ExcelColumnMapping, colIdx: number | null) => {
     setEditorForm((f) => ({ ...f, columns: { ...f.columns, [field]: colIdx } }));
@@ -727,6 +761,9 @@ function ExcelFormatsSection() {
                 </div>
                 <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
                   Encabezado: fila {fmt.headerRow + 1} · Datos desde fila {fmt.dataStartRow + 1}
+                  {' · '}
+                  {Object.values(fmt.columns).filter((v) => typeof v === 'number' && v >= 0).length}{' '}
+                  columnas mapeadas
                   {fmt.detection ? ` · Detección: "${fmt.detection.value}" en ${colLetter(fmt.detection.col)}${fmt.detection.row + 1}` : ''}
                 </p>
               </div>

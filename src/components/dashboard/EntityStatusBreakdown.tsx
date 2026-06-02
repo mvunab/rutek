@@ -9,6 +9,8 @@ export interface StatusBreakdownRow {
   count: number;
   barClass: string;
   dotClass: string;
+  /** Hex para leyendas que deben coincidir con Recharts */
+  fill?: string;
 }
 
 interface EntityStatusBreakdownProps {

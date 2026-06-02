@@ -248,6 +248,10 @@ export interface ChartDataPoint {
   label: string;
   value: number;
   value2?: number;
+  /** Slug de estado (pedido) para color consistente en gráficos */
+  key?: string;
+  /** Color hex; si falta, el UI lo resuelve con `key` */
+  fill?: string;
 }
 
 // ─── Delivery Records (Admin. de Rutas tabla operacional) ────────────────────

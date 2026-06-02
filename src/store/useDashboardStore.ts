@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ChartDataPoint, DashboardStats } from '../types';
 import { api, isNetworkError } from '../lib/api';
+import { enrichStatusChartPoints } from '../lib/dashboardStatusBreakdown';
 
 const emptyStats: DashboardStats = {
   totalOrders: 0,
@@ -42,7 +43,9 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
       set({
         stats: { ...emptyStats, ...(data?.stats ?? {}) },
         ordersChart: Array.isArray(data?.ordersChart) ? data.ordersChart : [],
-        statusChart: Array.isArray(data?.statusChart) ? data.statusChart : [],
+        statusChart: Array.isArray(data?.statusChart)
+          ? enrichStatusChartPoints(data.statusChart)
+          : [],
         loaded: true,
       });
     } catch (err) {

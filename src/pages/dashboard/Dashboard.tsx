@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Package, Truck, Users, Map, TrendingUp, Clock,
   CheckCircle2, AlertCircle, ArrowRight,
@@ -24,10 +24,14 @@ import {
   kpiOrdersTotalSubtitle,
   mergeDashboardStats,
   orderStatusToChartPoints,
+  buildOrdersWeeklyChart,
+  ordersWeeklyChartHasActivity,
+  enrichStatusChartPoints,
+  recentOrdersLast7Days,
 } from '../../lib/dashboardStatusBreakdown';
+import { DASHBOARD_SERIES_COLORS, orderStatusColors } from '../../lib/statusColors';
 
-
-const CHART_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ef4444'];
+const ACTIVE_ROUTES_PAGE_SIZE = 10;
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -46,15 +50,28 @@ export function Dashboard() {
     }
   }, [isSuperAdmin, fetchDashboard, fetchOrders, fetchRoutes, fetchClients]);
 
-  if (isSuperAdmin) {
-    navigate('/super-admin', { replace: true });
-    return null;
-  }
-
-  const recentOrders = orders.slice(0, 4);
-  const activeRoutes = routes.filter(
-    (r) => r.status === 'not_started' || r.status === 'in_progress',
+  const recentOrders = useMemo(() => recentOrdersLast7Days(orders), [orders]);
+  const activeRoutes = useMemo(
+    () =>
+      routes.filter(
+        (r) => r.status === 'not_started' || r.status === 'in_progress',
+      ),
+    [routes],
   );
+
+  const [activeRoutesPage, setActiveRoutesPage] = useState(1);
+  const activeRoutesTotalPages = Math.max(
+    1,
+    Math.ceil(activeRoutes.length / ACTIVE_ROUTES_PAGE_SIZE),
+  );
+  const paginatedActiveRoutes = useMemo(() => {
+    const start = (activeRoutesPage - 1) * ACTIVE_ROUTES_PAGE_SIZE;
+    return activeRoutes.slice(start, start + ACTIVE_ROUTES_PAGE_SIZE);
+  }, [activeRoutes, activeRoutesPage]);
+
+  useEffect(() => {
+    setActiveRoutesPage((p) => Math.min(p, activeRoutesTotalPages));
+  }, [activeRoutes.length, activeRoutesTotalPages]);
 
   const routeStatusRows = useMemo(() => buildRouteStatusBreakdown(routes), [routes]);
   const orderStatusRows = useMemo(
@@ -63,9 +80,14 @@ export function Dashboard() {
   );
 
   const effectiveStatusChart = useMemo(() => {
-    if (statusChart.length > 0) return statusChart;
+    if (statusChart.length > 0) return enrichStatusChartPoints(statusChart);
     return orderStatusToChartPoints(orders, tenant);
   }, [statusChart, orders, tenant]);
+
+  const effectiveOrdersChart = useMemo(() => {
+    if (ordersChart.length > 0) return ordersChart;
+    return buildOrdersWeeklyChart(orders);
+  }, [ordersChart, orders]);
 
   const kpis = useMemo(
     () =>
@@ -78,8 +100,18 @@ export function Dashboard() {
 
   const ordersTotalSubtitle = useMemo(() => kpiOrdersTotalSubtitle(orders), [orders]);
 
-  const hasOrdersChart = ordersChart.length > 0;
-  const hasStatusChart = effectiveStatusChart.length > 0;
+  const hasOrdersChart =
+    ordersChart.length > 0 ||
+    ordersWeeklyChartHasActivity(effectiveOrdersChart) ||
+    orders.length > 0;
+  const hasStatusChart = effectiveStatusChart.some((p) => p.value > 0);
+  const ordersChartWeekEmpty =
+    orders.length > 0 && !ordersWeeklyChartHasActivity(effectiveOrdersChart);
+
+  if (isSuperAdmin) {
+    navigate('/super-admin', { replace: true });
+    return null;
+  }
 
   return (
     <div className="space-y-6">
@@ -163,21 +195,42 @@ export function Dashboard() {
               <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Creados vs entregados</p>
             </div>
             <div className="flex items-center gap-4 text-xs text-stone-500 dark:text-stone-400">
-              <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-primary-500 rounded inline-block" /> Creados</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-emerald-500 rounded inline-block" /> Entregados</span>
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="w-3 h-0.5 rounded inline-block"
+                  style={{ backgroundColor: DASHBOARD_SERIES_COLORS.created }}
+                  aria-hidden
+                />
+                Creados
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="w-3 h-0.5 rounded inline-block"
+                  style={{ backgroundColor: DASHBOARD_SERIES_COLORS.delivered }}
+                  aria-hidden
+                />
+                Entregados
+              </span>
             </div>
           </div>
           {hasOrdersChart ? (
+            <>
+            {ordersChartWeekEmpty ? (
+              <p className="text-xs text-stone-400 dark:text-stone-500 mb-2">
+                Sin pedidos creados ni entregados en los últimos 7 días; hay {orders.length} pedido
+                {orders.length === 1 ? '' : 's'} en el sistema.
+              </p>
+            ) : null}
             <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={ordersChart} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <AreaChart data={effectiveOrdersChart} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorCreated" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    <stop offset="5%" stopColor={DASHBOARD_SERIES_COLORS.created} stopOpacity={0.15} />
+                    <stop offset="95%" stopColor={DASHBOARD_SERIES_COLORS.created} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorDelivered" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="5%" stopColor={DASHBOARD_SERIES_COLORS.delivered} stopOpacity={0.15} />
+                    <stop offset="95%" stopColor={DASHBOARD_SERIES_COLORS.delivered} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f0ec" />
@@ -188,13 +241,14 @@ export function Dashboard() {
                   labelStyle={{ color: '#57534e' }}
                   itemStyle={{ color: '#292524' }}
                 />
-                <Area type="monotone" dataKey="value" name="Creados" stroke="#3b82f6" strokeWidth={2} fill="url(#colorCreated)" dot={false} />
-                <Area type="monotone" dataKey="value2" name="Entregados" stroke="#10b981" strokeWidth={2} fill="url(#colorDelivered)" dot={false} />
+                <Area type="monotone" dataKey="value" name="Creados" stroke={DASHBOARD_SERIES_COLORS.created} strokeWidth={2} fill="url(#colorCreated)" dot={false} />
+                <Area type="monotone" dataKey="value2" name="Entregados" stroke={DASHBOARD_SERIES_COLORS.delivered} strokeWidth={2} fill="url(#colorDelivered)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
+            </>
           ) : (
             <div className="h-[200px] flex items-center justify-center text-sm text-stone-400 dark:text-stone-500">
-              Sin datos para mostrar
+              Sin pedidos en el sistema
             </div>
           )}
         </div>
@@ -216,9 +270,12 @@ export function Dashboard() {
                     dataKey="value"
                     paddingAngle={3}
                   >
-                    {effectiveStatusChart.map((entry, index) => (
-                      <Cell key={entry.label} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
+                    {effectiveStatusChart.map((entry) => {
+                      const fill =
+                        entry.fill ??
+                        (entry.key ? orderStatusColors(entry.key).fill : orderStatusColors('').fill);
+                      return <Cell key={entry.key ?? entry.label} fill={fill} />;
+                    })}
                   </Pie>
                   <Tooltip
                     contentStyle={{ backgroundColor: '#fff', border: '1px solid #e7e5e4', borderRadius: '8px', fontSize: '12px' }}
@@ -226,20 +283,31 @@ export function Dashboard() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="space-y-2 mt-2">
-                {effectiveStatusChart.map((item, i) => (
-                  <div key={item.label} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span aria-hidden="true" className="size-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS[i] }} />
-                      <span className="text-xs text-stone-500 dark:text-stone-400">{item.label}</span>
+                {effectiveStatusChart.map((item) => {
+                  const fill =
+                    item.fill ??
+                    (item.key ? orderStatusColors(item.key).fill : orderStatusColors('').fill);
+                  return (
+                    <div key={item.key ?? item.label} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span
+                          aria-hidden="true"
+                          className="size-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: fill }}
+                        />
+                        <span className="text-xs text-stone-500 dark:text-stone-400">{item.label}</span>
+                      </div>
+                      <span className="text-xs font-semibold text-stone-700 dark:text-stone-200 tabular-nums">
+                        {item.value}
+                      </span>
                     </div>
-                    <span className="text-xs font-semibold text-stone-700 dark:text-stone-200 tabular-nums">{item.value}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           ) : (
             <div className="h-[140px] flex items-center justify-center text-sm text-stone-400 dark:text-stone-500">
-              Sin datos para mostrar
+              Sin pedidos en el sistema
             </div>
           )}
         </div>
@@ -251,7 +319,9 @@ export function Dashboard() {
           <div className="flex items-center justify-between p-5 border-b border-stone-100 dark:border-stone-800">
             <div>
               <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Pedidos recientes</h3>
-              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Para agrupar en rutas</p>
+              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
+                Últimos 7 días · para agrupar en rutas
+              </p>
             </div>
             <Button variant="ghost" size="xs" onClick={() => navigate('/rutas')} icon={<ArrowRight size={12} />} iconPosition="right">
               Ir a rutas
@@ -260,7 +330,7 @@ export function Dashboard() {
           <div className="divide-y divide-stone-50 dark:divide-stone-800">
             {recentOrders.length === 0 ? (
               <div className="p-8 text-center text-sm text-stone-400 dark:text-stone-500">
-                Sin pedidos para mostrar
+                Sin pedidos creados en los últimos 7 días
               </div>
             ) : (
               recentOrders.map((order) => (
@@ -284,14 +354,18 @@ export function Dashboard() {
           <div className="flex items-center justify-between p-5 border-b border-stone-100 dark:border-stone-800">
             <div>
               <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Rutas activas</h3>
-              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Itinerario: pedidos y bultos totales</p>
+              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
+                {activeRoutes.length > 0
+                  ? `${activeRoutes.length} en curso · máx. ${ACTIVE_ROUTES_PAGE_SIZE} por página`
+                  : 'Itinerario: pedidos y bultos totales'}
+              </p>
             </div>
             <Button variant="ghost" size="xs" onClick={() => navigate('/rutas')} icon={<ArrowRight size={12} />} iconPosition="right">
               Ver rutas
             </Button>
           </div>
           <div className="divide-y divide-stone-50 dark:divide-stone-800">
-            {activeRoutes.map((route) => (
+            {paginatedActiveRoutes.map((route) => (
               <div key={route.id} className="px-5 py-3.5 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors">
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
@@ -339,6 +413,38 @@ export function Dashboard() {
               <div className="p-8 text-center text-sm text-stone-400 dark:text-stone-500">No hay rutas activas</div>
             )}
           </div>
+          {activeRoutes.length > ACTIVE_ROUTES_PAGE_SIZE ? (
+            <div
+              className="flex items-center justify-between gap-2 px-5 py-3 border-t border-stone-100 dark:border-stone-800"
+              aria-label="Paginación de rutas activas"
+            >
+              <span className="text-xs text-stone-500 dark:text-stone-400 tabular-nums">
+                Página {activeRoutesPage} de {activeRoutesTotalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="xs"
+                  disabled={activeRoutesPage <= 1}
+                  onClick={() => setActiveRoutesPage((p) => Math.max(1, p - 1))}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="xs"
+                  disabled={activeRoutesPage >= activeRoutesTotalPages}
+                  onClick={() =>
+                    setActiveRoutesPage((p) => Math.min(activeRoutesTotalPages, p + 1))
+                  }
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
