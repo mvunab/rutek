@@ -191,6 +191,11 @@ function isSameLocalDay(a: Date, b: Date): boolean {
   return startOfLocalDay(a).getTime() === startOfLocalDay(b).getTime();
 }
 
+/** Etiqueta compacta para eje X del gráfico semanal (ej. "01 jun"). */
+export function formatChartDayLabel(day: Date): string {
+  return day.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+}
+
 function deliveryDay(order: Order): Date | null {
   if (order.status !== 'delivered') return null;
   const raw = order.actualDelivery?.trim() || order.updatedAt?.trim() || '';
@@ -222,7 +227,7 @@ export function buildOrdersWeeklyChart(orders: Order[]): ChartDataPoint[] {
     }
 
     points.push({
-      label: day.toLocaleDateString('es-CL', { weekday: 'short' }),
+      label: formatChartDayLabel(day),
       value: created,
       value2: delivered,
     });

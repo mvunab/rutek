@@ -163,6 +163,24 @@ export function Dashboard() {
         />
       </div>
 
+      {/* Secondary stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Rutas activas', value: kpis.activeRoutes, icon: <Map size={16} />, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/40' },
+          { label: 'Cuentas', value: kpis.totalClients, icon: <Users size={16} />, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+          { label: 'Efectividad', value: `${kpis.deliveryRate}%`, icon: <TrendingUp size={16} />, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/40' },
+          { label: 'Tiempo prom.', value: kpis.avgDeliveryTime > 0 ? `${kpis.avgDeliveryTime} d` : '—', icon: <Clock size={16} />, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40' },
+        ].map((item) => (
+          <div key={item.label} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-4 flex items-center gap-3 shadow-sm">
+            <div className={`p-2 rounded-lg ${item.bg} dark:opacity-90 ${item.color}`}>{item.icon}</div>
+            <div>
+              <p className="text-xl font-bold text-stone-900 dark:text-stone-100">{item.value}</p>
+              <p className="text-xs text-stone-400 dark:text-stone-500">{item.label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <EntityStatusBreakdown
           title="Rutas por estado"
@@ -234,7 +252,13 @@ export function Dashboard() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f0ec" />
-                <XAxis dataKey="label" tick={{ fill: '#a8a29e', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: '#a8a29e', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={0}
+                />
                 <YAxis tick={{ fill: '#a8a29e', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#fff', border: '1px solid #e7e5e4', borderRadius: '8px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
@@ -446,24 +470,6 @@ export function Dashboard() {
             </div>
           ) : null}
         </div>
-      </div>
-
-      {/* Secondary stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Rutas activas', value: kpis.activeRoutes, icon: <Map size={16} />, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/40' },
-          { label: 'Cuentas', value: kpis.totalClients, icon: <Users size={16} />, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
-          { label: 'Efectividad', value: `${kpis.deliveryRate}%`, icon: <TrendingUp size={16} />, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/40' },
-          { label: 'Tiempo prom.', value: kpis.avgDeliveryTime > 0 ? `${kpis.avgDeliveryTime} d` : '—', icon: <Clock size={16} />, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40' },
-        ].map((item) => (
-          <div key={item.label} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-4 flex items-center gap-3 shadow-sm">
-            <div className={`p-2 rounded-lg ${item.bg} dark:opacity-90 ${item.color}`}>{item.icon}</div>
-            <div>
-              <p className="text-xl font-bold text-stone-900 dark:text-stone-100">{item.value}</p>
-              <p className="text-xs text-stone-400 dark:text-stone-500">{item.label}</p>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
