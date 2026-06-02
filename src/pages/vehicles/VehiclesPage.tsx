@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Pencil,
   X,
@@ -25,6 +26,7 @@ import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { Input, Select } from '../../components/ui/Input';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ApiError } from '../../lib/api';
+import { normalizeVehiclePlate, normalizeVehicleVin } from '../../lib/vehicleIdentity';
 
 type SortKey = keyof Pick<Vehicle, 'plate' | 'brand' | 'model' | 'year' | 'available'>;
 type SortDir = 'asc' | 'desc' | 'none';
@@ -190,10 +192,23 @@ export function VehiclesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Vehicle | null>(null);
 
   const formBaseId = useId();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     void fetchVehicles();
   }, [fetchVehicles]);
+
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (!editId || !loaded) return;
+    const target = vehicles.find((v) => v.id === editId);
+    if (!target) return;
+    setEditing(target);
+    setForm(vehicleToForm(target));
+    setFormError(null);
+    setModalOpen(true);
+    setSearchParams({}, { replace: true });
+  }, [loaded, vehicles, searchParams, setSearchParams]);
 
   const handleSort = (col: SortKey) => {
     if (sortCol !== col) {
@@ -321,15 +336,44 @@ export function VehiclesPage() {
       setFormError('VIN inválido: usa 11–17 caracteres (sin I, O ni Q).');
       return null;
     }
+
+    const normalizedPlate = normalizeVehiclePlate(plate);
+    const normalizedVin = normalizeVehicleVin(vin || null);
+
+    const plateDup = vehicles.find(
+      (v) =>
+        normalizeVehiclePlate(v.plate) === normalizedPlate &&
+        v.id !== editing?.id,
+    );
+    if (plateDup) {
+      setFormError(`Ya existe un vehículo con la patente ${plateDup.plate}.`);
+      return null;
+    }
+
+    if (normalizedVin) {
+      const vinDup = vehicles.find(
+        (v) =>
+          v.vin &&
+          normalizeVehicleVin(v.vin) === normalizedVin &&
+          v.id !== editing?.id,
+      );
+      if (vinDup) {
+        setFormError(
+          `El VIN ${normalizedVin} ya está registrado en el vehículo ${vinDup.plate}.`,
+        );
+        return null;
+      }
+    }
+
     return {
-      plate,
+      plate: normalizedPlate,
       brand,
       model,
       year,
       type: form.type,
       capacity: cap,
       available: form.available,
-      vin: vin || null,
+      vin: normalizedVin,
       maintenanceDueDate: form.maintenanceDueDate.trim() || null,
       circulationPermitDueDate: form.circulationPermitDueDate.trim() || null,
       technicalReviewDueDate: form.technicalReviewDueDate.trim() || null,
@@ -495,9 +539,13 @@ export function VehiclesPage() {
               {vehiclesWithAlerts.map(({ vehicle, compliance }) => (
                 <div key={vehicle.id} className="px-4 py-3 flex flex-wrap items-start gap-x-4 gap-y-1">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-stone-900 dark:text-stone-100" translate="no">
+                    <Link
+                      to={`/vehiculos/${vehicle.id}`}
+                      className="text-sm font-semibold text-stone-900 dark:text-stone-100 hover:text-primary-700 dark:hover:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+                      translate="no"
+                    >
                       {vehicle.plate}
-                    </p>
+                    </Link>
                     <p className="text-xs text-stone-500 dark:text-stone-400 truncate">
                       {vehicle.brand} {vehicle.model} {vehicle.year}
                     </p>
@@ -611,7 +659,13 @@ export function VehiclesPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className="font-mono text-sm font-medium text-stone-800 dark:text-stone-100">{v.plate}</span>
+                      <Link
+                        to={`/vehiculos/${v.id}`}
+                        className="font-mono text-sm font-medium text-primary-700 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+                        translate="no"
+                      >
+                        {v.plate}
+                      </Link>
                     </td>
                     <td className="px-3 py-2.5 text-sm text-stone-700 dark:text-stone-200">{v.brand}</td>
                     <td className="px-3 py-2.5 text-sm text-stone-700 dark:text-stone-200 min-w-0 max-w-[220px] truncate" title={v.model}>

@@ -35,6 +35,11 @@ const VehiclesPage = lazy(() =>
     default: m.VehiclesPage,
   })),
 );
+const VehicleDetailPage = lazy(() =>
+  import('./pages/vehicles/VehicleDetailPage').then((m) => ({
+    default: m.VehicleDetailPage,
+  })),
+);
 const SettingsPage = lazy(() =>
   import('./pages/settings/SettingsPage').then((m) => ({
     default: m.SettingsPage,
@@ -217,6 +222,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <PeonetaDashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="vehiculos/:id"
+                element={
+                  <ProtectedRoute>
+                    <VehicleDetailPage />
                   </ProtectedRoute>
                 }
               />

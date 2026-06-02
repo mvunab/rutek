@@ -191,4 +191,20 @@ export interface DbVehicle {
   technical_review_due_date?: string | null;
   created_at: string;
   updated_at: string;
+  documents?: DbVehicleDocument[];
+}
+
+export interface DbVehicleDocument {
+  id: string;
+  tenant_id: string;
+  vehicle_id: string;
+  kind: string;
+  storage_key: string;
+  file_url: string;
+  mime_type: string;
+  file_name?: string | null;
+  file_size?: number | null;
+  uploaded_by?: string | null;
+  created_at: string;
+  updated_at: string;
 }

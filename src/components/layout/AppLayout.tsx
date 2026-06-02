@@ -33,7 +33,13 @@ export function AppLayout() {
   }
 
   const inSuperAdmin = isSuperAdmin || location.pathname.startsWith('/super-admin');
-  const pageInfo = pageTitles[location.pathname] ?? { title: 'Rutek' };
+  const vehicleDetailMatch = /^\/vehiculos\/[^/]+$/.test(location.pathname);
+  const pageInfo = vehicleDetailMatch
+    ? {
+        title: 'Ficha de vehículo',
+        subtitle: 'Identificación, documentación y actividad reciente en rutas y pedidos',
+      }
+    : pageTitles[location.pathname] ?? { title: 'Rutek' };
   /** Rutas usa layout de altura fija: scroll solo en listado y panel de detalle. */
   const isRoutesPage = location.pathname === '/rutas';
 

@@ -14,6 +14,22 @@ export const COMPLIANCE_LABELS: Record<VehicleComplianceKind, string> = {
   technicalReview: 'Revisión técnica',
 };
 
+/** Tipos de documento en API / MinIO (`vehicle_documents.kind`). */
+export const COMPLIANCE_TO_DOCUMENT_KIND: Record<
+  VehicleComplianceKind,
+  'maintenance' | 'circulation_permit' | 'technical_review'
+> = {
+  maintenance: 'maintenance',
+  circulationPermit: 'circulation_permit',
+  technicalReview: 'technical_review',
+};
+
+/** Tarjetas con subida de evidencia escaneada (imagen o PDF). */
+export const COMPLIANCE_SUPPORTS_DOCUMENT_UPLOAD: VehicleComplianceKind[] = [
+  'maintenance',
+  'technicalReview',
+];
+
 function toLocalDay(isoDate: string): Date {
   const day = isoDate.trim().slice(0, 10);
   const [y, m, d] = day.split('-').map(Number);
@@ -107,4 +123,51 @@ export function formatComplianceHint(item: VehicleComplianceItem): string {
     return `${item.label}: vencido hace ${days} ${days === 1 ? 'día' : 'días'}`;
   }
   return `${item.label}: vence en ${item.daysLeft} ${item.daysLeft === 1 ? 'día' : 'días'}`;
+}
+
+export interface VehicleComplianceDetailItem {
+  kind: VehicleComplianceKind;
+  label: string;
+  dueDate: string | null;
+  status: ComplianceStatus;
+  daysLeft: number | null;
+}
+
+const COMPLIANCE_STATUS_LABELS: Record<ComplianceStatus, string> = {
+  none: 'Sin registrar',
+  ok: 'Al día',
+  warning: 'Por vencer',
+  expired: 'Vencido',
+};
+
+export function complianceStatusLabel(status: ComplianceStatus): string {
+  return COMPLIANCE_STATUS_LABELS[status];
+}
+
+/** Todos los ítems de documentación para la ficha (incluye al día y sin fecha). */
+export function listVehicleComplianceDetails(
+  dates: {
+    maintenanceDueDate?: string | null;
+    circulationPermitDueDate?: string | null;
+    technicalReviewDueDate?: string | null;
+  },
+  now = new Date(),
+): VehicleComplianceDetailItem[] {
+  const entries: { kind: VehicleComplianceKind; due?: string | null }[] = [
+    { kind: 'maintenance', due: dates.maintenanceDueDate },
+    { kind: 'circulationPermit', due: dates.circulationPermitDueDate },
+    { kind: 'technicalReview', due: dates.technicalReviewDueDate },
+  ];
+
+  return entries.map(({ kind, due }) => {
+    const dueDate = due?.trim() ? due.slice(0, 10) : null;
+    const status = complianceFromDueDate(due, now);
+    return {
+      kind,
+      label: COMPLIANCE_LABELS[kind],
+      dueDate,
+      status,
+      daysLeft: dueDate ? daysUntilDue(dueDate, now) : null,
+    };
+  });
 }

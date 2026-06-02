@@ -230,6 +230,27 @@ export interface Vehicle {
   circulationPermitDueDate?: string | null;
   technicalReviewDueDate?: string | null;
   createdAt?: string;
+  documents?: VehicleDocument[];
+}
+
+export type VehicleDocumentKind =
+  | 'maintenance'
+  | 'circulation_permit'
+  | 'technical_review';
+
+export interface VehicleDocument {
+  id: string;
+  tenantId: string;
+  vehicleId: string;
+  kind: VehicleDocumentKind;
+  storageKey: string;
+  fileUrl: string;
+  mimeType: string;
+  fileName?: string | null;
+  fileSize?: number | null;
+  uploadedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Dashboard Stats ─────────────────────────────────────────────────────────

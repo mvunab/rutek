@@ -1,7 +1,25 @@
 import { create } from 'zustand';
-import type { Vehicle, VehicleType } from '../types';
+import type { Vehicle, VehicleType, VehicleDocument, VehicleDocumentKind } from '../types';
 import { api, isNetworkError } from '../lib/api';
-import type { DbVehicle } from '../types/api';
+import type { DbVehicle, DbVehicleDocument } from '../types/api';
+import { normalizeVehiclePlate, normalizeVehicleVin } from '../lib/vehicleIdentity';
+
+function toVehicleDocument(r: DbVehicleDocument): VehicleDocument {
+  return {
+    id: r.id,
+    tenantId: r.tenant_id,
+    vehicleId: r.vehicle_id,
+    kind: r.kind as VehicleDocumentKind,
+    storageKey: r.storage_key,
+    fileUrl: r.file_url,
+    mimeType: r.mime_type,
+    fileName: r.file_name ?? null,
+    fileSize: r.file_size ?? null,
+    uploadedBy: r.uploaded_by ?? null,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
 
 function toVehicle(r: DbVehicle): Vehicle {
   return {
@@ -19,6 +37,7 @@ function toVehicle(r: DbVehicle): Vehicle {
     circulationPermitDueDate: r.circulation_permit_due_date ?? null,
     technicalReviewDueDate: r.technical_review_due_date ?? null,
     createdAt: r.created_at,
+    documents: Array.isArray(r.documents) ? r.documents.map(toVehicleDocument) : undefined,
   };
 }
 
@@ -43,6 +62,13 @@ interface VehicleStore {
   loading: boolean;
   loaded: boolean;
   fetchVehicles: () => Promise<void>;
+  fetchVehicle: (id: string) => Promise<Vehicle>;
+  uploadVehicleDocument: (
+    vehicleId: string,
+    kind: VehicleDocumentKind,
+    file: File,
+  ) => Promise<VehicleDocument>;
+  deleteVehicleDocument: (vehicleId: string, kind: VehicleDocumentKind) => Promise<void>;
   createVehicle: (input: CreateVehicleInput) => Promise<Vehicle>;
   updateVehicle: (id: string, patch: UpdateVehicleInput) => Promise<Vehicle>;
   deleteVehicle: (id: string) => Promise<void>;
@@ -50,7 +76,9 @@ interface VehicleStore {
 
 function buildVehicleBody(input: CreateVehicleInput | UpdateVehicleInput): Record<string, unknown> {
   const body: Record<string, unknown> = {};
-  if ('plate' in input && input.plate !== undefined) body.plate = input.plate.trim();
+  if ('plate' in input && input.plate !== undefined) {
+    body.plate = normalizeVehiclePlate(input.plate);
+  }
   if ('brand' in input && input.brand !== undefined) body.brand = input.brand.trim();
   if ('model' in input && input.model !== undefined) body.model = input.model.trim();
   if ('year' in input && input.year !== undefined) body.year = input.year;
@@ -58,8 +86,8 @@ function buildVehicleBody(input: CreateVehicleInput | UpdateVehicleInput): Recor
   if ('capacity' in input && input.capacity !== undefined) body.capacity = input.capacity;
   if ('available' in input && input.available !== undefined) body.available = input.available;
   if ('vin' in input && input.vin !== undefined) {
-    const v = input.vin?.trim().toUpperCase() ?? '';
-    body.vin = v.length > 0 ? v : null;
+    const v = input.vin?.trim() ?? '';
+    body.vin = v.length > 0 ? normalizeVehicleVin(v) : null;
   }
   if ('maintenanceDueDate' in input && input.maintenanceDueDate !== undefined) {
     body.maintenanceDueDate = input.maintenanceDueDate?.trim() ? input.maintenanceDueDate.trim() : null;
@@ -99,6 +127,47 @@ export const useVehicleStore = create<VehicleStore>((set) => ({
     } finally {
       set({ loading: false });
     }
+  },
+
+  fetchVehicle: async (id) => {
+    const row = await api.get<DbVehicle>(`/vehicles/${id}`);
+    const vehicle = toVehicle(row);
+    set((s) => ({
+      vehicles: s.vehicles.some((v) => v.id === id)
+        ? s.vehicles.map((v) => (v.id === id ? vehicle : v))
+        : [vehicle, ...s.vehicles],
+    }));
+    return vehicle;
+  },
+
+  uploadVehicleDocument: async (vehicleId, kind, file) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('kind', kind);
+    const row = await api.postForm<DbVehicleDocument>(`/vehicles/${vehicleId}/documents`, form);
+    const doc = toVehicleDocument(row);
+    set((s) => ({
+      vehicles: s.vehicles.map((v) => {
+        if (v.id !== vehicleId) return v;
+        const prev = v.documents ?? [];
+        const next = [...prev.filter((d) => d.kind !== kind), doc];
+        return { ...v, documents: next };
+      }),
+    }));
+    return doc;
+  },
+
+  deleteVehicleDocument: async (vehicleId, kind) => {
+    await api.del(`/vehicles/${vehicleId}/documents/${kind}`);
+    set((s) => ({
+      vehicles: s.vehicles.map((v) => {
+        if (v.id !== vehicleId) return v;
+        return {
+          ...v,
+          documents: (v.documents ?? []).filter((d) => d.kind !== kind),
+        };
+      }),
+    }));
   },
 
   createVehicle: async (input) => {
