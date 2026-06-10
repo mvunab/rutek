@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Building2, Moon, Sun, Monitor, Check, Key, Eye, EyeOff, Tags, Plus, Trash2,
-  FileSpreadsheet, ChevronDown, ChevronUp, Zap, Upload, X, AlertCircle,
+  FileSpreadsheet, Zap, Upload, X, AlertCircle,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';

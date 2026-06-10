@@ -25,6 +25,8 @@ interface OrderStore {
   /** Quita el pedido de la ruta (`route_id` null) y lo deja pendiente. */
   detachOrderFromRoute: (orderId: string) => Promise<void>;
   deleteOrder: (id: string) => Promise<void>;
+  /** Quita del estado local los pedidos de una ruta eliminada (cascade). */
+  removeOrdersForRoute: (routeId: string) => void;
   getFilteredOrders: () => Order[];
 }
 
@@ -313,6 +315,14 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     }
   },
 
+  removeOrdersForRoute: (routeId) => {
+    set((state) => ({
+      orders: state.orders.filter((o) => o.routeId !== routeId),
+      selectedOrder:
+        state.selectedOrder?.routeId === routeId ? null : state.selectedOrder,
+    }));
+  },
+
   getFilteredOrders: () => {
     const { orders, filters } = get();
     return orders.filter((order) => {
@@ -335,7 +345,8 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         return (
           order.code.toLowerCase().includes(term) ||
           order.clientName.toLowerCase().includes(term) ||
-          order.destination.city.toLowerCase().includes(term)
+          order.destination.city.toLowerCase().includes(term) ||
+          order.origin.city.toLowerCase().includes(term)
         );
       }
       return true;

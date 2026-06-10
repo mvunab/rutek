@@ -5,6 +5,7 @@ import { OrderStatusBadge, PriorityBadge } from '../ui/Badge';
 import type { Order, OrderStatusEvent } from '../../types';
 import { api } from '../../lib/api';
 import { resolveOrderStatusLabel } from '../../lib/orderStatusLabels';
+import { formatAddressLabel } from '../../lib/orderAddress';
 import { useAuthStore } from '../../store/useAuthStore';
 
 function statusIcon(status: string) {
@@ -129,14 +130,29 @@ export function OrderDetailModal({
           </div>
         ) : null}
 
-        <div className="bg-stone-50 dark:bg-stone-800/70 rounded-lg p-4 border border-stone-200 dark:border-stone-700">
-          <p className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">
-            Dirección
-          </p>
-          <p className="text-sm text-stone-800 dark:text-stone-100">{order.destination.street}</p>
-          <p className="text-xs text-stone-400 dark:text-stone-500">
-            {order.destination.city}, {order.destination.region}
-          </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="bg-stone-50 dark:bg-stone-800/70 rounded-lg p-4 border border-stone-200 dark:border-stone-700">
+            <p className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">
+              Origen (retiro)
+            </p>
+            {order.origin.street?.trim() ? (
+              <p className="text-sm text-stone-800 dark:text-stone-100">{order.origin.street}</p>
+            ) : null}
+            <p className="text-xs text-stone-400 dark:text-stone-500">
+              {formatAddressLabel(order.origin)}
+            </p>
+          </div>
+          <div className="bg-stone-50 dark:bg-stone-800/70 rounded-lg p-4 border border-stone-200 dark:border-stone-700">
+            <p className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">
+              Destino (entrega)
+            </p>
+            {order.destination.street?.trim() ? (
+              <p className="text-sm text-stone-800 dark:text-stone-100">{order.destination.street}</p>
+            ) : null}
+            <p className="text-xs text-stone-400 dark:text-stone-500">
+              {formatAddressLabel(order.destination)}
+            </p>
+          </div>
         </div>
 
         <div>

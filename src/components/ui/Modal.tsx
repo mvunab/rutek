@@ -56,15 +56,21 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-stone-900/40 dark:bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-stone-900/40 dark:bg-black/60 backdrop-blur-sm animate-modal-backdrop-enter motion-reduce:animate-none"
         onClick={onClose}
+        aria-hidden
       />
-      <div className={clsx(
-        'relative w-full bg-white border border-stone-200 rounded-2xl shadow-2xl',
-        'dark:bg-stone-900 dark:border-stone-700',
-        'flex flex-col max-h-[90vh]',
-        sizeClasses[size]
-      )}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        className={clsx(
+          'relative w-full bg-white border border-stone-200 rounded-2xl shadow-2xl',
+          'dark:bg-stone-900 dark:border-stone-700',
+          'flex flex-col max-h-[90vh]',
+          'animate-modal-content-enter motion-reduce:animate-none',
+          sizeClasses[size],
+        )}
+      >
         {!bare && (title || description) ? (
           <div className="flex items-start justify-between gap-4 p-6 border-b border-stone-100 dark:border-stone-800">
             <div>

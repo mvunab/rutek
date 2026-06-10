@@ -385,7 +385,7 @@ export function VehicleDetailPage() {
             Documentación y vencimientos
           </h2>
           <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-            Mantención, permiso de circulación y revisión técnica. En mantención y revisión técnica puedes adjuntar foto o PDF (almacenado en MinIO).
+            Mantención, permiso de circulación y revisión técnica. Puedes adjuntar foto o PDF en cada tarjeta (almacenado en MinIO).
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

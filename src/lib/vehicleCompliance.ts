@@ -27,6 +27,7 @@ export const COMPLIANCE_TO_DOCUMENT_KIND: Record<
 /** Tarjetas con subida de evidencia escaneada (imagen o PDF). */
 export const COMPLIANCE_SUPPORTS_DOCUMENT_UPLOAD: VehicleComplianceKind[] = [
   'maintenance',
+  'circulationPermit',
   'technicalReview',
 ];
 

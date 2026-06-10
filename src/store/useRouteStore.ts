@@ -2,6 +2,12 @@ import { create } from 'zustand';
 import type { Route, RouteFilters, RouteStop } from '../types';
 import { normalizeRouteStatus } from '../lib/routeStatusLabels';
 import { api, isNetworkError } from '../lib/api';
+import { useOrderStore } from './useOrderStore';
+
+export type DeleteRouteResult = {
+  deleted: boolean;
+  orders_deleted: number;
+};
 
 /** Cuerpo que espera `POST /routes` (`CreateRouteDto` en rutek-api, snake_case). */
 export type CreateRouteInput = {
@@ -100,7 +106,7 @@ interface RouteStore {
   assignDriver: (routeId: string, driverId: string, driverName: string) => Promise<void>;
   assignVehicle: (routeId: string, vehicleId: string, vehiclePlate: string) => Promise<void>;
   addOrderToRoute: (routeId: string, orderId: string) => Promise<void>;
-  deleteRoute: (id: string) => Promise<void>;
+  deleteRoute: (id: string) => Promise<DeleteRouteResult | undefined>;
   getFilteredRoutes: () => Route[];
 }
 
@@ -233,11 +239,13 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
 
   deleteRoute: async (id) => {
     try {
-      await api.del(`/routes/${id}`);
+      const res = await api.del<DeleteRouteResult>(`/routes/${id}`);
+      useOrderStore.getState().removeOrdersForRoute(id);
       set((state) => ({
         routes: state.routes.filter((r) => r.id !== id),
         selectedRoute: state.selectedRoute?.id === id ? null : state.selectedRoute,
       }));
+      return res;
     } catch (err) {
       if (isNetworkError(err)) return;
       throw err;

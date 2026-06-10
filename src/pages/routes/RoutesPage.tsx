@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useRef, useCallback, type ReactNode, type
 import {
   Plus, Search, ChevronUp, ChevronDown,
   Download, RefreshCw, SlidersHorizontal, Package, UserCircle, Route as RouteIcon, Truck,
-  Pencil, Trash2, X, Copy, MapPin, Box, ArrowLeft, Check, FileSpreadsheet, Unlink,
+  Pencil, Trash2, X, Copy, MapPin, Box, ArrowLeft, ArrowRight, Check, FileSpreadsheet, Unlink,
   CheckCircle2, XCircle, AlertCircle, Eye, LayoutGrid, LayoutList, Share2,
   CheckSquare, Square, ListChecks, Maximize2, Minimize2,
 } from 'lucide-react';
@@ -26,7 +26,14 @@ import { OrderForm, type OrderFormData } from '../../components/orders/OrderForm
 import { OrderDetailModal } from '../../components/orders/OrderDetailModal';
 import { useRouteImportStore } from '../../store/useRouteImportStore';
 import { toast } from '../../store/useToastStore';
+import { formatAddressLabel, resolveDefaultPickupAddress } from '../../lib/orderAddress';
+import { downloadRoutesExportCsv } from '../../lib/routesExport';
+import { photosForOrderOnRoute } from '../../lib/orderPhotos';
 import { SendTrackingModal } from '../../components/communications/SendTrackingModal';
+import { usePhotoStore } from '../../store/usePhotoStore';
+import { PhotoLightbox } from '../../components/photos/PhotoLightbox';
+import { OrderInspectionThumbnails } from '../../components/photos/OrderInspectionThumbnails';
+import type { RoutePhoto } from '../../types';
 
 // ─── Panel resize ─────────────────────────────────────────────────────────────
 
@@ -801,6 +808,40 @@ function formatRouteDayElegant(isoLike: string | undefined): string {
   }
 }
 
+function orderAddressParts(addr: Order['origin'] | Order['destination']) {
+  return {
+    location: formatAddressLabel(addr),
+    street: addr.street?.trim() || null,
+  };
+}
+
+const CHILE_REGION_OPTIONS: { value: string; label: string }[] = [
+  { value: 'Arica y Parinacota', label: 'Arica y Parinacota' },
+  { value: 'Tarapacá', label: 'Tarapacá' },
+  { value: 'Antofagasta', label: 'Antofagasta' },
+  { value: 'Atacama', label: 'Atacama' },
+  { value: 'Coquimbo', label: 'Coquimbo' },
+  { value: 'Valparaíso', label: 'Valparaíso' },
+  { value: 'Metropolitana', label: 'Región Metropolitana' },
+  { value: "O'Higgins", label: "O'Higgins" },
+  { value: 'Maule', label: 'Maule' },
+  { value: 'Ñuble', label: 'Ñuble' },
+  { value: 'Biobío', label: 'Biobío' },
+  { value: 'Araucanía', label: 'La Araucanía' },
+  { value: 'Los Ríos', label: 'Los Ríos' },
+  { value: 'Los Lagos', label: 'Los Lagos' },
+  { value: 'Aysén', label: 'Aysén' },
+  { value: 'Magallanes', label: 'Magallanes' },
+];
+
+function getRegionSelectOptions(currentRegion?: string) {
+  const current = currentRegion?.trim() || '';
+  const empty = { value: '', label: 'Sin cambio…' };
+  if (!current) return [empty, ...CHILE_REGION_OPTIONS];
+  if (CHILE_REGION_OPTIONS.some((o) => o.value === current)) return [empty, ...CHILE_REGION_OPTIONS];
+  return [empty, { value: current, label: current }, ...CHILE_REGION_OPTIONS];
+}
+
 const containerCard = clsx(
   'rounded-xl border shadow-sm',
   'bg-white border-stone-200 text-stone-900 shadow-stone-200/50',
@@ -855,41 +896,63 @@ function RouteListItem({
   fecha,
   selected,
   onSelect,
+  bulkMode,
+  bulkChecked,
+  onBulkToggle,
 }: {
   route: Route;
   agg: { pedidos: number; bultos: number; delivered: number; vehiclesLabel: string };
   fecha: string;
   selected: boolean;
   onSelect: () => void;
+  bulkMode?: boolean;
+  bulkChecked?: boolean;
+  onBulkToggle?: () => void;
 }) {
   const deliveryPct =
     agg.pedidos > 0 ? Math.round((agg.delivered / agg.pedidos) * 100) : 0;
   const hasDeliveries = agg.delivered > 0;
 
+  const handleClick = () => {
+    if (bulkMode && onBulkToggle) onBulkToggle();
+    else onSelect();
+  };
+
   return (
     <button
       type="button"
-      onClick={onSelect}
+      onClick={handleClick}
+      aria-pressed={bulkMode ? bulkChecked : selected}
       className={clsx(
         'w-full text-left rounded-xl px-4 py-3.5 transition-colors glass shadow-sm',
         'hover:bg-white/90 dark:hover:bg-stone-900/90 hover:shadow-md',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-stone-950',
-        selected
+        bulkMode && bulkChecked
           ? 'border-primary-400/80 dark:border-primary-500/70 ring-2 ring-primary-400/20 dark:ring-primary-500/25 shadow-md'
-          : 'border-stone-200/80 dark:border-stone-700/70',
+          : !bulkMode && selected
+            ? 'border-primary-400/80 dark:border-primary-500/70 ring-2 ring-primary-400/20 dark:ring-primary-500/25 shadow-md'
+            : 'border-stone-200/80 dark:border-stone-700/70',
       )}
     >
       <div className="flex items-start gap-3">
+        {bulkMode ? (
+          <span
+            className="shrink-0 mt-2 text-primary-600 dark:text-primary-400"
+            aria-hidden
+          >
+            {bulkChecked ? <CheckSquare size={20} /> : <Square size={20} className="text-stone-400" />}
+          </span>
+        ) : null}
         <div
           className={clsx(
             'size-11 shrink-0 rounded-xl flex items-center justify-center',
-            selected ? 'bg-primary-50/90 dark:bg-primary-950/40' : 'bg-stone-100/70 dark:bg-stone-800/60',
+            !bulkMode && selected ? 'bg-primary-50/90 dark:bg-primary-950/40' : 'bg-stone-100/70 dark:bg-stone-800/60',
           )}
           aria-hidden
         >
           <RouteIcon
             size={20}
-            className={selected ? 'text-primary-600 dark:text-primary-400' : 'text-stone-500 dark:text-stone-400'}
+            className={!bulkMode && selected ? 'text-primary-600 dark:text-primary-400' : 'text-stone-500 dark:text-stone-400'}
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -934,14 +997,16 @@ function RouteListItem({
             </div>
           ) : null}
         </div>
-        <ChevronDown
-          size={18}
-          className={clsx(
-            'shrink-0 text-stone-300 dark:text-stone-600 transition-transform duration-200',
-            selected && 'rotate-180 text-primary-600 dark:text-primary-400',
-          )}
-          aria-hidden
-        />
+        {!bulkMode ? (
+          <ChevronDown
+            size={18}
+            className={clsx(
+              'shrink-0 text-stone-300 dark:text-stone-600 transition-transform duration-200',
+              selected && 'rotate-180 text-primary-600 dark:text-primary-400',
+            )}
+            aria-hidden
+          />
+        ) : null}
       </div>
     </button>
   );
@@ -956,29 +1021,49 @@ function RouteTableRow({
   fecha,
   selected,
   onSelect,
+  bulkMode,
+  bulkChecked,
+  onBulkToggle,
 }: {
   route: Route;
   agg: { pedidos: number; bultos: number; delivered: number; vehiclesLabel: string; driversLabel: string };
   fecha: string;
   selected: boolean;
   onSelect: () => void;
+  bulkMode?: boolean;
+  bulkChecked?: boolean;
+  onBulkToggle?: () => void;
 }) {
+  const handleClick = () => {
+    if (bulkMode && onBulkToggle) onBulkToggle();
+    else onSelect();
+  };
+
+  const isHighlighted = bulkMode ? bulkChecked : selected;
+
   return (
     <tr
-      onClick={onSelect}
+      onClick={handleClick}
       className={clsx(
         'cursor-pointer transition-colors border-b border-stone-100 dark:border-stone-800',
-        selected
+        isHighlighted
           ? 'bg-primary-50/80 dark:bg-primary-950/25 shadow-[inset_3px_0_0_0] shadow-primary-500 dark:shadow-primary-400'
           : 'hover:bg-stone-50 dark:hover:bg-stone-800/50',
       )}
     >
+      {bulkMode ? (
+        <td className="px-3 py-2.5 align-middle w-10">
+          <span className="text-primary-600 dark:text-primary-400" aria-hidden>
+            {bulkChecked ? <CheckSquare size={18} /> : <Square size={18} className="text-stone-400" />}
+          </span>
+        </td>
+      ) : null}
       <td className="px-4 py-2.5 align-middle">
         <span
           translate="no"
           className={clsx(
             'font-mono text-xs font-semibold tabular-nums block truncate',
-            selected ? 'text-primary-700 dark:text-primary-300' : 'text-stone-600 dark:text-stone-400',
+            isHighlighted ? 'text-primary-700 dark:text-primary-300' : 'text-stone-600 dark:text-stone-400',
           )}
         >
           {route.code}
@@ -1101,13 +1186,15 @@ function orderToFormData(order: Order): OrderFormData {
     clientId: order.clientId,
     destinatario: order.clientName ?? '',
     priority: order.priority,
+    originStreet: order.origin.street,
+    originCity: order.origin.city,
+    originRegion: order.origin.region || 'Metropolitana',
     destStreet: order.destination.street,
     destCity: order.destination.city,
     destRegion: order.destination.region || 'Metropolitana',
     estimatedDelivery: order.estimatedDelivery,
     notes: order.notes ?? '',
     bultos: order.bultos,
-    dispatchGuideUrl: order.dispatchGuideUrl ?? '',
   };
 }
 
@@ -1286,25 +1373,25 @@ function RouteDetailSidePanel({
   fullscreen?: boolean;
   onToggleFullscreen?: () => void;
 }) {
-  const { user } = useAuthStore();
+  const { user, tenant } = useAuthStore();
   const canManage = user?.role === 'admin' || user?.role === 'operator';
-  const { orders, assignToRoute, detachOrderFromRoute, fetchOrders, addOrder, updateOrder } = useOrderStore();
+  const { orders, detachOrderFromRoute, fetchOrders, addOrder, updateOrder } = useOrderStore();
   const { fetchRoutes, addOrderToRoute, assignDriverToOrders, deleteRoute, updateRoute } = useRouteStore();
   const { clients, fetchClients } = useClientStore();
   const { users, fetchUsers } = useUserStore();
   const { vehicles, fetchVehicles } = useVehicleStore();
+  const { photos, fetchPhotos } = usePhotoStore();
 
   useEffect(() => {
     void fetchClients();
     void fetchUsers();
     void fetchVehicles();
-  }, [fetchClients, fetchUsers, fetchVehicles]);
+    void fetchPhotos();
+  }, [fetchClients, fetchUsers, fetchVehicles, fetchPhotos]);
 
-  const [pickOrderId, setPickOrderId] = useState('');
-  const [orphanSearch, setOrphanSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createOrderOpen, setCreateOrderOpen] = useState(false);
   const [createFormKey, setCreateFormKey] = useState(0);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
@@ -1330,7 +1417,13 @@ function RouteDetailSidePanel({
   const [bulkDraftDriver, setBulkDraftDriver] = useState('');
   const [bulkDraftPeoneta, setBulkDraftPeoneta] = useState('');
   const [bulkDraftVehicle, setBulkDraftVehicle] = useState('');
+  const [bulkDraftCity, setBulkDraftCity] = useState('');
+  const [bulkDraftRegion, setBulkDraftRegion] = useState('');
   const [bulkAssignBusy, setBulkAssignBusy] = useState(false);
+  const [inspectionLightbox, setInspectionLightbox] = useState<{
+    photos: RoutePhoto[];
+    index: number;
+  } | null>(null);
 
   const assigned = useMemo(
     () =>
@@ -1340,49 +1433,10 @@ function RouteDetailSidePanel({
     [orders, route.id],
   );
 
-  const orphanOrders = useMemo(
-    () =>
-      orders.filter(
-        (o) =>
-          !o.routeId &&
-          o.status !== 'delivered' &&
-          o.status !== 'cancelled',
-      ),
-    [orders],
-  );
-
-  const filteredOrphans = useMemo(() => {
-    const term = orphanSearch.trim().toLowerCase();
-    if (!term) return orphanOrders;
-    return orphanOrders.filter((o) => {
-      const hay = [
-        o.code,
-        o.clientName,
-        o.destination.city,
-        o.status,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return hay.includes(term);
-    });
-  }, [orphanOrders, orphanSearch]);
-
   const totals = useMemo(() => {
     const bultos = assigned.reduce((s, o) => s + (Number(o.bultos) || 0), 0);
     return { pedidos: assigned.length, bultos };
   }, [assigned]);
-
-  const orphanOptions = useMemo(() => {
-    const opts = filteredOrphans.toSorted((a, b) => a.code.localeCompare(b.code, 'es'));
-    return [
-      { value: '', label: 'Seleccionar pedido sin ruta…' },
-      ...opts.map((o) => ({
-        value: o.id,
-        label: `${o.code} · ${o.destination.city} · ${o.bultos} bultos · ${o.clientName?.trim() || 'Destinatario por confirmar'}`,
-      })),
-    ];
-  }, [filteredOrphans]);
 
   const driversList = useMemo(
     () =>
@@ -1432,22 +1486,10 @@ function RouteDetailSidePanel({
     [vehiclesSorted],
   );
 
-  const handleAttachOrphan = async () => {
-    if (!pickOrderId) return;
-    setActionError(null);
-    setBusyId('add');
-    try {
-      await assignToRoute(pickOrderId, route.id);
-      addOrderToRoute(route.id, pickOrderId);
-      setPickOrderId('');
-      await fetchOrders();
-      await fetchRoutes();
-    } catch {
-      setActionError('No se pudo vincular el pedido. Revisa permisos y conexión.');
-    } finally {
-      setBusyId(null);
-    }
-  };
+  const bulkRegionSelectOpts = useMemo(
+    () => getRegionSelectOptions(bulkDraftRegion),
+    [bulkDraftRegion],
+  );
 
   const handleCreateOrder = async (data: OrderFormData) => {
     const clientId = data.clientId?.trim();
@@ -1471,7 +1513,11 @@ function RouteDetailSidePanel({
         status: 'pending',
         priority: data.priority,
         routeId: route.id,
-        origin: { street: '', city: '', region: '' },
+        origin: {
+          street: data.originStreet.trim(),
+          city: data.originCity.trim(),
+          region: data.originRegion.trim(),
+        },
         destination: {
           street: data.destStreet,
           city: data.destCity,
@@ -1483,16 +1529,13 @@ function RouteDetailSidePanel({
         estimatedDelivery: data.estimatedDelivery,
         notes: data.notes,
         bultos: data.bultos,
-        ...(data.dispatchGuideUrl.trim()
-          ? { dispatchGuideUrl: data.dispatchGuideUrl.trim() }
-          : {}),
       });
       if (!created) {
         setActionError('No se pudo crear el pedido. Revisa la conexión con el servidor.');
         return;
       }
       addOrderToRoute(route.id, created.id);
-      setShowCreateForm(false);
+      setCreateOrderOpen(false);
       setCreateFormKey((k) => k + 1);
       await fetchOrders();
       await fetchRoutes();
@@ -1567,6 +1610,11 @@ function RouteDetailSidePanel({
         clientId,
         clientName: destinatario,
         priority: data.priority,
+        origin: {
+          street: data.originStreet.trim(),
+          city: data.originCity.trim(),
+          region: data.originRegion.trim(),
+        },
         destination: {
           street: data.destStreet,
           city: data.destCity,
@@ -1575,7 +1623,6 @@ function RouteDetailSidePanel({
         estimatedDelivery: data.estimatedDelivery,
         notes: data.notes,
         bultos: data.bultos,
-        dispatchGuideUrl: data.dispatchGuideUrl,
       });
       setEditingOrderId(null);
       await fetchOrders();
@@ -1608,15 +1655,30 @@ function RouteDetailSidePanel({
     setOrderApplyToAll(false);
   };
 
+  const closeCreateOrder = () => {
+    if (busyId === 'create') return;
+    setCreateOrderOpen(false);
+  };
+
+  const openCreateOrder = () => {
+    if (bulkAssignOpen) closeBulkAssign();
+    handleCancelOrderAssign();
+    setEditingOrderId(null);
+    setCreateOrderOpen(true);
+  };
+
   const closeBulkAssign = () => {
     setBulkAssignOpen(false);
     setBulkSelectedIds(new Set());
     setBulkDraftDriver('');
     setBulkDraftPeoneta('');
     setBulkDraftVehicle('');
+    setBulkDraftCity('');
+    setBulkDraftRegion('');
   };
 
   const openBulkAssign = () => {
+    setCreateOrderOpen(false);
     handleCancelOrderAssign();
     setEditingOrderId(null);
     setBulkAssignOpen(true);
@@ -1635,49 +1697,95 @@ function RouteDetailSidePanel({
   const selectAllBulk = () => setBulkSelectedIds(new Set(assigned.map((o) => o.id)));
   const selectNoneBulk = () => setBulkSelectedIds(new Set());
 
-  const performBulkAssignment = async (orderIds: string[]) => {
+  const performBulkApply = async (orderIds: string[]) => {
+    const city = bulkDraftCity.trim();
+    const region = bulkDraftRegion.trim();
+    const hasTeam = Boolean(bulkDraftDriver || bulkDraftPeoneta || bulkDraftVehicle);
+    const hasLocation = Boolean(city || region);
+
+    if (!hasTeam && !hasLocation) {
+      setActionError('Completa al menos un campo para aplicar.');
+      return;
+    }
+
     setBulkAssignBusy(true);
     setActionError(null);
-    try {
-      const d = bulkDraftDriver ? driversList.find((u) => u.id === bulkDraftDriver) : null;
-      const pe = bulkDraftPeoneta ? peonetasList.find((u) => u.id === bulkDraftPeoneta) : null;
-      const v = bulkDraftVehicle ? vehiclesSorted.find((x) => x.id === bulkDraftVehicle) : null;
+    let locationError: string | null = null;
 
-      await assignDriverToOrders(route.id, {
-        driverId: d ? d.id : null,
-        driverName: d ? d.name : null,
-        peonetaId: pe ? pe.id : null,
-        peonetaName: pe ? pe.name : null,
-        vehicleId: v ? v.id : null,
-        vehiclePlate: v ? v.plate : null,
-        orderIds,
-      });
+    try {
+      if (hasTeam) {
+        const d = bulkDraftDriver ? driversList.find((u) => u.id === bulkDraftDriver) : null;
+        const pe = bulkDraftPeoneta ? peonetasList.find((u) => u.id === bulkDraftPeoneta) : null;
+        const v = bulkDraftVehicle ? vehiclesSorted.find((x) => x.id === bulkDraftVehicle) : null;
+        await assignDriverToOrders(route.id, {
+          driverId: d ? d.id : null,
+          driverName: d ? d.name : null,
+          peonetaId: pe ? pe.id : null,
+          peonetaName: pe ? pe.name : null,
+          vehicleId: v ? v.id : null,
+          vehiclePlate: v ? v.plate : null,
+          orderIds,
+        });
+      }
+
+      if (hasLocation) {
+        const results = await Promise.allSettled(
+          orderIds.map(async (orderId) => {
+            const order = assigned.find((o) => o.id === orderId);
+            if (!order) return;
+            await updateOrder(orderId, {
+              destination: {
+                street: order.destination.street,
+                city: city || order.destination.city,
+                region: region || order.destination.region,
+              },
+            });
+          }),
+        );
+        const failed = results.filter((r) => r.status === 'rejected').length;
+        if (failed > 0) {
+          const ok = orderIds.length - failed;
+          locationError =
+            ok === 0
+              ? 'No se pudo actualizar la ubicación.'
+              : `Ubicación actualizada en ${ok} pedido${ok === 1 ? '' : 's'}; ${failed} fallaron.`;
+        }
+      }
+
       await fetchOrders();
-      closeBulkAssign();
-      toast.info(
-        orderIds.length === assigned.length
-          ? 'Asignación aplicada a toda la ruta'
-          : `Asignación aplicada a ${orderIds.length} pedido${orderIds.length === 1 ? '' : 's'}`,
-      );
+
+      if (locationError) {
+        setActionError(locationError);
+      } else {
+        toast.info(
+          `Cambios aplicados a ${orderIds.length} pedido${orderIds.length === 1 ? '' : 's'}`,
+        );
+        if (hasTeam) {
+          setBulkDraftDriver('');
+          setBulkDraftPeoneta('');
+          setBulkDraftVehicle('');
+        }
+        if (hasLocation) {
+          setBulkDraftCity('');
+          setBulkDraftRegion('');
+        }
+      }
     } catch {
-      setActionError('No se pudo aplicar la asignación masiva.');
+      setActionError('No se pudieron aplicar los cambios.');
     } finally {
       setBulkAssignBusy(false);
     }
   };
 
-  const handleBulkApplySelected = () => {
+  const handleBulkApply = () => {
     const ids = [...bulkSelectedIds];
     if (ids.length === 0) {
-      setActionError('Selecciona al menos un pedido.');
+      setActionError('Selecciona al menos un pedido en la lista.');
       return;
     }
-    if (!bulkDraftDriver && !bulkDraftPeoneta && !bulkDraftVehicle) {
-      setActionError('Elige chofer, peoneta o vehículo para aplicar.');
-      return;
-    }
+    const hasTeam = Boolean(bulkDraftDriver || bulkDraftPeoneta || bulkDraftVehicle);
     const v = bulkDraftVehicle ? vehiclesSorted.find((x) => x.id === bulkDraftVehicle) : null;
-    if (v && ids.length > 1) {
+    if (hasTeam && v && ids.length > 1) {
       setSameVehicleConfirm({
         orderId: ids[0]!,
         plate: v.plate,
@@ -1687,27 +1795,7 @@ function RouteDetailSidePanel({
       });
       return;
     }
-    void performBulkAssignment(ids);
-  };
-
-  const handleBulkApplyAllRoute = () => {
-    if (!bulkDraftDriver && !bulkDraftPeoneta && !bulkDraftVehicle) {
-      setActionError('Elige chofer, peoneta o vehículo para aplicar.');
-      return;
-    }
-    const allIds = assigned.map((o) => o.id);
-    const v = bulkDraftVehicle ? vehiclesSorted.find((x) => x.id === bulkDraftVehicle) : null;
-    if (v && assigned.length > 1) {
-      setSameVehicleConfirm({
-        orderId: assigned[0]!.id,
-        plate: v.plate,
-        otherCodes: assigned.map((o) => o.code),
-        bulk: true,
-        bulkOrderIds: allIds,
-      });
-      return;
-    }
-    void performBulkAssignment(allIds);
+    void performBulkApply(ids);
   };
 
   const getSameVehicleConflict = (
@@ -1805,6 +1893,13 @@ function RouteDetailSidePanel({
     return assigned[0]?.clientName?.trim() || '—';
   }, [route.clientId, clients, assigned]);
 
+  const defaultOrderOrigin = useMemo(() => {
+    const routeClient = route.clientId
+      ? clients.find((c) => c.id === route.clientId)
+      : undefined;
+    return resolveDefaultPickupAddress(routeClient, tenant);
+  }, [route.clientId, clients, tenant]);
+
   const routeDriversLabel = useMemo(
     () => summarizeRouteAssignees(assigned, 'driverName'),
     [assigned],
@@ -1834,11 +1929,18 @@ function RouteDetailSidePanel({
     setDeleteRouteBusy(true);
     setActionError(null);
     try {
-      await deleteRoute(route.id);
+      const result = await deleteRoute(route.id);
       await fetchOrders();
       await fetchRoutes();
       setDeleteRouteOpen(false);
       onClose();
+      const ordersDeleted = result?.orders_deleted ?? assigned.length;
+      toast.info(
+        'Ruta eliminada',
+        ordersDeleted > 0
+          ? `Se eliminaron ${ordersDeleted} pedido${ordersDeleted === 1 ? '' : 's'} en cadena.`
+          : 'La ruta no tenía pedidos asociados.',
+      );
     } catch (err) {
       setActionError(
         err instanceof ApiError ? err.message : 'No se pudo eliminar la ruta.',
@@ -2065,55 +2167,74 @@ function RouteDetailSidePanel({
             ) : null}
           </div>
 
-          <div className="flex items-center justify-between gap-2 px-0.5 sticky top-0 z-[1] py-1 -mx-0.5 bg-stone-50/95 dark:bg-[#0d0d0d]/95 backdrop-blur-sm border-b border-transparent dark:border-transparent">
-            <h3 className="text-[10px] font-semibold text-stone-500 dark:text-stone-500 uppercase tracking-wider">
+          <div
+            className="sticky top-0 z-[1] flex flex-wrap items-center justify-between gap-2 py-2 px-2 -mx-0.5 mb-1 rounded-xl border border-stone-200/80 dark:border-stone-700/80 bg-white/75 dark:bg-stone-900/55 backdrop-blur-sm shadow-sm"
+            role="toolbar"
+            aria-label="Acciones sobre pedidos de la ruta"
+          >
+            <h3 className="text-[10px] font-semibold text-stone-500 dark:text-stone-500 uppercase tracking-wider px-0.5">
               Pedidos en ruta
             </h3>
-            {canManage && assigned.length > 0 ? (
-              <Button
-                type="button"
-                variant={bulkAssignOpen ? 'primary' : 'secondary'}
-                size="sm"
-                icon={<ListChecks size={14} aria-hidden />}
-                onClick={() => (bulkAssignOpen ? closeBulkAssign() : openBulkAssign())}
-                disabled={bulkAssignBusy || orderAssignBusy !== null}
-                aria-pressed={bulkAssignOpen}
-              >
-                {bulkAssignOpen ? 'Salir masivo' : 'Asignación masiva'}
-              </Button>
+            {canManage ? (
+              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  icon={<Plus size={14} aria-hidden />}
+                  onClick={openCreateOrder}
+                  disabled={busyId === 'create' || bulkAssignBusy || createOrderOpen}
+                >
+                  Nuevo pedido
+                </Button>
+                {assigned.length > 0 ? (
+                  <Button
+                    type="button"
+                    variant={bulkAssignOpen ? 'violet' : 'violet-soft'}
+                    size="sm"
+                    icon={<ListChecks size={14} aria-hidden />}
+                    onClick={() => (bulkAssignOpen ? closeBulkAssign() : openBulkAssign())}
+                    disabled={bulkAssignBusy || orderAssignBusy !== null || busyId === 'create'}
+                    aria-pressed={bulkAssignOpen}
+                  >
+                    {bulkAssignOpen ? 'Listo' : 'Asignación masiva'}
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
           </div>
 
           {bulkAssignOpen && assigned.length > 0 ? (
-            <div className="rounded-xl border border-stone-200/90 dark:border-stone-700 bg-stone-50/80 dark:bg-stone-900/50 px-3 py-3 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-stone-800 dark:text-stone-200">
-                  Asignación masiva
+            <div className="rounded-xl border border-violet-200/80 dark:border-violet-800/60 bg-violet-50/40 dark:bg-violet-950/20 px-3 py-3 space-y-3 animate-toolbar-panel-enter motion-reduce:animate-none">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <p className="text-xs font-semibold text-stone-800 dark:text-stone-200 tabular-nums">
+                  {bulkSelectedIds.size} pedido{bulkSelectedIds.size === 1 ? '' : 's'} seleccionado
+                  {bulkSelectedIds.size === 1 ? '' : 's'}
                 </p>
-                <div className="flex flex-wrap gap-1">
-                  <Button
+                <div className="flex items-center gap-1 text-xs">
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
                     onClick={selectAllBulk}
                     disabled={bulkAssignBusy}
+                    className="px-2 py-1 rounded-md text-violet-700 dark:text-violet-300 hover:bg-violet-100/80 dark:hover:bg-violet-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-50"
                   >
                     Todos
-                  </Button>
-                  <Button
+                  </button>
+                  <span className="text-stone-300 dark:text-stone-600" aria-hidden>
+                    ·
+                  </span>
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
                     onClick={selectNoneBulk}
                     disabled={bulkAssignBusy}
+                    className="px-2 py-1 rounded-md text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50"
                   >
                     Ninguno
-                  </Button>
+                  </button>
                 </div>
               </div>
-              <p className="text-[11px] text-stone-600 dark:text-stone-400 tabular-nums">
-                {bulkSelectedIds.size} de {assigned.length} seleccionado
-                {bulkSelectedIds.size === 1 ? '' : 's'}
+              <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                Marca pedidos abajo y completa solo los campos que quieras cambiar.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Select
@@ -2143,29 +2264,46 @@ function RouteDetailSidePanel({
                   disabled={bulkAssignBusy}
                   autoComplete="off"
                 />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  loading={bulkAssignBusy}
-                  disabled={bulkAssignBusy || bulkSelectedIds.size === 0}
-                  onClick={handleBulkApplySelected}
-                >
-                  Aplicar a {bulkSelectedIds.size} seleccionado
-                  {bulkSelectedIds.size === 1 ? '' : 's'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
+                <Input
+                  id="bulk-dest-city"
+                  label="Ciudad destino"
+                  name="bulk_dest_city"
+                  placeholder="Ej: Maipú…"
+                  value={bulkDraftCity}
+                  onChange={(e) => setBulkDraftCity(e.target.value)}
                   disabled={bulkAssignBusy}
-                  onClick={handleBulkApplyAllRoute}
-                >
-                  Aplicar a toda la ruta
-                </Button>
-                <Button type="button" variant="ghost" disabled={bulkAssignBusy} onClick={closeBulkAssign}>
-                  Cancelar
-                </Button>
+                  autoComplete="off"
+                  containerClassName="sm:col-span-1"
+                />
+                <Select
+                  id="bulk-dest-region"
+                  label="Región destino"
+                  value={bulkDraftRegion}
+                  onChange={(e) => setBulkDraftRegion(e.target.value)}
+                  options={bulkRegionSelectOpts}
+                  disabled={bulkAssignBusy}
+                  autoComplete="off"
+                  containerClassName="sm:col-span-2"
+                />
               </div>
+              <Button
+                type="button"
+                loading={bulkAssignBusy}
+                disabled={
+                  bulkAssignBusy ||
+                  bulkSelectedIds.size === 0 ||
+                  (!bulkDraftDriver &&
+                    !bulkDraftPeoneta &&
+                    !bulkDraftVehicle &&
+                    !bulkDraftCity.trim() &&
+                    !bulkDraftRegion.trim())
+                }
+                onClick={handleBulkApply}
+                className="w-full sm:w-auto"
+              >
+                Aplicar a {bulkSelectedIds.size} pedido
+                {bulkSelectedIds.size === 1 ? '' : 's'}
+              </Button>
             </div>
           ) : null}
 
@@ -2186,7 +2324,9 @@ function RouteDetailSidePanel({
             <ul className="space-y-2">
               {assigned.map((o) => {
                 const destinatario = o.clientName?.trim() || 'Por confirmar';
-                const city = o.destination.city?.trim() || '—';
+                const originParts = orderAddressParts(o.origin);
+                const destParts = orderAddressParts(o.destination);
+                const hasOrigin = originParts.location !== '—';
                 const isAssignOpen = expandedOrderId === o.id;
                 const isEditOpen = editingOrderId === o.id;
                 const vehicleWarn = isAssignOpen ? getSameVehicleConflict(o.id) : null;
@@ -2200,6 +2340,9 @@ function RouteDetailSidePanel({
                 const isRejected = o.status === 'rejected';
                 const isInTransit = o.status === 'in_transit';
                 const showStatusOnCard = isDelivered || isRejected || isInTransit;
+                const inspectionPhotos = isDelivered
+                  ? photosForOrderOnRoute(photos, route, o)
+                  : [];
 
                 return (
                   <li
@@ -2209,7 +2352,7 @@ function RouteDetailSidePanel({
                       isDelivered && 'glass-card-order--delivered',
                       isRejected && 'glass-card-order--rejected',
                       isInTransit && 'glass-card-order--in-transit',
-                      bulkAssignOpen && isBulkSelected && 'ring-2 ring-primary-500/50 dark:ring-primary-400/45',
+                      bulkAssignOpen && isBulkSelected && 'ring-2 ring-violet-500/50 dark:ring-violet-400/45',
                     )}
                   >
                     <div className="p-3 space-y-3">
@@ -2257,10 +2400,10 @@ function RouteDetailSidePanel({
                                 setDetailOrder(o);
                               }}
                               className={clsx(
-                                'font-mono text-sm font-bold hover:text-primary-600 dark:hover:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded',
+                                'font-mono text-xs font-semibold hover:text-primary-600 dark:hover:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded',
                                 isDelivered
                                   ? 'text-emerald-900 dark:text-emerald-100'
-                                  : 'text-stone-900 dark:text-white',
+                                  : 'text-stone-600 dark:text-stone-300',
                               )}
                               title="Ver detalle del pedido"
                             >
@@ -2272,26 +2415,82 @@ function RouteDetailSidePanel({
                               ) : null}
                               <span
                                 className={clsx(
-                                  'rounded-lg px-2 py-0.5 text-xs font-semibold tabular-nums',
+                                  'rounded-lg px-2 py-0.5 text-[11px] font-semibold tabular-nums',
                                   isDelivered
                                     ? 'bg-emerald-100/90 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200'
-                                    : 'bg-stone-100/90 text-stone-700 dark:bg-stone-800/90 dark:text-stone-200',
+                                    : 'bg-stone-100/90 text-stone-600 dark:bg-stone-800/90 dark:text-stone-300',
                                 )}
                               >
                                 {o.bultos} bulto{o.bultos === 1 ? '' : 's'}
                               </span>
                             </div>
                           </div>
-                          <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-500 mt-1.5">
-                            Destinatario
+
+                          <div
+                            className={clsx(
+                              'mt-2.5 rounded-xl border px-2.5 py-2',
+                              isDelivered
+                                ? 'border-emerald-200/70 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/25'
+                                : isRejected
+                                  ? 'border-red-200/70 bg-red-50/40 dark:border-red-900/40 dark:bg-red-950/20'
+                                  : 'border-stone-200/80 bg-stone-50/70 dark:border-stone-700/60 dark:bg-stone-900/45',
+                            )}
+                          >
+                            <div
+                              className={clsx(
+                                'grid gap-2 min-w-0',
+                                hasOrigin ? 'grid-cols-[1fr_auto_1fr]' : 'grid-cols-1',
+                              )}
+                            >
+                              {hasOrigin ? (
+                                <div className="min-w-0">
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                                    Origen
+                                  </p>
+                                  <p className="text-sm font-semibold text-stone-900 dark:text-stone-50 truncate leading-snug">
+                                    {originParts.location}
+                                  </p>
+                                  {originParts.street ? (
+                                    <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate mt-0.5">
+                                      {originParts.street}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                              {hasOrigin ? (
+                                <div className="flex items-center justify-center self-center px-0.5" aria-hidden>
+                                  <ArrowRight size={16} className="text-stone-400 dark:text-stone-500 shrink-0" />
+                                </div>
+                              ) : null}
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-400">
+                                  Destino
+                                </p>
+                                <p className="text-sm font-semibold text-stone-900 dark:text-stone-50 truncate leading-snug">
+                                  {destParts.location}
+                                </p>
+                                {destParts.street ? (
+                                  <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate mt-0.5">
+                                    {destParts.street}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-stone-500 dark:text-stone-400 truncate mt-2">
+                            <span className="font-medium text-stone-600 dark:text-stone-300">{destinatario}</span>
                           </p>
-                          <p className="text-sm font-medium text-stone-800 dark:text-stone-100 truncate">
-                            {destinatario}
-                          </p>
-                          <p className="text-xs text-stone-500 dark:text-stone-400 flex items-center gap-1 mt-0.5 min-w-0">
-                            <MapPin size={12} className="shrink-0" aria-hidden />
-                            <span className="truncate">{city}</span>
-                          </p>
+
+                          {inspectionPhotos.length > 0 ? (
+                            <OrderInspectionThumbnails
+                              className="mt-2.5"
+                              photos={inspectionPhotos}
+                              onPhotoClick={(index) =>
+                                setInspectionLightbox({ photos: inspectionPhotos, index })
+                              }
+                            />
+                          ) : null}
                         </div>
                       </div>
 
@@ -2462,91 +2661,6 @@ function RouteDetailSidePanel({
               })}
             </ul>
           )}
-
-          {canManage ? (
-            <div className="space-y-3 pt-3 mt-1 rounded-xl border border-stone-200/90 dark:border-stone-700 bg-stone-50/70 dark:bg-stone-900/45 px-3 py-3 shadow-sm dark:shadow-none">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Nuevo pedido</h3>
-                  <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Vinculado a esta ruta.</p>
-                </div>
-                <Button
-                  type="button"
-                  variant={showCreateForm ? 'secondary' : 'primary'}
-                  size="sm"
-                  icon={showCreateForm ? <ChevronUp size={18} aria-hidden /> : <Plus size={18} aria-hidden />}
-                  aria-expanded={showCreateForm}
-                  onClick={() => setShowCreateForm((v) => !v)}
-                  disabled={busyId !== null}
-                >
-                  {showCreateForm ? 'Ocultar' : 'Agregar pedido'}
-                </Button>
-              </div>
-              {showCreateForm ? (
-                <div className="rounded-xl border border-stone-200 bg-white p-3 shadow-sm dark:border-stone-700 dark:bg-stone-900/50 dark:shadow-none">
-                  <OrderForm
-                    key={createFormKey}
-                    submitLabel="Crear pedido en la ruta"
-                    onSubmit={(d) => void handleCreateOrder(d)}
-                    onCancel={() => setShowCreateForm(false)}
-                    lockedClientId={route.clientId?.trim() || undefined}
-                    lockedClientName={
-                      routeClientLabel !== '—' ? routeClientLabel : undefined
-                    }
-                  />
-                </div>
-              ) : null}
-
-              {orphanOrders.length > 0 ? (
-                <div className="rounded-2xl border border-dashed border-stone-200 dark:border-stone-700 p-5 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">
-                        Vincular pedido sin ruta
-                      </p>
-                      <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
-                        {filteredOrphans.length}/{orphanOrders.length} disponibles
-                      </p>
-                    </div>
-                    <Input
-                      label="Buscar"
-                      value={orphanSearch}
-                      onChange={(e) => setOrphanSearch(e.target.value)}
-                      placeholder="Código, ciudad, destinatario…"
-                      name={`orphan-search-${route.id}`}
-                      autoComplete="off"
-                      containerClassName="max-w-xs w-full"
-                    />
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3 items-end">
-                    <Select
-                      id={`attach-orphan-route-${route.id}`}
-                      label="Pedido"
-                      value={pickOrderId}
-                      onChange={(e) => setPickOrderId(e.target.value)}
-                      options={orphanOptions}
-                      containerClassName="flex-1 w-full min-w-0"
-                      hint="Se moverá a esta ruta. No se elimina."
-                      autoComplete="off"
-                    />
-                    <Button
-                      type="button"
-                      onClick={() => void handleAttachOrphan()}
-                      disabled={!pickOrderId || busyId !== null}
-                      loading={busyId === 'add'}
-                    >
-                      Vincular a la ruta
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <p className="text-xs text-stone-500 text-center py-4">
-              Solo administradores u operadores pueden gestionar pedidos en esta ruta.
-            </p>
-          )}
         </div>
       </div>
       {detailOrder ? (
@@ -2555,6 +2669,43 @@ function RouteDetailSidePanel({
           onClose={() => setDetailOrder(null)}
           routeLabel={`${route.code} · ${route.name}`}
         />
+      ) : null}
+
+      {inspectionLightbox ? (
+        <PhotoLightbox
+          photos={inspectionLightbox.photos}
+          index={inspectionLightbox.index}
+          onIndexChange={(index) =>
+            setInspectionLightbox((prev) => (prev ? { ...prev, index } : prev))
+          }
+          onClose={() => setInspectionLightbox(null)}
+        />
+      ) : null}
+
+      {createOrderOpen ? (
+        <Modal
+          open
+          onClose={closeCreateOrder}
+          title="Nuevo pedido"
+          description={`${route.code}${route.name ? ` · ${route.name}` : ''} — se creará en esta ruta`}
+          size="xl"
+        >
+          <OrderForm
+            key={createFormKey}
+            submitLabel={busyId === 'create' ? 'Creando…' : 'Crear pedido en la ruta'}
+            onSubmit={(d) => void handleCreateOrder(d)}
+            onCancel={closeCreateOrder}
+            lockedClientId={route.clientId?.trim() || undefined}
+            lockedClientName={
+              routeClientLabel !== '—' ? routeClientLabel : undefined
+            }
+            defaultOrigin={{
+              originStreet: defaultOrderOrigin.street,
+              originCity: defaultOrderOrigin.city,
+              originRegion: defaultOrderOrigin.region,
+            }}
+          />
+        </Modal>
       ) : null}
 
       {editRouteOpen ? (
@@ -2625,7 +2776,7 @@ function RouteDetailSidePanel({
           setSameVehicleConfirm(null);
           if (!conf) return;
           if (conf.bulk && conf.bulkOrderIds?.length) {
-            void performBulkAssignment(conf.bulkOrderIds);
+            void performBulkApply(conf.bulkOrderIds);
             return;
           }
           if (conf.orderId) void performSaveOrderAssignment(conf.orderId);
@@ -2673,13 +2824,26 @@ function RouteDetailSidePanel({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export function RoutesPage() {
-  const { routes, loading: routesLoading, addRoute, fetchRoutes } = useRouteStore();
+  const { routes, loading: routesLoading, addRoute, fetchRoutes, deleteRoute } = useRouteStore();
   const { orders, fetchOrders } = useOrderStore();
+  const { fetchPhotos } = usePhotoStore();
+  const { tenant } = useAuthStore();
+  const { clients, fetchClients } = useClientStore();
 
   useEffect(() => {
     void fetchRoutes();
     void fetchOrders();
-  }, [fetchRoutes, fetchOrders]);
+    void fetchPhotos();
+    void fetchClients();
+  }, [fetchRoutes, fetchOrders, fetchPhotos, fetchClients]);
+
+  const clientNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const client of clients) {
+      if (client.companyName?.trim()) map.set(client.id, client.companyName.trim());
+    }
+    return map;
+  }, [clients]);
 
   const routeAggById = useMemo(() => {
     const map = new Map<
@@ -2703,6 +2867,7 @@ export function RoutesPage() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
   const [filterRouteStatus, setFilterRouteStatus] = useState<RouteStatus | 'all'>('all');
+  const [filterClientId, setFilterClientId] = useState<string>('all');
   const [filterDateRange, setFilterDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
   const [showFilters, setShowFilters] = useState(false);
   const [showNewRoute, setShowNewRoute] = useState(false);
@@ -2724,6 +2889,25 @@ export function RoutesPage() {
   const [newRouteError, setNewRouteError] = useState<string | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
   const [detailPanelFullscreen, setDetailPanelFullscreen] = useState(false);
+  const [bulkDeleteMode, setBulkDeleteMode] = useState(false);
+  const [bulkDeleteSelectedIds, setBulkDeleteSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
+
+  const closeBulkDeleteMode = useCallback(() => {
+    setBulkDeleteMode(false);
+    setBulkDeleteSelectedIds(new Set());
+    setBulkDeleteOpen(false);
+  }, []);
+
+  const toggleBulkDeleteRoute = useCallback((id: string) => {
+    setBulkDeleteSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const closeDetailPanel = useCallback(() => {
     setDetailPanelFullscreen(false);
@@ -2750,6 +2934,35 @@ export function RoutesPage() {
   const routeDateKey = (r: Route) =>
     typeof r.startTime === 'string' && r.startTime.includes('T') ? r.startTime : r.createdAt;
 
+  const routeMatchesClient = useCallback(
+    (route: Route, clientId: string) => {
+      if (route.clientId === clientId) return true;
+      return orders.some((o) => o.routeId === route.id && o.clientId === clientId);
+    },
+    [orders],
+  );
+
+  const clientsWithRoutes = useMemo(() => {
+    const ids = new Set<string>();
+    for (const route of routes) {
+      if (route.clientId) ids.add(route.clientId);
+      for (const order of orders) {
+        if (order.routeId === route.id && order.clientId) ids.add(order.clientId);
+      }
+    }
+    return clients
+      .filter((c) => ids.has(c.id))
+      .toSorted((a, b) => a.companyName.localeCompare(b.companyName, 'es'));
+  }, [routes, orders, clients]);
+
+  const clientFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Todos los clientes' },
+      ...clientsWithRoutes.map((c) => ({ value: c.id, label: c.companyName })),
+    ],
+    [clientsWithRoutes],
+  );
+
   const filteredRoutes = useMemo(() => {
     const cutoff = filterDateRange !== 'all'
       ? new Date(Date.now() - parseInt(filterDateRange) * 86_400_000)
@@ -2757,6 +2970,7 @@ export function RoutesPage() {
 
     let data = routes.filter((r) => {
       if (filterRouteStatus !== 'all' && r.status !== filterRouteStatus) return false;
+      if (filterClientId !== 'all' && !routeMatchesClient(r, filterClientId)) return false;
       if (cutoff) {
         const dateStr = routeDateKey(r);
         if (!dateStr || new Date(dateStr) < cutoff) return false;
@@ -2829,14 +3043,86 @@ export function RoutesPage() {
       });
     }
     return data;
-  }, [routes, orders, filterRouteStatus, filterDateRange, search, sortCol, sortDir, routeAggById]);
+  }, [routes, orders, filterRouteStatus, filterClientId, filterDateRange, search, sortCol, sortDir, routeAggById, routeMatchesClient]);
 
   const statusCounts = useMemo(
     () => Object.fromEntries(ROUTE_STATUSES.map((s) => [s, routes.filter((r) => r.status === s).length])),
     [routes],
   );
 
-  const hasActiveFilters = filterRouteStatus !== 'all' || filterDateRange !== '30d';
+  const hasActiveFilters =
+    filterRouteStatus !== 'all' || filterClientId !== 'all' || filterDateRange !== '30d';
+
+  const handleExportRoutes = useCallback(() => {
+    if (filteredRoutes.length === 0) {
+      toast.warning('Sin rutas para exportar', 'Ajusta los filtros o crea rutas primero.');
+      return;
+    }
+    const { rowCount, routeCount } = downloadRoutesExportCsv(filteredRoutes, orders, {
+      clientNames: clientNameById,
+      tenant,
+    });
+    toast.info(
+      'Exportación descargada',
+      `${routeCount} ruta${routeCount === 1 ? '' : 's'} · ${rowCount} fila${rowCount === 1 ? '' : 's'} en el archivo CSV.`,
+    );
+  }, [filteredRoutes, orders, clientNameById, tenant]);
+
+  const selectAllBulkDelete = useCallback(() => {
+    setBulkDeleteSelectedIds(new Set(filteredRoutes.map((r) => r.id)));
+  }, [filteredRoutes]);
+
+  const selectNoneBulkDelete = useCallback(() => {
+    setBulkDeleteSelectedIds(new Set());
+  }, []);
+
+  const bulkDeleteTargets = useMemo(
+    () => routes.filter((r) => bulkDeleteSelectedIds.has(r.id)),
+    [routes, bulkDeleteSelectedIds],
+  );
+
+  const bulkDeleteOrderCount = useMemo(
+    () => orders.filter((o) => o.routeId && bulkDeleteSelectedIds.has(o.routeId)).length,
+    [orders, bulkDeleteSelectedIds],
+  );
+
+  const handleConfirmBulkDelete = async () => {
+    const ids = [...bulkDeleteSelectedIds];
+    if (ids.length === 0) return;
+    setBulkDeleteBusy(true);
+    try {
+      const results = await Promise.allSettled(ids.map((id) => deleteRoute(id)));
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      const ok = ids.length - failed;
+      const ordersDeleted = results.reduce((sum, r) => {
+        if (r.status !== 'fulfilled' || !r.value) return sum;
+        return sum + (r.value.orders_deleted ?? 0);
+      }, 0);
+      await fetchOrders();
+      await fetchRoutes();
+      if (selectedRoute && bulkDeleteSelectedIds.has(selectedRoute.id)) {
+        setSelectedRoute(null);
+        setDetailPanelFullscreen(false);
+      }
+      closeBulkDeleteMode();
+      if (failed === 0) {
+        toast.info(
+          ok === 1 ? 'Ruta eliminada' : `${ok} rutas eliminadas`,
+          ordersDeleted > 0
+            ? `${ordersDeleted} pedido${ordersDeleted === 1 ? '' : 's'} eliminado${ordersDeleted === 1 ? '' : 's'} en cadena.`
+            : undefined,
+        );
+      } else if (ok === 0) {
+        toast.error('No se pudieron eliminar las rutas seleccionadas.');
+      } else {
+        toast.error(`${ok} rutas eliminadas; ${failed} no se pudieron eliminar.`);
+      }
+    } catch {
+      toast.error('No se pudieron eliminar las rutas seleccionadas.');
+    } finally {
+      setBulkDeleteBusy(false);
+    }
+  };
 
   const handleAddRoute = async (data: RouteFormData) => {
     setNewRouteError(null);
@@ -2915,7 +3201,28 @@ export function RoutesPage() {
           Actualizar
         </Button>
 
-        <Button variant="secondary" size="sm" icon={<Download size={14} />}>
+        {filteredRoutes.length > 0 ? (
+          <Button
+            variant={bulkDeleteMode ? 'primary' : 'secondary'}
+            size="sm"
+            icon={<ListChecks size={14} />}
+            onClick={() => {
+              if (bulkDeleteMode) closeBulkDeleteMode();
+              else setBulkDeleteMode(true);
+            }}
+            aria-pressed={bulkDeleteMode}
+          >
+            {bulkDeleteMode ? 'Cancelar selección' : 'Seleccionar'}
+          </Button>
+        ) : null}
+
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<Download size={14} aria-hidden />}
+          onClick={handleExportRoutes}
+          disabled={filteredRoutes.length === 0}
+        >
           Exportar
         </Button>
 
@@ -3013,6 +3320,25 @@ export function RoutesPage() {
             </div>
           </div>
 
+          {/* Filtro por cliente (cuenta mandante) */}
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Cliente</p>
+            <Select
+              id="routes-filter-client"
+              label="Cuenta mandante"
+              value={filterClientId}
+              onChange={(e) => setFilterClientId(e.target.value)}
+              options={clientFilterOptions}
+              autoComplete="off"
+              containerClassName="max-w-md"
+              hint={
+                clientsWithRoutes.length === 0
+                  ? 'No hay rutas asociadas a cuentas aún.'
+                  : 'Incluye rutas con la cuenta asignada o pedidos de ese mandante.'
+              }
+            />
+          </div>
+
           {/* Filtro por rango de fechas */}
           <div className="space-y-2">
             <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
@@ -3053,11 +3379,49 @@ export function RoutesPage() {
               size="sm"
               onClick={() => {
                 setFilterRouteStatus('all');
+                setFilterClientId('all');
                 setFilterDateRange('30d');
                 setShowFilters(false);
               }}
             >
               Restablecer filtros
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {bulkDeleteMode && filteredRoutes.length > 0 ? (
+        <div
+          className="mx-6 rounded-xl border border-red-200/80 dark:border-red-900/50 bg-red-50/70 dark:bg-red-950/25 px-4 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0"
+          role="region"
+          aria-label="Eliminación en lote"
+        >
+          <div className="space-y-0.5">
+            <p className="text-sm font-semibold text-stone-800 dark:text-stone-100">
+              Selección para eliminar
+            </p>
+            <p className="text-xs text-stone-600 dark:text-stone-400 tabular-nums">
+              {bulkDeleteSelectedIds.size} de {filteredRoutes.length} ruta
+              {filteredRoutes.length === 1 ? '' : 's'} seleccionada
+              {bulkDeleteSelectedIds.size === 1 ? '' : 's'}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={selectAllBulkDelete} disabled={bulkDeleteBusy}>
+              Todas
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={selectNoneBulkDelete} disabled={bulkDeleteBusy}>
+              Ninguna
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              icon={<Trash2 size={14} />}
+              disabled={bulkDeleteSelectedIds.size === 0 || bulkDeleteBusy}
+              onClick={() => setBulkDeleteOpen(true)}
+            >
+              Eliminar {bulkDeleteSelectedIds.size > 0 ? `(${bulkDeleteSelectedIds.size})` : ''}
             </Button>
           </div>
         </div>
@@ -3147,6 +3511,9 @@ export function RoutesPage() {
                             fecha={formatRouteDay(routeDateKey(r))}
                             selected={selectedRoute?.id === r.id}
                             onSelect={() => setSelectedRoute(r)}
+                            bulkMode={bulkDeleteMode}
+                            bulkChecked={bulkDeleteSelectedIds.has(r.id)}
+                            onBulkToggle={() => toggleBulkDeleteRoute(r.id)}
                           />
                         </li>
                       );
@@ -3171,6 +3538,30 @@ export function RoutesPage() {
                         </colgroup>
                         <thead className="bg-stone-50 dark:bg-stone-800/70 border-b border-stone-200 dark:border-stone-700">
                           <tr>
+                            {bulkDeleteMode ? (
+                              <th scope="col" className="px-3 py-2.5 w-10">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const allSelected = filteredRoutes.every((r) => bulkDeleteSelectedIds.has(r.id));
+                                    if (allSelected) selectNoneBulkDelete();
+                                    else selectAllBulkDelete();
+                                  }}
+                                  className="p-0.5 rounded text-primary-600 dark:text-primary-400 hover:bg-stone-200/80 dark:hover:bg-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                  aria-label={
+                                    filteredRoutes.every((r) => bulkDeleteSelectedIds.has(r.id))
+                                      ? 'Deseleccionar todas las rutas visibles'
+                                      : 'Seleccionar todas las rutas visibles'
+                                  }
+                                >
+                                  {filteredRoutes.length > 0 && filteredRoutes.every((r) => bulkDeleteSelectedIds.has(r.id)) ? (
+                                    <CheckSquare size={16} aria-hidden />
+                                  ) : (
+                                    <Square size={16} className="text-stone-400" aria-hidden />
+                                  )}
+                                </button>
+                              </th>
+                            ) : null}
                             {[
                               { label: 'Folio', col: 'code' as RouteSortKey, align: 'left' as const },
                               { label: 'Nombre', col: 'name' as RouteSortKey, align: 'left' as const },
@@ -3215,6 +3606,9 @@ export function RoutesPage() {
                                 fecha={formatRouteDay(routeDateKey(r))}
                                 selected={selectedRoute?.id === r.id}
                                 onSelect={() => setSelectedRoute(r)}
+                                bulkMode={bulkDeleteMode}
+                                bulkChecked={bulkDeleteSelectedIds.has(r.id)}
+                                onBulkToggle={() => toggleBulkDeleteRoute(r.id)}
                               />
                             );
                           })}
@@ -3300,6 +3694,47 @@ export function RoutesPage() {
           error={newRouteError}
         />
       </Modal>
+
+      <TypeToConfirmModal
+        open={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        onConfirm={handleConfirmBulkDelete}
+        title={bulkDeleteTargets.length === 1 ? 'Eliminar ruta' : 'Eliminar rutas en lote'}
+        loading={bulkDeleteBusy}
+        confirmLabel={bulkDeleteTargets.length === 1 ? 'Eliminar ruta' : `Eliminar ${bulkDeleteTargets.length} rutas`}
+        message={
+          <>
+            <p>
+              Se eliminarán{' '}
+              <strong className="tabular-nums">{bulkDeleteTargets.length}</strong>{' '}
+              ruta{bulkDeleteTargets.length === 1 ? '' : 's'} y todos sus pedidos asociados.
+            </p>
+            {bulkDeleteOrderCount > 0 ? (
+              <p className="mt-2">
+                {bulkDeleteOrderCount} pedido{bulkDeleteOrderCount === 1 ? '' : 's'} serán eliminados permanentemente.
+              </p>
+            ) : (
+              <p className="mt-2">Las rutas seleccionadas no tienen pedidos.</p>
+            )}
+            {bulkDeleteTargets.length <= 5 ? (
+              <ul className="mt-3 space-y-1 text-xs font-mono text-stone-600 dark:text-stone-400">
+                {bulkDeleteTargets.map((r) => (
+                  <li key={r.id} translate="no">
+                    {r.code}
+                    {r.name ? ` — ${r.name}` : ''}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">
+                Incluye{' '}
+                {bulkDeleteTargets.slice(0, 3).map((r) => r.code).join(', ')}
+                {' '}y {bulkDeleteTargets.length - 3} más…
+              </p>
+            )}
+          </>
+        }
+      />
 
     </div>
   );

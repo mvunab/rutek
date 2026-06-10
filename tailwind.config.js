@@ -72,11 +72,26 @@ export default {
           '0%': { opacity: '0', transform: 'translateY(1.25rem)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        'modal-backdrop-enter': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        'modal-content-enter': {
+          '0%': { opacity: '0', transform: 'scale(0.96) translateY(14px)' },
+          '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
+        },
+        'toolbar-panel-enter': {
+          '0%': { opacity: '0', transform: 'translateY(-6px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         'page-enter': 'page-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards',
         'route-panel-enter': 'route-panel-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both',
         'route-panel-enter-mobile': 'route-panel-enter-mobile 0.4s cubic-bezier(0.22, 1, 0.36, 1) both',
+        'modal-backdrop-enter': 'modal-backdrop-enter 0.24s ease-out forwards',
+        'modal-content-enter': 'modal-content-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+        'toolbar-panel-enter': 'toolbar-panel-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards',
       },
     },
   },

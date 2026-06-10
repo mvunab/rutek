@@ -1,7 +1,7 @@
 import { clsx } from 'clsx';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success' | 'violet' | 'violet-soft';
 type ButtonSize = 'xs' | 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -24,6 +24,10 @@ const variantClasses: Record<ButtonVariant, string> = {
     'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 disabled:opacity-50 dark:bg-red-950/40 dark:hover:bg-red-950/60 dark:border-red-900 dark:text-red-300',
   success:
     'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 disabled:opacity-50 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50 dark:border-emerald-900 dark:text-emerald-300',
+  violet:
+    'bg-violet-600 hover:bg-violet-700 text-white shadow-sm disabled:bg-violet-300 dark:bg-violet-600 dark:hover:bg-violet-500 dark:disabled:bg-violet-900',
+  'violet-soft':
+    'bg-violet-50 hover:bg-violet-100 text-violet-800 border border-violet-200 shadow-sm disabled:opacity-50 dark:bg-violet-950/45 dark:hover:bg-violet-950/65 dark:border-violet-800 dark:text-violet-200',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -45,12 +49,18 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
+  const focusRingClass =
+    variant === 'violet' || variant === 'violet-soft'
+      ? 'focus:ring-violet-500/50'
+      : 'focus:ring-primary-500/50';
+
   return (
     <button
       disabled={disabled || loading}
       className={clsx(
         'inline-flex items-center justify-center font-medium transition-all duration-150',
-        'focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-stone-950',
+        'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-stone-950',
+        focusRingClass,
         'disabled:cursor-not-allowed disabled:opacity-60',
         variantClasses[variant],
         sizeClasses[size],
