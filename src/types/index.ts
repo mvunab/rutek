@@ -201,6 +201,10 @@ export interface Route {
   vehiclePlate?: string;
   /** RM-3: cliente único de la ruta. Se infiere del primer pedido asignado. */
   clientId?: string | null;
+  /** N° consecutivo de hoja de ruta (el que usa el operador; no es el folio interno `code`). */
+  guiaInterna?: number;
+  /** Referencia adicional del cliente (OC, proyecto, etc.). */
+  ref?: string | null;
   stops: RouteStop[];
   orderIds: string[];
   startTime?: string;

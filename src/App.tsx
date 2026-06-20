@@ -18,6 +18,11 @@ const ClientsPage = lazy(() =>
     default: m.ClientsPage,
   })),
 );
+const ClientDetailPage = lazy(() =>
+  import('./pages/clients/ClientDetailPage').then((m) => ({
+    default: m.ClientDetailPage,
+  })),
+);
 const OrdersPage = lazy(() =>
   import('./pages/orders/OrdersPage').then((m) => ({ default: m.OrdersPage })),
 );
@@ -45,6 +50,11 @@ const SettingsPage = lazy(() =>
     default: m.SettingsPage,
   })),
 );
+const ValuationsPage = lazy(() =>
+  import('./pages/valuations/ValuationsPage').then((m) => ({
+    default: m.ValuationsPage,
+  })),
+);
 const SuperAdminDashboard = lazy(() =>
   import('./pages/super-admin/SuperAdminDashboard').then((m) => ({
     default: m.SuperAdminDashboard,
@@ -68,6 +78,11 @@ const AdminUsersPage = lazy(() =>
 const AuditPage = lazy(() =>
   import('./pages/super-admin/AuditPage').then((m) => ({
     default: m.AuditPage,
+  })),
+);
+const ObservabilityPage = lazy(() =>
+  import('./pages/super-admin/ObservabilityPage').then((m) => ({
+    default: m.ObservabilityPage,
   })),
 );
 const NotFound = lazy(() =>
@@ -107,9 +122,9 @@ function ProtectedRoute({
   children: React.ReactNode;
   requireSuperAdmin?: boolean;
 }) {
-  const { isAuthenticated, isSuperAdmin, loading } = useAuthStore();
+  const { isAuthenticated, isSuperAdmin, loading, sessionChecked } = useAuthStore();
 
-  if (loading) {
+  if (!sessionChecked || loading) {
     return <PageFallback />;
   }
 
@@ -174,6 +189,14 @@ function App() {
                 }
               />
               <Route
+                path="clientes/:id"
+                element={
+                  <ProtectedRoute>
+                    <ClientDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="clientes"
                 element={
                   <ProtectedRoute>
@@ -210,6 +233,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <PhotosPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="valorizacion"
+                element={
+                  <ProtectedRoute>
+                    <ValuationsPage />
                   </ProtectedRoute>
                 }
               />
@@ -286,6 +317,14 @@ function App() {
                 element={
                   <ProtectedRoute requireSuperAdmin>
                     <AuditPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="super-admin/observabilidad"
+                element={
+                  <ProtectedRoute requireSuperAdmin>
+                    <ObservabilityPage />
                   </ProtectedRoute>
                 }
               />

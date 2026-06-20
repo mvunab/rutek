@@ -25,6 +25,7 @@ export interface ImportPreview {
 export interface ImportConfirmResult {
   route_id: string;
   route_code: string;
+  route_number?: number | string;
   route_name: string;
   orders_created: number;
   client_name: string;

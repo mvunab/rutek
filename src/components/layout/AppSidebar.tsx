@@ -2,7 +2,8 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Truck, Package, Map, UserCircle2,
   Users, Bell, LogOut, Settings, ChevronLeft,
-  Shield, Building2, FileClock, Car, X, Images,
+  Shield, Building2, FileClock, Car, X, Images, Calculator,
+  Gauge,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useEffect, useMemo, useState } from 'react';
@@ -10,6 +11,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import type { UserRole } from '../../types';
 import { useToastStore } from '../../store/useToastStore';
 import { NotificationCenter } from '../notifications/NotificationCenter';
+import { NAV_TOUR_TARGET_ATTR } from '../../lib/navTour';
 
 interface NavItem {
   to: string;
@@ -23,15 +25,17 @@ const tenantNavItems: NavItem[] = [
   { to: '/dashboard',  icon: <LayoutDashboard size={18} />, label: 'Back Office',      roles: ['admin', 'operator'] },
   { to: '/rutas',      icon: <Truck size={18} />,           label: 'Rutas',            roles: ['admin', 'operator', 'driver'] },
   { to: '/pedidos',    icon: <Package size={18} />,         label: 'Pedidos',          roles: ['client'] },
-  { to: '/clientes',   icon: <Users size={18} />,           label: 'Cuentas',          roles: ['admin', 'operator'] },
+  { to: '/clientes',   icon: <Users size={18} />,           label: 'Clientes',         roles: ['admin', 'operator'] },
   { to: '/vehiculos',  icon: <Car size={18} />,             label: 'Vehículos',        roles: ['admin', 'operator'] },
   { to: '/usuarios',   icon: <UserCircle2 size={18} />,     label: 'Usuarios Sistema', roles: ['admin'] },
   { to: '/fotos',      icon: <Images size={18} />,          label: 'Fotos de Ruta',    roles: ['admin', 'operator'] },
+  { to: '/valorizacion', icon: <Calculator size={18} />,    label: 'Valorización',     roles: ['admin', 'operator'] },
   { to: '/mis-rutas',  icon: <Truck size={18} />,           label: 'Mis Rutas',         roles: ['peoneta'] },
 ];
 
 const superAdminNavItems: NavItem[] = [
   { to: '/super-admin',            icon: <LayoutDashboard size={18} />, label: 'Resumen Global', roles: ['super_admin'], end: true },
+  { to: '/super-admin/observabilidad', icon: <Gauge size={18} />,     label: 'Observabilidad', roles: ['super_admin'] },
   { to: '/super-admin/tenants',    icon: <Building2 size={18} />,       label: 'Tenants',        roles: ['super_admin'] },
   { to: '/super-admin/users',      icon: <Users size={18} />,           label: 'Usuarios',       roles: ['super_admin'] },
   { to: '/super-admin/auditoria',  icon: <FileClock size={18} />,       label: 'Auditoría',      roles: ['super_admin'] },
@@ -49,6 +53,8 @@ const roleLabels: Record<UserRole, string> = {
 export interface AppSidebarProps {
   mobileOpen: boolean;
   onMobileClose: () => void;
+  /** Expande el sidebar durante el tour guiado */
+  tourForceExpanded?: boolean;
 }
 
 /** Tooltip flotante para el sidebar colapsado (CSS puro, accesible por hover) */
@@ -71,7 +77,7 @@ function CollapsedTooltip({ label }: { label: string }) {
   );
 }
 
-export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
+export function AppSidebar({ mobileOpen, onMobileClose, tourForceExpanded = false }: AppSidebarProps) {
   const { user, tenant, isSuperAdmin, logout } = useAuthStore();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -126,7 +132,8 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
     : 'text-primary-600 dark:text-white';
 
   const renderNav = (isMobile: boolean) => {
-    const showLabels = isMobile || !collapsed;
+    const expandedForTour = tourForceExpanded && !isMobile;
+    const showLabels = isMobile || !collapsed || expandedForTour;
 
     return (
       <>
@@ -206,6 +213,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
                 <NavLink
                   to={item.to}
                   end={item.end}
+                  {...{ [NAV_TOUR_TARGET_ATTR]: item.to }}
                   aria-label={!showLabels ? item.label : undefined}
                   className={({ isActive }) => clsx(
                     'flex items-center rounded-lg text-sm font-medium',
@@ -256,6 +264,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
             <li className="relative group/item">
               <button
                 type="button"
+                {...{ [NAV_TOUR_TARGET_ATTR]: 'notifications' }}
                 aria-label={unreadCount > 0 ? `Notificaciones — ${unreadCount} sin leer` : 'Notificaciones'}
                 onClick={() => setNotifOpen(true)}
                 className={clsx(
@@ -291,6 +300,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
             <li className="relative group/item">
               <NavLink
                 to="/configuracion"
+                {...{ [NAV_TOUR_TARGET_ATTR]: '/configuracion' }}
                 aria-label={!showLabels ? 'Configuración' : undefined}
                 className={({ isActive }) => clsx(
                   'flex items-center rounded-lg text-sm font-medium',
@@ -372,7 +382,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
           'rounded-2xl shadow-sidebar',
           'dark:shadow-none dark:border dark:border-stone-800 dark:rounded-none dark:my-0 dark:ml-0 dark:h-full dark:border-r',
           'transition-[width] duration-200 ease-in-out',
-          collapsed ? 'w-[68px]' : 'w-60',
+          collapsed && !tourForceExpanded ? 'w-[68px]' : 'w-60',
         )}
       >
         {renderNav(false)}

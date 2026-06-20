@@ -7,6 +7,7 @@ import { useOrderStore } from '../../store/useOrderStore';
 import { resolveOrderStatusLabel } from '../../lib/orderStatusLabels';
 import { Card } from '../../components/ui/Card';
 import type { Route, Order } from '../../types';
+import { formatRouteDisplayTitle } from '../../lib/routeSequence';
 
 const ROUTE_STATUS_LABEL: Record<string, string> = {
   not_started: 'Sin iniciar',
@@ -148,8 +149,8 @@ export function PeonetaDashboardPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">
-                    {route.name || route.code}
+                  <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate" translate="no">
+                    {formatRouteDisplayTitle(route)}
                   </p>
                   <span
                     className={clsx(
@@ -181,7 +182,7 @@ export function PeonetaDashboardPage() {
             </div>
 
             {/* Lista de pedidos asignados */}
-            <ul className="divide-y divide-stone-100 dark:divide-stone-800" aria-label={`Pedidos de la ruta ${route.name || route.code}`}>
+            <ul className="divide-y divide-stone-100 dark:divide-stone-800" aria-label={`Pedidos de la ruta ${formatRouteDisplayTitle(route)}`}>
               {myOrders.map((order) => {
                 const label = resolveOrderStatusLabel(order.status, tenant);
                 return (

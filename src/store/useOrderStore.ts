@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Order, OrderFilters, OrderItem } from '../types';
 import { api, isNetworkError } from '../lib/api';
+import { normalizeOptionalUuid } from '../lib/uuid';
 
 /** Alta de pedido: siempre incluye la ruta (`route_id` obligatorio en API). */
 export type OrderCreatePayload = Omit<
@@ -215,13 +216,21 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
           data.dispatchGuideUrl.trim() === '' ? null : data.dispatchGuideUrl.trim();
       }
 
-      if (data.clientId !== undefined) body.client_id = data.clientId;
+      if (data.clientId !== undefined) {
+        body.client_id = normalizeOptionalUuid(data.clientId) ?? null;
+      }
       if (data.clientName !== undefined) body.client_name = data.clientName;
-      if (data.driverId !== undefined) body.driver_id = data.driverId;
+      if (data.driverId !== undefined) {
+        body.driver_id = normalizeOptionalUuid(data.driverId) ?? null;
+      }
       if (data.driverName !== undefined) body.driver_name = data.driverName;
-      if (data.peonetaId !== undefined) body.peoneta_id = data.peonetaId;
+      if (data.peonetaId !== undefined) {
+        body.peoneta_id = normalizeOptionalUuid(data.peonetaId) ?? null;
+      }
       if (data.peonetaName !== undefined) body.peoneta_name = data.peonetaName;
-      if (data.vehicleId !== undefined) body.vehicle_id = data.vehicleId;
+      if (data.vehicleId !== undefined) {
+        body.vehicle_id = normalizeOptionalUuid(data.vehicleId) ?? null;
+      }
       if (data.vehiclePlate !== undefined) body.vehicle_plate = data.vehiclePlate;
       if (data.origin !== undefined) {
         body.origin_street = data.origin.street;

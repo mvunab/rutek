@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, Users, TrendingUp, AlertCircle, CheckCircle2,
   Plus, Eye, Pencil, Shield, Activity, Search, Filter,
-  ArrowUpRight, Minus, Clock, Globe, Package, Truck
+  ArrowUpRight, Minus, Clock, Globe, Package, Truck, Gauge,
 } from 'lucide-react';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { Button } from '../../components/ui/Button';
@@ -319,6 +319,9 @@ export function SuperAdminDashboard() {
               </Button>
               <Button fullWidth variant="secondary" onClick={() => navigate('/super-admin/users')} icon={<Users size={14} />}>
                 Usuarios Globales
+              </Button>
+              <Button fullWidth variant="ghost" onClick={() => navigate('/super-admin/observabilidad')} icon={<Gauge size={14} />}>
+                Observabilidad
               </Button>
               <Button fullWidth variant="ghost" onClick={() => navigate('/super-admin/tenants')} icon={<Filter size={14} />}>
                 Gestión Completa

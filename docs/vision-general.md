@@ -97,10 +97,11 @@ flowchart LR
 
 ### Infraestructura
 
-- **Docker Compose** — Postgres + MinIO en servidor
+- **Docker Compose** — Postgres + MinIO + DbGate en servidor
 - **nginx** — SPA estática, proxy API, proxy `/media/` a MinIO
 - **systemd** — servicio `rutek-api` en producción
 - Deploy desde Mac: `rutek-api/deploy/deploy-from-local.sh`
+- Túneles SSH + IA local (Cursor MCP): [README-SERVICIOS-TUNEL.md](../../rutek-api/deploy/README-SERVICIOS-TUNEL.md), [MCP Cursor](../../rutek-api/deploy/mcp/README-MCP-CURSOR.md)
 
 ---
 

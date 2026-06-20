@@ -72,6 +72,30 @@ export function clearAccessToken() {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
 }
 
+type AuthExpiredListener = () => void;
+const authExpiredListeners = new Set<AuthExpiredListener>();
+
+export function onAuthExpired(listener: AuthExpiredListener) {
+  authExpiredListeners.add(listener);
+  return () => authExpiredListeners.delete(listener);
+}
+
+function notifyAuthExpired() {
+  for (const fn of authExpiredListeners) {
+    try {
+      fn();
+    } catch {
+      // listener no debe romper el flujo
+    }
+  }
+}
+
+function handleUnauthorized(accessToken: string | null) {
+  if (!accessToken) return;
+  clearAccessToken();
+  notifyAuthExpired();
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const accessToken = getAccessToken();
 
@@ -97,6 +121,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
+    if (res.status === 401) {
+      handleUnauthorized(accessToken);
+    }
     throw new ApiError(res.status, body);
   }
 
@@ -131,6 +158,9 @@ export const api = {
     }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
+      if (res.status === 401) {
+        handleUnauthorized(accessToken);
+      }
       throw new ApiError(res.status, body);
     }
     const text = await res.text();

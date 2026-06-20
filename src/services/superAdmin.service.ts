@@ -50,6 +50,10 @@ export const superAdminService = {
     return api.get('/super-admin/stats');
   },
 
+  async getObservability() {
+    return api.get<Record<string, unknown>>('/super-admin/observability');
+  },
+
   async listTenants(): Promise<Tenant[]> {
     const data = await api.get<DbTenant[]>('/super-admin/tenants');
     return data.map(toTenant);

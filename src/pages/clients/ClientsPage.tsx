@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Phone, Mail, MapPin, History, Edit2, Trash2, Building2, CheckCircle, XCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Search, Phone, Mail, MapPin, ArrowRight, Edit2, Trash2, Building2, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { Modal, ConfirmModal } from '../../components/ui/Modal';
+import { Modal } from '../../components/ui/Modal';
+import { ClientDeleteModal } from '../../components/clients/ClientDeleteModal';
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useClientStore } from '../../store/useClientStore';
-import { OrderStatusBadge } from '../../components/ui/Badge';
+import { toast } from '../../store/useToastStore';
 import type { Client } from '../../types';
 import { clsx } from 'clsx';
 import { chileRegionSelectOptions } from '../../lib/chileRegions';
@@ -106,7 +108,7 @@ function ClientForm({ initial = EMPTY_INITIAL, onSubmit, onCancel, submitLabel =
             form.active ? 'translate-x-5' : 'translate-x-0.5'
           )} />
         </button>
-        <span className="text-sm text-stone-600 dark:text-stone-300">Cuenta activa</span>
+        <span className="text-sm text-stone-600 dark:text-stone-300">Cliente activo</span>
       </div>
       <div className="flex justify-end gap-3 pt-2">
         <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
@@ -116,41 +118,9 @@ function ClientForm({ initial = EMPTY_INITIAL, onSubmit, onCancel, submitLabel =
   );
 }
 
-function ClientHistoryModal({ client, onClose }: { client: Client; onClose: () => void }) {
-  const { getClientHistory } = useClientStore();
-  const history = getClientHistory(client.id);
-
-  return (
-    <Modal open onClose={onClose} title={`Historial — ${client.companyName}`} description="Historial de servicios de la cuenta" size="lg">
-      {history.length === 0 ? (
-        <p className="text-sm text-stone-400 dark:text-stone-500 text-center py-8">Sin historial disponible</p>
-      ) : (
-        <div className="space-y-3">
-          {history.map((h) => (
-            <div key={h.id} className="flex items-center gap-4 p-4 bg-stone-50 dark:bg-stone-800/70 rounded-lg border border-stone-200 dark:border-stone-700">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-mono font-semibold text-stone-700 dark:text-stone-200">{h.orderCode}</span>
-                  <OrderStatusBadge status={h.status} />
-                </div>
-                <p className="text-xs text-stone-500 dark:text-stone-400">{h.description}</p>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-sm font-semibold text-stone-800 dark:text-stone-100">
-                  {h.totalAmount > 0 ? `$${h.totalAmount.toLocaleString('es-CL')}` : '—'}
-                </p>
-                <p className="text-xs text-stone-400 dark:text-stone-500">{h.date}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Modal>
-  );
-}
-
 export function ClientsPage() {
-  const { clients, searchTerm, setSearchTerm, addClient, updateClient, deleteClient, fetchClients } = useClientStore();
+  const navigate = useNavigate();
+  const { clients, searchTerm, setSearchTerm, addClient, updateClient, deleteClient, getDeletionImpact, fetchClients } = useClientStore();
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
@@ -158,7 +128,6 @@ export function ClientsPage() {
   }, [fetchClients]);
 
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [historyClient, setHistoryClient] = useState<Client | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Client | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
@@ -217,14 +186,14 @@ export function ClientsPage() {
           ))}
         </div>
         <Button onClick={() => setShowForm(true)} icon={<Plus size={16} />}>
-          Nueva cuenta
+          Nuevo cliente
         </Button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Total cuentas', value: clients.length, color: 'text-stone-700 dark:text-stone-200', box: 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800' },
+          { label: 'Total clientes', value: clients.length, color: 'text-stone-700 dark:text-stone-200', box: 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800' },
           { label: 'Activos', value: clients.filter(c => c.active).length, color: 'text-emerald-700 dark:text-emerald-300', box: 'bg-emerald-50 dark:bg-emerald-950/35 border-emerald-100 dark:border-emerald-900/50' },
           { label: 'Inactivos', value: clients.filter(c => !c.active).length, color: 'text-stone-500 dark:text-stone-400', box: 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800' },
         ].map((s) => (
@@ -239,9 +208,9 @@ export function ClientsPage() {
       {filtered.length === 0 ? (
         <EmptyState
           icon={<Building2 size={32} />}
-          title="No se encontraron cuentas"
-          description="Ajusta los filtros o registra una nueva cuenta"
-          action={{ label: 'Nueva cuenta', onClick: () => setShowForm(true), icon: <Plus size={14} /> }}
+          title="No se encontraron clientes"
+          description="Ajusta los filtros o registra un nuevo cliente"
+          action={{ label: 'Nuevo cliente', onClick: () => setShowForm(true), icon: <Plus size={14} /> }}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -282,13 +251,13 @@ export function ClientsPage() {
                 <span className="text-[10px] text-stone-400 dark:text-stone-500 font-mono">RUT: {client.rut}</span>
                 <div className="flex-1" />
                 <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => setHistoryClient(client)}
-                  icon={<History size={13} />}
-                  className="text-stone-400 dark:text-stone-500 hover:text-stone-700 dark:hover:text-stone-200"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate(`/clientes/${client.id}`)}
+                  icon={<ArrowRight size={14} aria-hidden />}
+                  iconPosition="right"
                 >
-                  Historial
+                  Ver ficha
                 </Button>
                 <Button variant="ghost" size="xs" onClick={() => setEditingClient(client)} icon={<Edit2 size={13} />} />
                 <Button
@@ -296,6 +265,7 @@ export function ClientsPage() {
                   size="xs"
                   onClick={() => setDeleteTarget(client)}
                   icon={<Trash2 size={13} />}
+                  aria-label={`Eliminar cliente ${client.companyName}`}
                   className="text-stone-400 dark:text-stone-500 hover:text-red-600 dark:hover:text-red-400"
                 />
               </div>
@@ -304,12 +274,12 @@ export function ClientsPage() {
         </div>
       )}
 
-      <Modal open={showForm} onClose={() => setShowForm(false)} title="Registrar cuenta" description="Completa los datos de la nueva cuenta" size="xl">
-        <ClientForm onSubmit={handleAdd} onCancel={() => setShowForm(false)} submitLabel="Registrar cuenta" />
+      <Modal open={showForm} onClose={() => setShowForm(false)} title="Registrar cliente" description="Completa los datos del nuevo cliente" size="xl">
+        <ClientForm onSubmit={handleAdd} onCancel={() => setShowForm(false)} submitLabel="Registrar cliente" />
       </Modal>
 
       {editingClient && (
-        <Modal open onClose={() => setEditingClient(null)} title="Editar cuenta" description={editingClient.companyName} size="xl">
+        <Modal open onClose={() => setEditingClient(null)} title="Editar cliente" description={editingClient.companyName} size="xl">
           <ClientForm
             initial={editingClient}
             onSubmit={handleEdit}
@@ -319,17 +289,16 @@ export function ClientsPage() {
         </Modal>
       )}
 
-      {historyClient && (
-        <ClientHistoryModal client={historyClient} onClose={() => setHistoryClient(null)} />
-      )}
-
-      <ConfirmModal
+      <ClientDeleteModal
         open={!!deleteTarget}
+        client={deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={() => { if (deleteTarget) deleteClient(deleteTarget.id); setDeleteTarget(null); }}
-        title="Eliminar cuenta"
-        message={`¿Seguro que deseas eliminar la cuenta "${deleteTarget?.companyName}"? Esta acción no se puede deshacer.`}
-        confirmLabel="Eliminar"
+        loadImpact={getDeletionImpact}
+        onConfirmCascade={async () => {
+          if (!deleteTarget) return;
+          await deleteClient(deleteTarget.id, { cascade: true });
+          toast.info('Cliente eliminado', 'Se eliminaron los datos asociados en cadena.');
+        }}
       />
     </div>
   );

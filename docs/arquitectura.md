@@ -74,6 +74,7 @@ flowchart TB
 | **SPA** | React build en `/opt/rutek/web/dist` | `/` | UI operativa |
 | **API** | NestJS + systemd | `127.0.0.1:4000` | Lógica de negocio, auth |
 | **PostgreSQL** | Docker `postgres:16-alpine` | `127.0.0.1:5432` | Persistencia relacional |
+| **DbGate** | Docker | `127.0.0.1:5050` (solo túnel SSH) | Explorador SQL web |
 | **MinIO** | Docker | `9000` (S3), `9001` (consola local) | Fotos, Excel importados, docs vehículos |
 | **nginx** | Ubuntu package | `443` HTTPS | Terminación TLS, reverse proxy |
 
@@ -96,6 +97,7 @@ flowchart LR
     DC[docker compose]
     PG2[(rutek-postgres)]
     M2[(rutek-minio)]
+    D2[rutek-dbgate<br/>127.0.0.1:5050]
     WebDir[/opt/rutek/web/dist]
     ApiDir[/opt/rutek/api]
     UpDir[/opt/rutek/uploads]
@@ -112,7 +114,18 @@ flowchart LR
   Systemd --> UpDir
   DC --> PG2
   DC --> M2
+  DC --> D2
 ```
+
+### Acceso a herramientas internas (túnel SSH)
+
+Servicios que **no** están en internet pública: DbGate (`5050`), consola MinIO (`9001`), Postgres (`5432`). Acceso desde la Mac de desarrollo:
+
+```bash
+bash rutek-api/deploy/mcp/start-tunnel.sh
+```
+
+Documentación: **[rutek-api/deploy/README-SERVICIOS-TUNEL.md](../../rutek-api/deploy/README-SERVICIOS-TUNEL.md)** e **[MCP + modelos locales](../../rutek-api/deploy/mcp/README-MCP-CURSOR.md)**.
 
 ### Rutas nginx (resumen)
 
@@ -130,7 +143,9 @@ flowchart LR
 | `deploy-from-local.sh` | `rutek-api/deploy/` | Deploy completo desde Mac |
 | `remote-setup.sh` | idem | Build, migrate, seed, nginx, systemd |
 | `reset-prod-data.sh` | idem | `migrate reset` + limpieza MinIO |
-| `docker-compose.prod.yml` | idem | Postgres + MinIO |
+| `docker-compose.prod.yml` | idem | Postgres + MinIO + DbGate |
+| `README-SERVICIOS-TUNEL.md` | idem | Túneles SSH, servicios |
+| `mcp/README-MCP-CURSOR.md` | idem | Cursor + Postgres MCP + Ollama |
 
 ---
 

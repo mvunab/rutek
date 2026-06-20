@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import type { Route, RouteFilters, RouteStop } from '../types';
 import { normalizeRouteStatus } from '../lib/routeStatusLabels';
+import { resolveRouteSequence } from '../lib/routeSequence';
 import { api, isNetworkError } from '../lib/api';
+import { normalizeOptionalUuid } from '../lib/uuid';
 import { useOrderStore } from './useOrderStore';
 
 export type DeleteRouteResult = {
@@ -12,8 +14,8 @@ export type DeleteRouteResult = {
 /** Cuerpo que espera `POST /routes` (`CreateRouteDto` en rutek-api, snake_case). */
 export type CreateRouteInput = {
   name: string;
-  /** Folio / código legible; si se omite, se genera en el servidor. */
-  code?: string;
+  /** N° consecutivo de hoja de ruta (guía interna). */
+  guiaInterna?: number;
   notes?: string;
   /** UUID del cliente al que pertenece esta ruta (RM-3). Opcional: si se omite, se infiere del primer pedido asignado. */
   clientId?: string;
@@ -51,6 +53,8 @@ function mapRouteFromApi(row: Record<string, unknown>): Route {
     createdAt: String(row.created_at ?? new Date().toISOString()),
     notes: row.notes != null ? String(row.notes) : undefined,
     clientId: row.client_id != null ? String(row.client_id) : null,
+    guiaInterna: Number(row.guia_interna ?? 0) || undefined,
+    ref: row.ref != null ? String(row.ref) : null,
   };
 }
 
@@ -58,10 +62,18 @@ function routePatchToApi(data: PatchRouteInput): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (data.name !== undefined) out.name = data.name;
   if (data.status !== undefined) out.status = data.status;
-  if (data.clientId !== undefined) out.client_id = data.clientId;
-  if (data.driverId !== undefined) out.driver_id = data.driverId;
+  if (data.clientId !== undefined) {
+    out.client_id = normalizeOptionalUuid(data.clientId) ?? null;
+  }
+  if (data.guiaInterna !== undefined) out.guia_interna = data.guiaInterna;
+  if (data.ref !== undefined) out.ref = data.ref;
+  if (data.driverId !== undefined) {
+    out.driver_id = normalizeOptionalUuid(data.driverId) ?? null;
+  }
   if (data.driverName !== undefined) out.driver_name = data.driverName;
-  if (data.vehicleId !== undefined) out.vehicle_id = data.vehicleId;
+  if (data.vehicleId !== undefined) {
+    out.vehicle_id = normalizeOptionalUuid(data.vehicleId) ?? null;
+  }
   if (data.vehiclePlate !== undefined) out.vehicle_plate = data.vehiclePlate;
   if (data.stops !== undefined) out.stops = data.stops;
   if (data.estimatedDistance !== undefined) out.estimated_distance = data.estimatedDistance;
@@ -152,9 +164,11 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
     const body: Record<string, unknown> = {
       name: input.name.trim(),
     };
-    if (input.code?.trim()) body.code = input.code.trim();
     if (input.notes?.trim()) body.notes = input.notes.trim();
     if (input.clientId?.trim()) body.client_id = input.clientId.trim();
+    if (input.guiaInterna != null && input.guiaInterna > 0) {
+      body.guia_interna = input.guiaInterna;
+    }
     try {
       const created = await api.post<Record<string, unknown>>('/routes', body);
       set((state) => ({
@@ -194,12 +208,16 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
   assignDriverToOrders: async (routeId, input) => {
     try {
       const body: Record<string, unknown> = {
-        driver_id: input.driverId,
+        driver_id: normalizeOptionalUuid(input.driverId) ?? null,
       };
       if (input.driverName !== undefined) body.driver_name = input.driverName;
-      if (input.peonetaId !== undefined) body.peoneta_id = input.peonetaId;
+      if (input.peonetaId !== undefined) {
+        body.peoneta_id = normalizeOptionalUuid(input.peonetaId) ?? null;
+      }
       if (input.peonetaName !== undefined) body.peoneta_name = input.peonetaName;
-      if (input.vehicleId !== undefined) body.vehicle_id = input.vehicleId;
+      if (input.vehicleId !== undefined) {
+        body.vehicle_id = normalizeOptionalUuid(input.vehicleId) ?? null;
+      }
       if (input.vehiclePlate !== undefined) body.vehicle_plate = input.vehiclePlate;
       if (input.orderIds?.length) body.order_ids = input.orderIds;
       await api.patch(`/routes/${routeId}/assign-driver`, body);
@@ -260,8 +278,9 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
       if (filters.search) {
         const term = filters.search.toLowerCase();
         return (
-          route.code.toLowerCase().includes(term) ||
           route.name.toLowerCase().includes(term) ||
+          route.code.toLowerCase().includes(term) ||
+          String(resolveRouteSequence(route) ?? '').includes(term) ||
           (route.driverName?.toLowerCase().includes(term) ?? false)
         );
       }

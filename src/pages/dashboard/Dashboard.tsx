@@ -15,6 +15,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useDashboardStore } from '../../store/useDashboardStore';
 import { useOrderStore } from '../../store/useOrderStore';
 import { useRouteStore } from '../../store/useRouteStore';
+import { formatRouteDisplayLabel } from '../../lib/routeSequence';
 import { useClientStore } from '../../store/useClientStore';
 import { EntityStatusBreakdown } from '../../components/dashboard/EntityStatusBreakdown';
 import {
@@ -347,7 +348,13 @@ export function Dashboard() {
                 Últimos 7 días · para agrupar en rutas
               </p>
             </div>
-            <Button variant="ghost" size="xs" onClick={() => navigate('/rutas')} icon={<ArrowRight size={12} />} iconPosition="right">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate('/rutas')}
+              icon={<ArrowRight size={16} aria-hidden />}
+              iconPosition="right"
+            >
               Ir a rutas
             </Button>
           </div>
@@ -384,7 +391,13 @@ export function Dashboard() {
                   : 'Itinerario: pedidos y bultos totales'}
               </p>
             </div>
-            <Button variant="ghost" size="xs" onClick={() => navigate('/rutas')} icon={<ArrowRight size={12} />} iconPosition="right">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate('/rutas')}
+              icon={<ArrowRight size={16} aria-hidden />}
+              iconPosition="right"
+            >
               Ver rutas
             </Button>
           </div>
@@ -393,7 +406,9 @@ export function Dashboard() {
               <div key={route.id} className="px-5 py-3.5 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors">
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-semibold text-stone-700 dark:text-stone-200">{route.code}</span>
+                    <span className="text-xs font-mono font-semibold text-stone-700 dark:text-stone-200 tabular-nums" translate="no">
+                      N° {formatRouteDisplayLabel(route)}
+                    </span>
                     <RouteStatusBadge status={route.status} />
                   </div>
                   <span className="text-xs text-stone-400 dark:text-stone-500">{route.orderIds.length} paradas</span>
@@ -449,7 +464,7 @@ export function Dashboard() {
                 <Button
                   type="button"
                   variant="secondary"
-                  size="xs"
+                  size="sm"
                   disabled={activeRoutesPage <= 1}
                   onClick={() => setActiveRoutesPage((p) => Math.max(1, p - 1))}
                 >
@@ -458,7 +473,7 @@ export function Dashboard() {
                 <Button
                   type="button"
                   variant="secondary"
-                  size="xs"
+                  size="sm"
                   disabled={activeRoutesPage >= activeRoutesTotalPages}
                   onClick={() =>
                     setActiveRoutesPage((p) => Math.min(activeRoutesTotalPages, p + 1))

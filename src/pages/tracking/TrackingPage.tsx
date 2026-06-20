@@ -22,8 +22,15 @@ import {
   buildTimeline,
   groupTimelineByDate,
   formatTime,
-  resolveStatusLabel,
 } from '../../lib/trackingReport';
+import { TRACKING_BRAND } from '../../lib/trackingTheme';
+import { useForceLightTheme } from '../../hooks/useForceLightTheme';
+import { TrackingOrderStatusMarker } from '../../components/tracking/TrackingOrderStatusMarker';
+
+/** Azul corporativo estilo referencia */
+const BX_BLUE = TRACKING_BRAND.blue;
+const BX_LIGHT = TRACKING_BRAND.light;
+const BX_DEW = TRACKING_BRAND.dew;
 
 function resolveApi(): string {
   const fromEnv = import.meta.env.VITE_API_URL;
@@ -31,11 +38,6 @@ function resolveApi(): string {
   if (import.meta.env.MODE === 'development') return 'http://localhost:4000';
   return '';
 }
-
-/** Azul corporativo estilo referencia */
-const BX_BLUE = '#003DA5';
-const BX_LIGHT = '#E8F4FC';
-const BX_DEW = '#E6F2FA';
 
 function HorizontalTimeline({
   activeIndex,
@@ -233,6 +235,7 @@ function HistoryTimeline({ info }: { info: TrackingInfo }) {
 }
 
 export function TrackingPage() {
+  useForceLightTheme();
   const { token } = useParams<{ token: string }>();
   const [info, setInfo] = useState<TrackingInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -270,7 +273,7 @@ export function TrackingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center text-stone-900" style={{ colorScheme: 'light' }}>
         <div className="flex flex-col items-center gap-3 text-stone-500" role="status" aria-live="polite">
           <Loader2 className="size-10 animate-spin motion-reduce:animate-none" style={{ color: BX_BLUE }} aria-hidden />
           <p className="text-sm font-medium">Cargando seguimiento…</p>
@@ -281,7 +284,7 @@ export function TrackingPage() {
 
   if (error || !info) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 text-stone-900" style={{ colorScheme: 'light' }}>
         <article className="max-w-md w-full text-center bg-white rounded-2xl shadow-md p-8 border border-stone-100">
           <XCircle className="size-14 text-red-400 mx-auto mb-4" aria-hidden />
           <h1 className="text-xl font-extrabold text-stone-900">Link inválido o expirado</h1>
@@ -294,10 +297,9 @@ export function TrackingPage() {
   const activeIndex = getActiveStepIndex(info);
   const rejected = info.status === 'rejected' || info.status === 'cancelled';
   const headline = getStatusHeadline(info);
-  const statusLabel = resolveStatusLabel(info.status);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 text-stone-900" style={{ colorScheme: 'light' }}>
       <div className="mx-auto py-6 sm:py-8 px-4">
         <main className="max-w-[1256px] mx-auto space-y-6">
           {/* Encabezado tenant */}
@@ -333,11 +335,12 @@ export function TrackingPage() {
                     {info.orderCode}
                   </span>
                 </p>
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Box className="size-5 text-stone-400" aria-hidden />
                   <span className="text-xs font-extrabold text-stone-500 uppercase tracking-wide">
-                    {statusLabel} · {info.clientName}
+                    {info.clientName}
                   </span>
+                  <TrackingOrderStatusMarker status={info.status} size="md" />
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">

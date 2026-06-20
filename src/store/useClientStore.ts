@@ -3,6 +3,15 @@ import type { Client, ServiceHistory } from '../types';
 import { api } from '../lib/api';
 import type { DbClient } from '../types/api';
 
+export interface ClientDeletionImpact {
+  client_id: string;
+  company_name: string;
+  routes_count: number;
+  orders_count: number;
+  activities_count: number;
+  requires_cascade: boolean;
+}
+
 function toClient(r: DbClient): Client {
   return {
     id: r.id,
@@ -32,7 +41,8 @@ interface ClientStore {
   selectClient: (client: Client | null) => void;
   addClient: (data: Omit<Client, 'id' | 'createdAt' | 'tenantId'>) => Promise<void>;
   updateClient: (id: string, data: Partial<Client>) => Promise<void>;
-  deleteClient: (id: string) => Promise<void>;
+  deleteClient: (id: string, options?: { cascade?: boolean }) => Promise<void>;
+  getDeletionImpact: (id: string) => Promise<ClientDeletionImpact>;
   getClientHistory: (clientId: string) => ServiceHistory[];
 }
 
@@ -92,8 +102,14 @@ export const useClientStore = create<ClientStore>((set, get) => ({
     }));
   },
 
-  deleteClient: async (id) => {
-    await api.del(`/clients/${id}`);
+  getDeletionImpact: async (id) => {
+    return api.get<ClientDeletionImpact>(`/clients/${id}/deletion-impact`);
+  },
+
+  deleteClient: async (id, options) => {
+    const cascade = options?.cascade ?? false;
+    const qs = cascade ? '?cascade=true' : '';
+    await api.del(`/clients/${id}${qs}`);
     set((s) => ({
       clients: s.clients.filter((c) => c.id !== id),
       selectedClient: s.selectedClient?.id === id ? null : s.selectedClient,

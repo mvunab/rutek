@@ -15,11 +15,12 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-primary-600 hover:bg-primary-700 text-white shadow-sm disabled:bg-primary-300',
+  primary:
+    'bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white shadow-md shadow-primary-600/20 hover:shadow-lg hover:shadow-primary-600/25 disabled:bg-primary-300 disabled:shadow-none font-semibold',
   secondary:
-    'bg-surface hover:bg-surface-hover text-stone-700 border border-stone-200 shadow-card disabled:opacity-50 dark:bg-stone-900 dark:hover:bg-stone-800 dark:text-stone-200 dark:border-stone-600 dark:shadow-none',
+    'bg-surface hover:bg-surface-hover active:bg-stone-100 text-stone-800 border border-stone-300 shadow-sm hover:shadow-md disabled:opacity-50 font-semibold dark:bg-stone-900 dark:hover:bg-stone-800 dark:active:bg-stone-800 dark:text-stone-100 dark:border-stone-600 dark:shadow-none',
   ghost:
-    'hover:bg-surface-hover text-stone-600 hover:text-stone-900 disabled:text-stone-300 dark:hover:bg-stone-800 dark:text-stone-300 dark:hover:text-stone-100',
+    'hover:bg-surface-hover active:bg-stone-100 text-stone-700 hover:text-stone-900 font-medium disabled:text-stone-300 dark:hover:bg-stone-800 dark:active:bg-stone-800 dark:text-stone-300 dark:hover:text-stone-100',
   danger:
     'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 disabled:opacity-50 dark:bg-red-950/40 dark:hover:bg-red-950/60 dark:border-red-900 dark:text-red-300',
   success:
@@ -31,10 +32,10 @@ const variantClasses: Record<ButtonVariant, string> = {
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  xs: 'px-2 py-1 text-xs rounded-md gap-1',
-  sm: 'px-3 py-1.5 text-sm rounded-lg gap-1.5',
-  md: 'px-4 py-2 text-sm rounded-lg gap-2',
-  lg: 'px-5 py-2.5 text-base rounded-xl gap-2',
+  xs: 'px-3 py-1.5 text-xs rounded-lg gap-1.5 min-h-8',
+  sm: 'px-4 py-2 text-sm rounded-lg gap-2 min-h-10',
+  md: 'px-5 py-2.5 text-sm rounded-xl gap-2 min-h-11',
+  lg: 'px-6 py-3 text-base rounded-xl gap-2.5 min-h-12',
 };
 
 export function Button({
@@ -58,8 +59,8 @@ export function Button({
     <button
       disabled={disabled || loading}
       className={clsx(
-        'inline-flex items-center justify-center font-medium transition-all duration-150',
-        'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-stone-950',
+        'inline-flex items-center justify-center transition-[box-shadow,background-color,color,border-color] duration-150 touch-manipulation',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-stone-950',
         focusRingClass,
         'disabled:cursor-not-allowed disabled:opacity-60',
         variantClasses[variant],

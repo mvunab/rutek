@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { Map, Menu, Shield } from 'lucide-react';
 import { clsx } from 'clsx';
 import { AppSidebar } from './AppSidebar';
+import { NavbarTour } from '../onboarding/NavbarTour';
 import { useAuthStore } from '../../store/useAuthStore';
+import { Activity } from 'lucide-react';
 
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   '/dashboard':     { title: 'Dashboard',         subtitle: 'Resumen operacional en tiempo real' },
-  '/clientes':      { title: 'Cuentas',           subtitle: 'Administra y consulta tus mandantes (cliente directo)' },
+  '/clientes':      { title: 'Clientes',           subtitle: 'Administra y consulta tus clientes y mandantes' },
   '/pedidos': {
     title: 'Mis pedidos',
     subtitle: 'Seguimiento de tus envíos. El alta y la planificación en ruta las gestiona tu operador desde Rutas.',
@@ -18,15 +20,56 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   },
   '/usuarios':      { title: 'Usuarios Sistema', subtitle: 'Administradores, operadores, repartidores, peonetas y clientes de la plataforma' },
   '/fotos':         { title: 'Admin. Fotos',      subtitle: 'Fotografías de inspección y entrega desde la app móvil' },
+  '/valorizacion':  { title: 'Valorización',      subtitle: 'Cobro a clientes y pago a choferes y peonetas por pedido' },
   '/configuracion': { title: 'Configuración',     subtitle: 'Tema de la interfaz y datos de la empresa' },
   '/vehiculos':     { title: 'Vehículos',         subtitle: 'Flota, VIN, mantención y vencimientos de documentación con alertas' },
   '/mis-rutas':     { title: 'Mis Rutas',          subtitle: 'Pedidos que tienes asignados en las rutas de hoy' },
 };
 
 export function AppLayout() {
-  const { isAuthenticated, isSuperAdmin } = useAuthStore();
+  const { user, isAuthenticated, isSuperAdmin, loading, restoreSession } = useAuthStore();
   const location = useLocation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [tourSidebarExpanded, setTourSidebarExpanded] = useState(false);
+
+  const prepareSidebarForTour = useCallback(() => {
+    setTourSidebarExpanded(true);
+    setMobileSidebarOpen(true);
+    try {
+      localStorage.setItem('sidebar-collapsed', 'false');
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const handleTourEnd = useCallback(() => {
+    setTourSidebarExpanded(false);
+    setMobileSidebarOpen(false);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void restoreSession().finally(() => {
+      if (!cancelled) setSessionReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [restoreSession]);
+
+  if (!sessionReady || loading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center bg-canvas dark:bg-stone-950"
+        role="status"
+        aria-live="polite"
+      >
+        <Activity size={24} className="animate-spin text-primary-600 mr-2" aria-hidden />
+        <span className="text-sm text-stone-500 dark:text-stone-400">Cargando sesión…</span>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -34,12 +77,18 @@ export function AppLayout() {
 
   const inSuperAdmin = isSuperAdmin || location.pathname.startsWith('/super-admin');
   const vehicleDetailMatch = /^\/vehiculos\/[^/]+$/.test(location.pathname);
+  const clientDetailMatch = /^\/clientes\/[^/]+$/.test(location.pathname);
   const pageInfo = vehicleDetailMatch
     ? {
         title: 'Ficha de vehículo',
         subtitle: 'Identificación, documentación y actividad reciente en rutas y pedidos',
       }
-    : pageTitles[location.pathname] ?? { title: 'Rutek' };
+    : clientDetailMatch
+      ? {
+          title: 'Ficha de cliente',
+          subtitle: 'Actividad comercial, oportunidades e historial de pedidos',
+        }
+      : pageTitles[location.pathname] ?? { title: 'Rutek' };
   /** Rutas usa layout de altura fija: scroll solo en listado y panel de detalle. */
   const isRoutesPage = location.pathname === '/rutas';
 
@@ -56,7 +105,18 @@ export function AppLayout() {
       <AppSidebar
         mobileOpen={mobileSidebarOpen}
         onMobileClose={() => setMobileSidebarOpen(false)}
+        tourForceExpanded={tourSidebarExpanded}
       />
+
+      {user && (
+        <NavbarTour
+          userId={user.id}
+          role={user.role}
+          isSuperAdmin={isSuperAdmin}
+          onPrepareSidebar={prepareSidebarForTour}
+          onTourEnd={handleTourEnd}
+        />
+      )}
 
       {/* Content column */}
       <div className="flex flex-col flex-1 min-w-0 min-h-0">

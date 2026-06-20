@@ -30,6 +30,7 @@ import {
   VEHICLE_TYPE_LABELS,
 } from '../../lib/vehicleLabels';
 import { routeStatusLabel } from '../../lib/routeStatusLabels';
+import { formatRouteDisplayLabel, formatRouteDisplayTitle } from '../../lib/routeSequence';
 import { OrderStatusBadge, RouteStatusBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { ConfirmModal } from '../../components/ui/Modal';
@@ -432,11 +433,11 @@ export function VehicleDetailPage() {
                 <li key={route.id}>
                   <div className="flex items-center justify-between gap-3 px-5 py-3.5">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-stone-900 dark:text-stone-100 truncate">
-                        {route.name || route.code}
+                      <p className="text-sm font-medium text-stone-900 dark:text-stone-100 truncate" translate="no">
+                        {formatRouteDisplayTitle(route)}
                       </p>
-                      <p className="text-xs text-stone-500 dark:text-stone-400 truncate">
-                        Folio {route.code} · {formatVehicleDate(route.createdAt)} ·{' '}
+                      <p className="text-xs text-stone-500 dark:text-stone-400 truncate tabular-nums">
+                        N° {formatRouteDisplayLabel(route)} · {formatVehicleDate(route.createdAt)} ·{' '}
                         {routeStatusLabel(route.status)}
                       </p>
                     </div>

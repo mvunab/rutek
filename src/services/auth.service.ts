@@ -6,8 +6,9 @@ import {
   getAccessToken,
   isHttpError,
 } from '../lib/api';
+import { isAccessTokenExpired } from '../lib/jwt';
 import type { User, Tenant } from '../types';
-import type { DbTenant, DbUser } from '../types/api';
+import type { DbTenant } from '../types/api';
 
 export interface AuthResponse {
   user: User;
@@ -47,19 +48,6 @@ function mapUserFromLogin(
   };
 }
 
-function mapUserFromDb(raw: DbUser, effectiveTenantId: string | null): User {
-  return {
-    id: raw.id,
-    tenantId: effectiveTenantId ?? raw.tenant_id ?? '',
-    name: raw.name,
-    email: raw.email,
-    role: raw.role as User['role'],
-    phone: raw.phone ?? undefined,
-    active: raw.active,
-    createdAt: raw.created_at,
-  };
-}
-
 function mapTenantFromDb(raw: DbTenant): Tenant {
   const customRaw = raw.custom_order_statuses;
   const customOrderStatuses = Array.isArray(customRaw)
@@ -95,9 +83,9 @@ function mapTenantFromDb(raw: DbTenant): Tenant {
   };
 }
 
-async function loadTenantSafely(tenantId: string): Promise<Tenant | null> {
+async function loadTenantSafely(): Promise<Tenant | null> {
   try {
-    const data = await api.get<DbTenant>(`/super-admin/tenants/${tenantId}`);
+    const data = await api.get<DbTenant>('/tenant/profile');
     return mapTenantFromDb(data);
   } catch (err) {
     if (isHttpError(err) && (err.status === 403 || err.status === 404)) {
@@ -134,11 +122,11 @@ export const authService = {
       setAccessToken(res.access_token);
 
       const isSuperAdmin = res.user.role === 'super_admin';
-      const tenantId = isSuperAdmin ? null : res.user.tenantId;
+      const tenantId = res.user.tenantId || null;
 
       let tenant: Tenant | null = null;
       if (tenantId) {
-        tenant = await loadTenantSafely(tenantId);
+        tenant = await loadTenantSafely();
         tenant = await enrichTenantOrderCatalog(tenant);
       }
 
@@ -160,21 +148,25 @@ export const authService = {
   },
 
   async getSession(): Promise<AuthResponse | null> {
-    if (!getAccessToken()) return null;
+    const token = getAccessToken();
+    if (!token || isAccessTokenExpired(token)) {
+      clearAccessToken();
+      return null;
+    }
 
     try {
-      const me = await api.get<DbUser>('/auth/me');
+      const me = await api.get<LoginResponseUser>('/auth/me');
       const isSuperAdmin = me.role === 'super_admin';
-      const tenantId = isSuperAdmin ? null : me.tenant_id;
+      const tenantId = me.tenantId || null;
 
       let tenant: Tenant | null = null;
       if (tenantId) {
-        tenant = await loadTenantSafely(tenantId);
+        tenant = await loadTenantSafely();
         tenant = await enrichTenantOrderCatalog(tenant);
       }
 
       return {
-        user: mapUserFromDb(me, tenantId),
+        user: mapUserFromLogin(me, tenantId),
         tenant,
         isSuperAdmin,
       };
@@ -187,8 +179,9 @@ export const authService = {
     }
   },
 
-  async getTenant(tenantId: string): Promise<Tenant | null> {
-    return loadTenantSafely(tenantId);
+  async getTenant(): Promise<Tenant | null> {
+    const tenant = await loadTenantSafely();
+    return enrichTenantOrderCatalog(tenant);
   },
 
   async changeMyPassword(currentPassword: string, newPassword: string) {

@@ -1,20 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Building2, Moon, Sun, Monitor, Check, Key, Eye, EyeOff, Tags, Plus, Trash2,
-  FileSpreadsheet, Zap, Upload, X, AlertCircle,
+  FileSpreadsheet, Zap, Upload, X, AlertCircle, Activity, Map,
 } from 'lucide-react';
+import { PricingProfileSection } from '../../components/pricing/PricingProfileSection';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input, Select } from '../../components/ui/Input';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useUiStore } from '../../store/useUiStore';
+import { useNavTourStore } from '../../store/useNavTourStore';
 import type { Tenant, ExcelFormatConfig, ExcelColumnMapping } from '../../types';
+import type { DbTenant } from '../../types/api';
 import {
   maxMappedColumnIndex,
   normalizeExcelFormat,
   normalizeExcelFormatsList,
 } from '../../lib/excelFormat';
 import { api, ApiError } from '../../lib/api';
+import { authService } from '../../services/auth.service';
 
 type CompanyForm = {
   name: string;
@@ -40,10 +44,55 @@ const emptyForm: CompanyForm = {
   plan: 'starter',
 };
 
+function tenantToForm(tenant: Tenant): CompanyForm {
+  return {
+    name: tenant.name,
+    legalName: tenant.legalName ?? '',
+    rut: tenant.rut,
+    email: tenant.email ?? '',
+    phone: tenant.phone ?? '',
+    address: tenant.address ?? '',
+    city: tenant.city ?? '',
+    region: tenant.region ?? '',
+    plan: tenant.plan,
+  };
+}
+
+function isTenantAdmin(role: string | undefined): boolean {
+  return role === 'admin' || role === 'super_admin';
+}
+
+function NavTourSettingsCard() {
+  const requestStart = useNavTourStore((s) => s.requestStart);
+
+  return (
+    <Card padding="lg">
+      <div className="flex items-start gap-3 mb-5">
+        <div className="p-2 rounded-lg bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400">
+          <Map size={20} aria-hidden="true" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+            Tour del menú
+          </h2>
+          <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
+            Repasa las secciones principales del menú lateral con una guía paso a paso.
+          </p>
+        </div>
+      </div>
+      <Button type="button" variant="secondary" onClick={requestStart}>
+        Ver tour del menú
+      </Button>
+    </Card>
+  );
+}
+
 export function SettingsPage() {
-  const { tenant, user, updateTenant, changeMyPassword, loading } = useAuthStore();
+  const { tenant, user, updateTenant, changeMyPassword, loading: authLoading } = useAuthStore();
   const { theme, setTheme } = useUiStore();
   const [form, setForm] = useState<CompanyForm>(emptyForm);
+  const [hydrating, setHydrating] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [savedCompany, setSavedCompany] = useState(false);
   const [savingCompany, setSavingCompany] = useState(false);
   const [companyError, setCompanyError] = useState('');
@@ -59,28 +108,59 @@ export function SettingsPage() {
   const [savingOrderStatuses, setSavingOrderStatuses] = useState(false);
 
   useEffect(() => {
-    if (!tenant) return;
-    setForm({
-      name: tenant.name,
-      legalName: tenant.legalName ?? '',
-      rut: tenant.rut,
-      email: tenant.email ?? '',
-      phone: tenant.phone ?? '',
-      address: tenant.address ?? '',
-      city: tenant.city ?? '',
-      region: tenant.region ?? '',
-      plan: tenant.plan,
-    });
-  }, [tenant]);
+    document.getElementById('main-content')?.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
+  const refreshTenant = async () => {
+    setHydrating(true);
+    setLoadError('');
+    try {
+      const fresh = await authService.getTenant();
+      if (fresh) {
+        updateTenant(fresh);
+        setForm(tenantToForm(fresh));
+        setExtraOrderStatuses(
+          (fresh.customOrderStatuses ?? []).map((r) => ({ slug: r.slug, label: r.label })),
+        );
+      } else if (!useAuthStore.getState().tenant) {
+        setLoadError('No se pudo cargar la empresa. Verifica tu conexión e intenta de nuevo.');
+      }
+    } catch {
+      if (!useAuthStore.getState().tenant) {
+        setLoadError('No se pudo cargar la configuración. Intenta de nuevo.');
+      }
+    } finally {
+      setHydrating(false);
+    }
+  };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (tenant) {
+      setForm(tenantToForm(tenant));
+      setExtraOrderStatuses(
+        (tenant.customOrderStatuses ?? []).map((r) => ({ slug: r.slug, label: r.label })),
+      );
+      setHydrating(false);
+    }
+    void refreshTenant();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recargar al montar con sesión lista
+  }, [authLoading]);
+
+  useEffect(() => {
+    if (hydrating || !tenant) return;
+    setForm(tenantToForm(tenant));
+  }, [tenant, hydrating]);
+
+  useEffect(() => {
+    if (hydrating || !tenant) return;
     setExtraOrderStatuses(
-      (tenant?.customOrderStatuses ?? []).map((r) => ({ slug: r.slug, label: r.label })),
+      (tenant.customOrderStatuses ?? []).map((r) => ({ slug: r.slug, label: r.label })),
     );
-  }, [tenant?.customOrderStatuses]);
+  }, [tenant?.customOrderStatuses, tenant, hydrating]);
 
   const handleSaveOrderStatuses = async () => {
-    if (!tenant || user?.role !== 'admin') return;
+    if (!tenant || !isTenantAdmin(user?.role)) return;
     setOrderStatusErr('');
     setSavingOrderStatuses(true);
     try {
@@ -126,14 +206,29 @@ export function SettingsPage() {
       plan: form.plan,
     };
     try {
-      await api.patch('/tenant/profile', payload);
-    } catch {
-      setCompanyError('No se pudieron guardar los datos en el servidor. Los cambios se aplicaron localmente.');
-    } finally {
-      updateTenant(payload);
-      setSavingCompany(false);
+      const data = await api.patch<DbTenant>('/tenant/profile', payload);
+      const fresh = await authService.getTenant();
+      if (fresh) {
+        updateTenant(fresh);
+      } else {
+        updateTenant({
+          name: data.name,
+          legalName: data.legal_name ?? undefined,
+          rut: data.rut,
+          email: data.email ?? undefined,
+          phone: data.phone ?? undefined,
+          address: data.address ?? undefined,
+          city: data.city ?? undefined,
+          region: data.region ?? undefined,
+          plan: data.plan as Tenant['plan'],
+        });
+      }
       setSavedCompany(true);
       window.setTimeout(() => setSavedCompany(false), 2500);
+    } catch {
+      setCompanyError('No se pudieron guardar los datos. Intenta de nuevo.');
+    } finally {
+      setSavingCompany(false);
     }
   };
 
@@ -158,16 +253,47 @@ export function SettingsPage() {
     }
   };
 
+  if (authLoading || hydrating) {
+    return (
+      <div className="flex items-center justify-center min-h-[40vh] gap-2" role="status">
+        <Activity size={20} className="animate-spin text-primary-600" aria-hidden />
+        <span className="text-sm text-stone-500 dark:text-stone-400">Cargando configuración…</span>
+      </div>
+    );
+  }
+
+  const canEditTenant = isTenantAdmin(user?.role);
+
   if (!tenant) {
     return (
-      <p className="text-sm text-stone-500 dark:text-stone-400">
-        No hay empresa asociada a la sesión.
-      </p>
+      <div className="mx-auto max-w-3xl space-y-8">
+        <NavTourSettingsCard />
+        <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/20 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-amber-900 dark:text-amber-200">
+            {loadError || 'No hay empresa asociada a tu cuenta.'}
+          </p>
+          <Button type="button" variant="secondary" size="sm" onClick={() => void refreshTenant()}>
+            Reintentar
+          </Button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="mx-auto max-w-3xl space-y-8 pb-8">
+      {loadError ? (
+        <div
+          className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/20 px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+          role="alert"
+        >
+          <p className="text-sm text-amber-900 dark:text-amber-200">{loadError}</p>
+          <Button type="button" variant="secondary" size="sm" onClick={() => void refreshTenant()}>
+            Reintentar
+          </Button>
+        </div>
+      ) : null}
+
       {/* Apariencia */}
       <Card padding="lg">
         <div className="flex items-start gap-3 mb-5">
@@ -216,7 +342,9 @@ export function SettingsPage() {
         </div>
       </Card>
 
-      {user?.role === 'admin' && (
+      <NavTourSettingsCard />
+
+      {canEditTenant && (
         <Card padding="lg">
           <div className="flex items-start gap-3 mb-5">
             <div className="p-2 rounded-lg bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400">
@@ -322,6 +450,7 @@ export function SettingsPage() {
         </div>
 
         <form onSubmit={(e) => void handleCompanySubmit(e)} className="space-y-4">
+          <fieldset disabled={!canEditTenant} className="space-y-4 border-0 p-0 m-0 min-w-0">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Nombre comercial"
@@ -346,6 +475,7 @@ export function SettingsPage() {
               label="Plan contratado"
               value={form.plan}
               onChange={(e) => set('plan', e.target.value as CompanyForm['plan'])}
+              disabled={!canEditTenant}
               options={[
                 { value: 'starter', label: 'Starter' },
                 { value: 'professional', label: 'Professional' },
@@ -388,6 +518,7 @@ export function SettingsPage() {
               onChange={(e) => set('region', e.target.value)}
             />
           </div>
+          </fieldset>
 
           {companyError && (
             <p className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-1.5" role="alert">
@@ -396,7 +527,9 @@ export function SettingsPage() {
             </p>
           )}
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Button type="submit" loading={savingCompany}>Guardar cambios</Button>
+            {canEditTenant ? (
+              <Button type="submit" loading={savingCompany}>Guardar cambios</Button>
+            ) : null}
             {savedCompany && (
               <span
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400"
@@ -487,8 +620,8 @@ export function SettingsPage() {
           )}
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Cambiando...' : 'Cambiar contraseña'}
+            <Button type="submit" disabled={authLoading}>
+              {authLoading ? 'Cambiando…' : 'Cambiar contraseña'}
             </Button>
             {savedPw && (
               <span
@@ -504,8 +637,11 @@ export function SettingsPage() {
         </form>
       </Card>
 
-      {user?.role === 'admin' && (
-        <ExcelFormatsSection />
+      {canEditTenant && (
+        <>
+          <PricingProfileSection />
+          <ExcelFormatsSection />
+        </>
       )}
     </div>
   );

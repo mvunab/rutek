@@ -1,10 +1,96 @@
 import { formatAddressFull, formatAddressLabel } from './orderAddress';
 import { resolveOrderStatusLabel } from './orderStatusLabels';
+import { resolveRouteSequence } from './routeSequence';
 import { routeStatusLabel, normalizeRouteStatus } from './routeStatusLabels';
-import type { Order, OrderPriority, Route, Tenant } from '../types';
+import type { Order, OrderPriority, Route, RouteStatus, Tenant } from '../types';
+
+export type RoutesDateRangeFilter = '7d' | '30d' | 'month' | '90d' | 'all';
+
+const PERIOD_LABELS: Record<RoutesDateRangeFilter, string> = {
+  '7d': 'Últimos 7 días',
+  '30d': 'Últimos 30 días',
+  month: 'Mes en curso',
+  '90d': 'Últimos 90 días',
+  all: 'Todo el historial',
+};
+
+const dateFmt = new Intl.DateTimeFormat('es-CL', { dateStyle: 'long' });
+
+/** Fecha mínima (inclusive) según el filtro de período en Rutas. */
+export function routesExportCutoff(filter: RoutesDateRangeFilter): Date | null {
+  if (filter === 'all') return null;
+  if (filter === 'month') {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  const days = Number.parseInt(filter, 10);
+  return new Date(Date.now() - days * 86_400_000);
+}
+
+export interface RoutesExportRangeDescription {
+  periodLabel: string;
+  fromLabel: string | null;
+  toLabel: string;
+  /** Texto corto para toolbar / tooltip */
+  short: string;
+  /** Texto completo para filtros y toast */
+  summary: string;
+  filenameSuffix: string;
+}
+
+export function describeRoutesExportRange(
+  filter: RoutesDateRangeFilter,
+  now = new Date(),
+): RoutesExportRangeDescription {
+  const toLabel = dateFmt.format(now);
+  const periodLabel = PERIOD_LABELS[filter];
+
+  if (filter === 'all') {
+    return {
+      periodLabel,
+      fromLabel: null,
+      toLabel,
+      short: 'Todas las fechas',
+      summary:
+        'Se exportan las rutas que coinciden con los filtros actuales, sin límite de fecha (todo el historial).',
+      filenameSuffix: 'historial-completo',
+    };
+  }
+
+  const cutoff = routesExportCutoff(filter)!;
+  const fromLabel = dateFmt.format(cutoff);
+
+  return {
+    periodLabel,
+    fromLabel,
+    toLabel,
+    short: `${fromLabel} → hoy`,
+    summary: `Se exportan rutas cuya fecha de planificación es desde el ${fromLabel} hasta hoy (${toLabel}). Período activo: ${periodLabel}.`,
+    filenameSuffix: filter === 'month' ? 'mes-en-curso' : filter,
+  };
+}
+
+export function describeRoutesExportFilters(options: {
+  dateRange: RoutesDateRangeFilter;
+  routeStatus: RouteStatus | 'all';
+  clientLabel: string | null;
+  search: string;
+}): string {
+  const parts: string[] = [describeRoutesExportRange(options.dateRange).summary];
+  if (options.routeStatus !== 'all') {
+    parts.push(`Estado de ruta: ${routeStatusLabel(options.routeStatus)}.`);
+  }
+  if (options.clientLabel) {
+    parts.push(`Cuenta mandante: ${options.clientLabel}.`);
+  }
+  if (options.search.trim()) {
+    parts.push(`Búsqueda: «${options.search.trim()}».`);
+  }
+  return parts.join(' ');
+}
 
 export const ROUTES_EXPORT_HEADERS = [
-  'Código ruta',
+  'N° ruta',
   'Nombre ruta',
   'Estado ruta',
   'Fecha ruta',
@@ -29,6 +115,11 @@ const PRIORITY_LABELS: Record<OrderPriority, string> = {
   high: 'Alta',
   urgent: 'Urgente',
 };
+
+function formatRouteSequence(route: Route): string {
+  const n = resolveRouteSequence(route);
+  return n != null ? String(n) : '';
+}
 
 function routeDateIso(route: Route): string {
   const raw =
@@ -71,7 +162,7 @@ function orderRow(
 
   if (!order) {
     return [
-      route.code,
+      formatRouteSequence(route),
       route.name,
       routeStatusLabel(status),
       routeDateIso(route),
@@ -92,7 +183,7 @@ function orderRow(
   }
 
   return [
-    route.code,
+    formatRouteSequence(route),
     route.name,
     routeStatusLabel(status),
     routeDateIso(route),
@@ -145,10 +236,18 @@ export function buildRoutesExportRows(
 export function downloadRoutesExportCsv(
   routes: Route[],
   orders: Order[],
-  options?: { clientNames?: Map<string, string>; tenant?: Tenant | null },
-): { rowCount: number; routeCount: number } {
+  options?: {
+    clientNames?: Map<string, string>;
+    tenant?: Tenant | null;
+    dateRange?: RoutesDateRangeFilter;
+  },
+): { rowCount: number; routeCount: number; filename: string } {
   const dataRows = buildRoutesExportRows(routes, orders, options);
-  if (dataRows.length === 0) return { rowCount: 0, routeCount: 0 };
+  if (dataRows.length === 0) return { rowCount: 0, routeCount: 0, filename: '' };
+
+  const range = describeRoutesExportRange(options?.dateRange ?? '30d');
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const filename = `rutek-rutas-${range.filenameSuffix}-${todayIso}.csv`;
 
   const lines = [
     ROUTES_EXPORT_HEADERS.join(';'),
@@ -159,9 +258,9 @@ export function downloadRoutesExportCsv(
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = `rutek-rutas-${new Date().toISOString().slice(0, 10)}.csv`;
+  anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
 
-  return { rowCount: dataRows.length, routeCount: routes.length };
+  return { rowCount: dataRows.length, routeCount: routes.length, filename };
 }

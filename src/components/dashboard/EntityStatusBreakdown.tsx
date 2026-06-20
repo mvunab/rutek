@@ -101,11 +101,11 @@ export function EntityStatusBreakdown({
 
       {onViewAll ? (
         <Button
-          variant="ghost"
-          size="xs"
-          className="mt-4 self-start"
+          variant="secondary"
+          size="sm"
+          className="mt-5 w-full sm:w-auto"
           onClick={onViewAll}
-          icon={<ArrowRight size={12} />}
+          icon={<ArrowRight size={16} aria-hidden />}
           iconPosition="right"
         >
           {viewAllLabel}

@@ -12,7 +12,7 @@ const PITCH_HIGHLIGHTS = [
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { login, isAuthenticated, restoreSession, loading } = useAuthStore();
+  const { login, isAuthenticated, restoreSession, loading, sessionChecked } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -21,17 +21,27 @@ export function LoginPage() {
   const passwordId = useId();
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      await restoreSession();
-      if (cancelled) return;
-      const state = useAuthStore.getState();
-      if (state.isAuthenticated) {
-        navigate(state.isSuperAdmin ? '/super-admin' : '/dashboard', { replace: true });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [navigate, restoreSession]);
+    void restoreSession();
+  }, [restoreSession]);
+
+  useEffect(() => {
+    if (!sessionChecked || !isAuthenticated) return;
+    navigate(useAuthStore.getState().isSuperAdmin ? '/super-admin' : '/dashboard', {
+      replace: true,
+    });
+  }, [sessionChecked, isAuthenticated, navigate]);
+
+  if (!sessionChecked || loading) {
+    return (
+      <div
+        className="min-h-screen min-h-dvh flex items-center justify-center bg-white"
+        role="status"
+        aria-live="polite"
+      >
+        <span className="text-sm text-stone-500">Verificando sesión…</span>
+      </div>
+    );
+  }
 
   if (isAuthenticated) return null;
 

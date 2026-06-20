@@ -27,8 +27,20 @@ import { OrderDetailModal } from '../../components/orders/OrderDetailModal';
 import { useRouteImportStore } from '../../store/useRouteImportStore';
 import { toast } from '../../store/useToastStore';
 import { formatAddressLabel, resolveDefaultPickupAddress } from '../../lib/orderAddress';
-import { downloadRoutesExportCsv } from '../../lib/routesExport';
+import { downloadRoutesExportCsv, describeRoutesExportFilters, describeRoutesExportRange, routesExportCutoff, type RoutesDateRangeFilter } from '../../lib/routesExport';
+import {
+  formatOrderInRouteLabel,
+  formatRouteDisplayLabel,
+  formatRouteDisplayTitle,
+  formatRouteSequence,
+  parseRouteSequenceInput,
+  resolveRouteSequence,
+  suggestNextRouteSequence,
+} from '../../lib/routeSequence';
+import { resolveAssignee, resolveVehicle } from '../../lib/teamAssignment';
+import { isUuidV4 } from '../../lib/uuid';
 import { photosForOrderOnRoute } from '../../lib/orderPhotos';
+import { RouteValuationPanel } from '../../components/pricing/RouteValuationPanel';
 import { SendTrackingModal } from '../../components/communications/SendTrackingModal';
 import { usePhotoStore } from '../../store/usePhotoStore';
 import { PhotoLightbox } from '../../components/photos/PhotoLightbox';
@@ -233,7 +245,7 @@ function ImportExcelModal({
 
       // Notificación de éxito
       toast.info(
-        `Ruta ${res.route_code} importada`,
+        `Ruta N° ${preview?.route_number ?? res.route_number ?? res.route_code} importada`,
         `${res.orders_created} pedido${res.orders_created !== 1 ? 's' : ''} creados · cuenta: ${res.client_name || 'Sin asignar'}`,
       );
 
@@ -287,10 +299,10 @@ function ImportExcelModal({
             }
 
             await updateOrder(orderId, {
-              ...(dId
+              ...(dId && isUuidV4(dId)
                 ? { driverId: dId, driverName: driverById.get(dId) ?? null }
                 : {}),
-              ...(vId
+              ...(vId && isUuidV4(vId)
                 ? { vehicleId: vId, vehiclePlate: vehicleById.get(vId) ?? null }
                 : {}),
             });
@@ -419,8 +431,12 @@ function ImportExcelModal({
                 ¡Ruta importada correctamente!
               </p>
               <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
-                <span translate="no" className="font-mono font-bold">{lastResult.route_code}</span>
-                {' '}· {lastResult.orders_created} pedidos creados · cuenta: {lastResult.client_name}
+                N°{' '}
+                <span translate="no" className="font-mono font-bold">
+                  {preview?.route_number ?? lastResult.route_code}
+                </span>
+                {' '}· {lastResult.orders_created} pedidos creados
+                {lastResult.client_name ? ` · cuenta: ${lastResult.client_name}` : ''}
               </p>
             </div>
             <Button onClick={handleClose}>Cerrar</Button>
@@ -957,12 +973,12 @@ function RouteListItem({
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-stone-900 dark:text-stone-50 truncate">
-            {route.name}
+            <span translate="no" className="tabular-nums">N° {formatRouteDisplayLabel(route)}</span>
+            {route.name?.trim() ? (
+              <span className="font-normal text-stone-500 dark:text-stone-400"> · {route.name}</span>
+            ) : null}
           </p>
           <div className="flex items-center gap-2 flex-wrap mt-0.5 text-[11px] text-stone-500 dark:text-stone-400 tabular-nums">
-            <span translate="no" className="font-mono font-semibold">
-              {route.code}
-            </span>
             <RouteStatusBadge status={route.status} />
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[11px] text-stone-400 dark:text-stone-500 tabular-nums">
@@ -1066,7 +1082,7 @@ function RouteTableRow({
             isHighlighted ? 'text-primary-700 dark:text-primary-300' : 'text-stone-600 dark:text-stone-400',
           )}
         >
-          {route.code}
+          {formatRouteSequence(route)}
         </span>
       </td>
       <td className="px-4 py-2.5 align-middle min-w-0">
@@ -1127,15 +1143,29 @@ function OrderCardAction({
       onClick={onClick}
       disabled={disabled || loading}
       aria-label={label}
+      aria-pressed={active}
+      title={
+        disabled && !loading
+          ? `${label} (no disponible mientras otra acción está en curso)`
+          : active
+            ? `${label} (abierta — pulsa de nuevo para cerrar)`
+            : label
+      }
       className={clsx(
         'glass-btn inline-flex flex-1 items-center justify-center gap-1.5 min-h-[2rem] rounded-lg px-2 py-1.5 text-xs font-medium',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-stone-950',
+        disabled || loading
+          ? 'glass-btn--disabled cursor-not-allowed'
+          : tone === 'danger'
+            ? active
+              ? 'glass-btn--danger glass-btn--active'
+              : 'glass-btn--danger glass-btn--idle'
+            : active
+              ? 'glass-btn--active'
+              : 'glass-btn--idle',
         tone === 'danger'
-          ? 'glass-btn--danger focus-visible:ring-red-400'
-          : active
-            ? 'glass-btn--active focus-visible:ring-[#FF7B00]/50'
-            : 'focus-visible:ring-[#FF7B00]/45',
-        (disabled || loading) && 'opacity-50 cursor-not-allowed',
+          ? 'focus-visible:ring-red-400'
+          : 'focus-visible:ring-[#FF7B00]/45',
       )}
     >
       <span className="shrink-0" aria-hidden="true">
@@ -1212,7 +1242,7 @@ const routeStatusDot: Record<RouteStatus, string> = {
 
 // ─── Route Form (create/edit) ─────────────────────────────────────────────────
 interface RouteFormData {
-  code: string;
+  guiaInterna: string;
   name: string;
   notes: string;
   clientId: string;
@@ -1220,12 +1250,14 @@ interface RouteFormData {
 
 function RouteForm({
   initial,
+  suggestedSequence,
   onSubmit,
   onCancel,
   submitLabel = 'Guardar',
   error,
 }: {
   initial?: Partial<RouteFormData>;
+  suggestedSequence?: number;
   onSubmit: (data: RouteFormData) => void | Promise<void>;
   onCancel: () => void;
   submitLabel?: string;
@@ -1233,21 +1265,31 @@ function RouteForm({
 }) {
   const { clients, fetchClients } = useClientStore();
   const [form, setForm] = useState<RouteFormData>({
-    code: '',
+    guiaInterna: suggestedSequence != null ? String(suggestedSequence) : '',
     name: '',
     notes: '',
     clientId: '',
     ...initial,
   });
   const [saving, setSaving] = useState(false);
+  const [sequenceTouched, setSequenceTouched] = useState(Boolean(initial?.guiaInterna));
 
   useEffect(() => {
     void fetchClients();
   }, [fetchClients]);
 
+  useEffect(() => {
+    if (sequenceTouched || suggestedSequence == null) return;
+    setForm((p) =>
+      p.guiaInterna.trim() ? p : { ...p, guiaInterna: String(suggestedSequence) },
+    );
+  }, [suggestedSequence, sequenceTouched]);
+
   const f = (field: keyof RouteFormData) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      if (field === 'guiaInterna') setSequenceTouched(true);
       setForm((p) => ({ ...p, [field]: e.target.value }));
+    };
 
   const clientOptions = [
     { value: '', label: 'Sin cuenta (se asigna al primer pedido)…' },
@@ -1259,10 +1301,12 @@ function RouteForm({
 
   const handleSubmit = async () => {
     if (!form.name.trim()) return;
+    const sequence = parseRouteSequenceInput(form.guiaInterna);
+    if (sequence == null) return;
     setSaving(true);
     try {
       await onSubmit({
-        code: form.code.trim(),
+        guiaInterna: String(sequence),
         name: form.name.trim(),
         notes: form.notes.trim(),
         clientId: form.clientId,
@@ -1288,21 +1332,28 @@ function RouteForm({
         hint="Todos los pedidos de la ruta deben pertenecer a la misma cuenta (mandante). Si no la seleccionás ahora, se inferirá del primer pedido que agregues."
       />
       <Input
+        label="N° de ruta (consecutivo)"
+        placeholder={suggestedSequence != null ? String(suggestedSequence) : 'Ej: 1246…'}
+        value={form.guiaInterna}
+        onChange={f('guiaInterna')}
+        name="route_sequence"
+        type="number"
+        inputMode="numeric"
+        min={1}
+        autoComplete="off"
+        spellCheck={false}
+        hint={
+          suggestedSequence != null
+            ? `Sugerido: ${suggestedSequence} (último consecutivo + 1). Es el número de tu planilla / Excel.`
+            : 'Número consecutivo de tu hoja de ruta (no es el folio interno del sistema).'
+        }
+      />
+      <Input
         label="Nombre de la ruta"
         placeholder="Ej: Santiago Norte"
         value={form.name}
         onChange={f('name')}
         name="route_name"
-      />
-      <Input
-        label="Código / folio interno"
-        placeholder="Opcional — se genera automáticamente si lo dejás vacío"
-        value={form.code}
-        onChange={f('code')}
-        name="route_code"
-        autoComplete="off"
-        spellCheck={false}
-        hint="Folio de uso interno. No es necesario completarlo."
       />
       <Textarea
         label="Notas"
@@ -1315,7 +1366,12 @@ function RouteForm({
         <Button type="button" variant="ghost" onClick={onCancel} disabled={saving}>
           Cancelar
         </Button>
-        <Button type="button" onClick={() => void handleSubmit()} loading={saving} disabled={!form.name.trim()}>
+        <Button
+          type="button"
+          onClick={() => void handleSubmit()}
+          loading={saving}
+          disabled={!form.name.trim() || parseRouteSequenceInput(form.guiaInterna) == null}
+        >
           {submitLabel}
         </Button>
       </div>
@@ -1441,7 +1497,7 @@ function RouteDetailSidePanel({
   const driversList = useMemo(
     () =>
       users
-        .filter((u) => u.role === 'driver' && u.active)
+        .filter((u) => u.role === 'driver' && u.active && isUuidV4(u.id))
         .toSorted((a, b) => a.name.localeCompare(b.name, 'es')),
     [users],
   );
@@ -1449,7 +1505,7 @@ function RouteDetailSidePanel({
   const peonetasList = useMemo(
     () =>
       users
-        .filter((u) => u.role === 'peoneta' && u.active)
+        .filter((u) => u.role === 'peoneta' && u.active && isUuidV4(u.id))
         .toSorted((a, b) => a.name.localeCompare(b.name, 'es')),
     [users],
   );
@@ -1578,9 +1634,12 @@ function RouteDetailSidePanel({
     if (bulkAssignOpen) closeBulkAssign();
     setEditingOrderId(null);
     setExpandedOrderId(o.id);
-    setOrderDraftDriver(o.driverId ?? '');
-    setOrderDraftPeoneta(o.peonetaId ?? '');
-    setOrderDraftVehicle(o.vehicleId ?? '');
+    const draftDriver = o.driverId && isUuidV4(o.driverId) ? o.driverId : '';
+    const draftPeoneta = o.peonetaId && isUuidV4(o.peonetaId) ? o.peonetaId : '';
+    const draftVehicle = o.vehicleId && isUuidV4(o.vehicleId) ? o.vehicleId : '';
+    setOrderDraftDriver(draftDriver);
+    setOrderDraftPeoneta(draftPeoneta);
+    setOrderDraftVehicle(draftVehicle);
     setOrderApplyToAll(false);
   };
 
@@ -1700,11 +1759,27 @@ function RouteDetailSidePanel({
   const performBulkApply = async (orderIds: string[]) => {
     const city = bulkDraftCity.trim();
     const region = bulkDraftRegion.trim();
-    const hasTeam = Boolean(bulkDraftDriver || bulkDraftPeoneta || bulkDraftVehicle);
+    const driver = resolveAssignee(bulkDraftDriver, driversList);
+    const peoneta = resolveAssignee(bulkDraftPeoneta, peonetasList);
+    const vehicle = resolveVehicle(bulkDraftVehicle, vehiclesSorted);
+    const hasTeam = Boolean(driver || peoneta || vehicle);
     const hasLocation = Boolean(city || region);
 
     if (!hasTeam && !hasLocation) {
       setActionError('Completa al menos un campo para aplicar.');
+      return;
+    }
+
+    if (bulkDraftDriver.trim() && !driver) {
+      setActionError('Selecciona un chofer válido de la lista.');
+      return;
+    }
+    if (bulkDraftPeoneta.trim() && !peoneta) {
+      setActionError('Selecciona una peoneta válida de la lista.');
+      return;
+    }
+    if (bulkDraftVehicle.trim() && !vehicle) {
+      setActionError('Selecciona un vehículo válido de la lista.');
       return;
     }
 
@@ -1714,16 +1789,13 @@ function RouteDetailSidePanel({
 
     try {
       if (hasTeam) {
-        const d = bulkDraftDriver ? driversList.find((u) => u.id === bulkDraftDriver) : null;
-        const pe = bulkDraftPeoneta ? peonetasList.find((u) => u.id === bulkDraftPeoneta) : null;
-        const v = bulkDraftVehicle ? vehiclesSorted.find((x) => x.id === bulkDraftVehicle) : null;
         await assignDriverToOrders(route.id, {
-          driverId: d ? d.id : null,
-          driverName: d ? d.name : null,
-          peonetaId: pe ? pe.id : null,
-          peonetaName: pe ? pe.name : null,
-          vehicleId: v ? v.id : null,
-          vehiclePlate: v ? v.plate : null,
+          driverId: driver?.id ?? null,
+          driverName: driver?.name ?? null,
+          peonetaId: peoneta?.id ?? null,
+          peonetaName: peoneta?.name ?? null,
+          vehicleId: vehicle?.id ?? null,
+          vehiclePlate: vehicle?.plate ?? null,
           orderIds,
         });
       }
@@ -1770,8 +1842,21 @@ function RouteDetailSidePanel({
           setBulkDraftRegion('');
         }
       }
-    } catch {
-      setActionError('No se pudieron aplicar los cambios.');
+    } catch (err) {
+      let msg = 'No se pudieron aplicar los cambios.';
+      if (err instanceof ApiError) {
+        try {
+          const parsed = JSON.parse(err.body) as { message?: string | string[] };
+          const apiMsg = parsed.message;
+          if (typeof apiMsg === 'string' && apiMsg.length > 0) msg = apiMsg;
+          else if (Array.isArray(apiMsg) && apiMsg.length > 0) msg = apiMsg.join(' · ');
+        } catch {
+          if (err.body) msg = err.body;
+        }
+      } else if (err instanceof Error && err.message) {
+        msg = err.message;
+      }
+      setActionError(msg);
     } finally {
       setBulkAssignBusy(false);
     }
@@ -1826,28 +1911,45 @@ function RouteDetailSidePanel({
   const performSaveOrderAssignment = async (orderId: string) => {
     setOrderAssignBusy(orderId);
     setActionError(null);
-    try {
-      const d = orderDraftDriver ? driversList.find((u) => u.id === orderDraftDriver) : null;
-      const pe = orderDraftPeoneta ? peonetasList.find((u) => u.id === orderDraftPeoneta) : null;
-      const v = orderDraftVehicle ? vehiclesSorted.find((x) => x.id === orderDraftVehicle) : null;
 
+    const driver = resolveAssignee(orderDraftDriver, driversList);
+    const peoneta = resolveAssignee(orderDraftPeoneta, peonetasList);
+    const vehicle = resolveVehicle(orderDraftVehicle, vehiclesSorted);
+
+    if (orderDraftDriver.trim() && !driver) {
+      setActionError('Selecciona un chofer válido de la lista.');
+      setOrderAssignBusy(null);
+      return;
+    }
+    if (orderDraftPeoneta.trim() && !peoneta) {
+      setActionError('Selecciona una peoneta válida de la lista.');
+      setOrderAssignBusy(null);
+      return;
+    }
+    if (orderDraftVehicle.trim() && !vehicle) {
+      setActionError('Selecciona un vehículo válido de la lista.');
+      setOrderAssignBusy(null);
+      return;
+    }
+
+    try {
       if (orderApplyToAll) {
         await assignDriverToOrders(route.id, {
-          driverId: d ? d.id : null,
-          driverName: d ? d.name : null,
-          peonetaId: pe ? pe.id : null,
-          peonetaName: pe ? pe.name : null,
-          vehicleId: v ? v.id : null,
-          vehiclePlate: v ? v.plate : null,
+          driverId: driver?.id ?? null,
+          driverName: driver?.name ?? null,
+          peonetaId: peoneta?.id ?? null,
+          peonetaName: peoneta?.name ?? null,
+          vehicleId: vehicle?.id ?? null,
+          vehiclePlate: vehicle?.plate ?? null,
         });
       } else {
         await updateOrder(orderId, {
-          driverId: d ? d.id : null,
-          driverName: d ? d.name : null,
-          peonetaId: pe ? pe.id : null,
-          peonetaName: pe ? pe.name : null,
-          vehicleId: v ? v.id : null,
-          vehiclePlate: v ? v.plate : null,
+          driverId: driver?.id ?? null,
+          driverName: driver?.name ?? null,
+          peonetaId: peoneta?.id ?? null,
+          peonetaName: peoneta?.name ?? null,
+          vehicleId: vehicle?.id ?? null,
+          vehiclePlate: vehicle?.plate ?? null,
         });
       }
 
@@ -1859,8 +1961,21 @@ function RouteDetailSidePanel({
       setOrderApplyToAll(false);
       setOrderAssignSaved(orderId);
       setTimeout(() => setOrderAssignSaved(null), 3000);
-    } catch {
-      setActionError('No se pudo guardar la asignación del pedido.');
+    } catch (err) {
+      let msg = 'No se pudo guardar la asignación del pedido.';
+      if (err instanceof ApiError) {
+        try {
+          const parsed = JSON.parse(err.body) as { message?: string | string[] };
+          const apiMsg = parsed.message;
+          if (typeof apiMsg === 'string' && apiMsg.length > 0) msg = apiMsg;
+          else if (Array.isArray(apiMsg) && apiMsg.length > 0) msg = apiMsg.join(' · ');
+        } catch {
+          if (err.body) msg = err.body;
+        }
+      } else if (err instanceof Error && err.message) {
+        msg = err.message;
+      }
+      setActionError(msg);
     } finally {
       setOrderAssignBusy(null);
     }
@@ -1884,6 +1999,12 @@ function RouteDetailSidePanel({
   const rejectedCount = assigned.filter((o) => o.status === 'rejected').length;
   const deliveryProgressPct =
     assigned.length > 0 ? Math.round((deliveredCount / assigned.length) * 100) : 0;
+
+  const valuationRefreshKey = useMemo(
+    () =>
+      `${assigned.length}-${deliveredCount}-${totals.bultos}-${route.status}-${route.estimatedDistance}`,
+    [assigned.length, deliveredCount, totals.bultos, route.status, route.estimatedDistance],
+  );
 
   const routeClientLabel = useMemo(() => {
     if (route.clientId) {
@@ -1916,8 +2037,10 @@ function RouteDetailSidePanel({
   const [editRouteBusy, setEditRouteBusy] = useState(false);
   const [editRouteError, setEditRouteError] = useState<string | null>(null);
   const copyRouteCode = async () => {
+    const label = formatRouteSequence(route);
+    if (label === '—') return;
     try {
-      await navigator.clipboard.writeText(route.code);
+      await navigator.clipboard.writeText(label);
       setCodeCopied(true);
       setTimeout(() => setCodeCopied(false), 2000);
     } catch {
@@ -1955,10 +2078,12 @@ function RouteDetailSidePanel({
     setEditRouteError(null);
     setEditRouteBusy(true);
     try {
+      const sequence = parseRouteSequenceInput(data.guiaInterna);
       await updateRoute(route.id, {
         name: data.name.trim(),
         notes: data.notes.trim() || undefined,
         clientId: data.clientId ? data.clientId : null,
+        ...(sequence != null ? { guiaInterna: sequence } : {}),
       });
       await fetchRoutes();
       setEditRouteOpen(false);
@@ -1974,7 +2099,7 @@ function RouteDetailSidePanel({
       <div
         className="flex flex-col h-full min-h-0 w-full overflow-hidden bg-white/30 dark:bg-stone-950/20 backdrop-blur-md"
         role="complementary"
-        aria-label={`Detalle de ruta ${route.code}`}
+        aria-label={`Detalle de ruta ${formatRouteDisplayTitle(route)}`}
       >
         <div className="flex items-center gap-2 px-3 py-2 border-b border-stone-200/70 dark:border-stone-800/70 bg-white/60 dark:bg-stone-950/35 backdrop-blur-md shrink-0 shadow-sm">
           <button
@@ -2007,9 +2132,15 @@ function RouteDetailSidePanel({
             <button
               type="button"
               onClick={() => setTrackingRouteOpen(true)}
-              className="shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 dark:hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              className={clsx(
+                'shrink-0 rounded-lg p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors',
+                trackingRouteOpen
+                  ? 'text-primary-700 bg-primary-100 dark:text-primary-200 dark:bg-primary-950/50'
+                  : 'text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 dark:hover:text-stone-200',
+              )}
               aria-label="Enviar seguimiento de ruta"
-              title="Enviar seguimiento de ruta"
+              aria-pressed={trackingRouteOpen}
+              title={trackingRouteOpen ? 'Seguimiento (activo)' : 'Enviar seguimiento de ruta'}
             >
               <Share2 size={18} aria-hidden />
             </button>
@@ -2019,8 +2150,15 @@ function RouteDetailSidePanel({
               <button
                 type="button"
                 onClick={() => setEditRouteOpen(true)}
-                className="shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 dark:hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                className={clsx(
+                  'shrink-0 rounded-lg p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors',
+                  editRouteOpen
+                    ? 'text-primary-700 bg-primary-100 dark:text-primary-200 dark:bg-primary-950/50'
+                    : 'text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 dark:hover:text-stone-200',
+                )}
                 aria-label="Editar ruta"
+                aria-pressed={editRouteOpen}
+                title={editRouteOpen ? 'Editar (activo)' : 'Editar ruta'}
               >
                 <Pencil size={18} aria-hidden />
               </button>
@@ -2063,13 +2201,13 @@ function RouteDetailSidePanel({
                   <div className="min-w-0">
                     <div className="flex items-center gap-1">
                       <span translate="no" className="font-mono text-sm font-bold text-stone-900 dark:text-white truncate">
-                        {route.code}
+                        N° {formatRouteSequence(route)}
                       </span>
                       <button
                         type="button"
                         onClick={() => void copyRouteCode()}
                         className="p-0.5 rounded text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:text-stone-500 dark:hover:text-stone-300 dark:hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-                        aria-label={codeCopied ? 'Código copiado' : 'Copiar código de ruta'}
+                        aria-label={codeCopied ? 'N° copiado' : 'Copiar n° de ruta'}
                       >
                         {codeCopied ? (
                           <Check size={12} className="text-emerald-400" aria-hidden />
@@ -2167,6 +2305,14 @@ function RouteDetailSidePanel({
             ) : null}
           </div>
 
+          {assigned.length > 0 ? (
+            <RouteValuationPanel
+              routeId={route.id}
+              canManage={canManage}
+              refreshKey={valuationRefreshKey.length}
+            />
+          ) : null}
+
           <div
             className="sticky top-0 z-[1] flex flex-wrap items-center justify-between gap-2 py-2 px-2 -mx-0.5 mb-1 rounded-xl border border-stone-200/80 dark:border-stone-700/80 bg-white/75 dark:bg-stone-900/55 backdrop-blur-sm shadow-sm"
             role="toolbar"
@@ -2184,6 +2330,8 @@ function RouteDetailSidePanel({
                   icon={<Plus size={14} aria-hidden />}
                   onClick={openCreateOrder}
                   disabled={busyId === 'create' || bulkAssignBusy || createOrderOpen}
+                  className={clsx(createOrderOpen && 'ring-2 ring-primary-400/60 ring-offset-1 dark:ring-offset-stone-950')}
+                  aria-pressed={createOrderOpen}
                 >
                   Nuevo pedido
                 </Button>
@@ -2203,6 +2351,23 @@ function RouteDetailSidePanel({
               </div>
             ) : null}
           </div>
+
+          {canManage && assigned.length > 0 && !bulkAssignOpen ? (
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500 dark:text-stone-400 px-0.5 -mt-1">
+              <span className="inline-flex items-center gap-1">
+                <span className="size-2.5 rounded border border-[#ff7b00] bg-[#ff7b00]/20" aria-hidden />
+                Acción abierta
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="size-2.5 rounded border border-stone-300 dark:border-stone-600 bg-stone-100 dark:bg-stone-800" aria-hidden />
+                Disponible
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="size-2.5 rounded border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900 opacity-50" aria-hidden />
+                Bloqueada
+              </span>
+            </p>
+          ) : null}
 
           {bulkAssignOpen && assigned.length > 0 ? (
             <div className="rounded-xl border border-violet-200/80 dark:border-violet-800/60 bg-violet-50/40 dark:bg-violet-950/20 px-3 py-3 space-y-3 animate-toolbar-panel-enter motion-reduce:animate-none">
@@ -2322,7 +2487,7 @@ function RouteDetailSidePanel({
             </div>
           ) : (
             <ul className="space-y-2">
-              {assigned.map((o) => {
+              {assigned.map((o, orderIndex) => {
                 const destinatario = o.clientName?.trim() || 'Por confirmar';
                 const originParts = orderAddressParts(o.origin);
                 const destParts = orderAddressParts(o.destination);
@@ -2362,7 +2527,7 @@ function RouteDetailSidePanel({
                             type="button"
                             role="checkbox"
                             aria-checked={isBulkSelected}
-                            aria-label={`Seleccionar pedido ${o.code}`}
+                            aria-label={`Seleccionar pedido ${formatOrderInRouteLabel(route, orderIndex)}`}
                             onClick={() => toggleBulkOrder(o.id)}
                             className="shrink-0 mt-0.5 p-0.5 rounded-md text-primary-600 dark:text-primary-400 hover:bg-stone-100 dark:hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                           >
@@ -2407,7 +2572,7 @@ function RouteDetailSidePanel({
                               )}
                               title="Ver detalle del pedido"
                             >
-                              {o.code}
+                              {formatOrderInRouteLabel(route, orderIndex)}
                             </button>
                             <div className="flex flex-col items-end gap-1 shrink-0">
                               {showStatusOnCard ? (
@@ -2667,7 +2832,7 @@ function RouteDetailSidePanel({
         <OrderDetailModal
           order={detailOrder}
           onClose={() => setDetailOrder(null)}
-          routeLabel={`${route.code} · ${route.name}`}
+          routeLabel={formatRouteDisplayTitle(route)}
         />
       ) : null}
 
@@ -2687,7 +2852,7 @@ function RouteDetailSidePanel({
           open
           onClose={closeCreateOrder}
           title="Nuevo pedido"
-          description={`${route.code}${route.name ? ` · ${route.name}` : ''} — se creará en esta ruta`}
+          description={`${formatRouteDisplayTitle(route)} — se creará en esta ruta`}
           size="xl"
         >
           <OrderForm
@@ -2717,12 +2882,12 @@ function RouteDetailSidePanel({
             setEditRouteError(null);
           }}
           title="Editar ruta"
-          description={route.code}
+          description={formatRouteDisplayTitle(route)}
           size="xl"
         >
           <RouteForm
             initial={{
-              code: route.code,
+              guiaInterna: String(resolveRouteSequence(route) ?? ''),
               name: route.name,
               notes: route.notes ?? '',
               clientId: route.clientId ?? '',
@@ -2749,7 +2914,7 @@ function RouteDetailSidePanel({
         message={
           <>
             <p>
-              Se eliminará la ruta <strong translate="no">{route.code}</strong>
+              Se eliminará la ruta <strong translate="no">N° {formatRouteDisplayLabel(route)}</strong>
               {route.name ? (
                 <>
                   {' '}
@@ -2799,7 +2964,7 @@ function RouteDetailSidePanel({
       {trackingRouteOpen ? (
         <SendTrackingModal
           routeId={route.id}
-          routeCode={route.code}
+          routeCode={formatRouteSequence(route)}
           open
           onClose={() => setTrackingRouteOpen(false)}
         />
@@ -2868,7 +3033,7 @@ export function RoutesPage() {
   const [search, setSearch] = useState('');
   const [filterRouteStatus, setFilterRouteStatus] = useState<RouteStatus | 'all'>('all');
   const [filterClientId, setFilterClientId] = useState<string>('all');
-  const [filterDateRange, setFilterDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
+  const [filterDateRange, setFilterDateRange] = useState<RoutesDateRangeFilter>('30d');
   const [showFilters, setShowFilters] = useState(false);
   const [showNewRoute, setShowNewRoute] = useState(false);
   const [showImportExcel, setShowImportExcel] = useState(false);
@@ -2964,9 +3129,7 @@ export function RoutesPage() {
   );
 
   const filteredRoutes = useMemo(() => {
-    const cutoff = filterDateRange !== 'all'
-      ? new Date(Date.now() - parseInt(filterDateRange) * 86_400_000)
-      : null;
+    const cutoff = routesExportCutoff(filterDateRange);
 
     let data = routes.filter((r) => {
       if (filterRouteStatus !== 'all' && r.status !== filterRouteStatus) return false;
@@ -2980,8 +3143,9 @@ export function RoutesPage() {
         const pedidosEnRuta = orders.filter((o) => o.routeId === r.id);
         const agg = routeAggById.get(r.id);
         return (
-          r.code.toLowerCase().includes(t) ||
           r.name.toLowerCase().includes(t) ||
+          String(resolveRouteSequence(r) ?? '').includes(t) ||
+          r.code.toLowerCase().includes(t) ||
           (agg?.driversLabel.toLowerCase().includes(t) ?? false) ||
           (agg?.vehiclesLabel.toLowerCase().includes(t) ?? false) ||
           pedidosEnRuta.some(
@@ -3002,10 +3166,13 @@ export function RoutesPage() {
         let av: string | number = '';
         let bv: string | number = '';
         switch (sortCol) {
-          case 'code':
-            av = a.code;
-            bv = b.code;
+          case 'code': {
+            const seqA = resolveRouteSequence(a);
+            const seqB = resolveRouteSequence(b);
+            av = seqA ?? 0;
+            bv = seqB ?? 0;
             break;
+          }
           case 'name':
             av = a.name;
             bv = b.name;
@@ -3053,20 +3220,40 @@ export function RoutesPage() {
   const hasActiveFilters =
     filterRouteStatus !== 'all' || filterClientId !== 'all' || filterDateRange !== '30d';
 
+  const exportRangeDescription = useMemo(
+    () => describeRoutesExportRange(filterDateRange),
+    [filterDateRange],
+  );
+
+  const exportFiltersDescription = useMemo(
+    () =>
+      describeRoutesExportFilters({
+        dateRange: filterDateRange,
+        routeStatus: filterRouteStatus,
+        clientLabel:
+          filterClientId !== 'all'
+            ? clients.find((c) => c.id === filterClientId)?.companyName ?? null
+            : null,
+        search,
+      }),
+    [filterDateRange, filterRouteStatus, filterClientId, clients, search],
+  );
+
   const handleExportRoutes = useCallback(() => {
     if (filteredRoutes.length === 0) {
       toast.warning('Sin rutas para exportar', 'Ajusta los filtros o crea rutas primero.');
       return;
     }
-    const { rowCount, routeCount } = downloadRoutesExportCsv(filteredRoutes, orders, {
+    const { rowCount, routeCount, filename } = downloadRoutesExportCsv(filteredRoutes, orders, {
       clientNames: clientNameById,
       tenant,
+      dateRange: filterDateRange,
     });
     toast.info(
       'Exportación descargada',
-      `${routeCount} ruta${routeCount === 1 ? '' : 's'} · ${rowCount} fila${rowCount === 1 ? '' : 's'} en el archivo CSV.`,
+      `${routeCount} ruta${routeCount === 1 ? '' : 's'} · ${rowCount} fila${rowCount === 1 ? '' : 's'} (${filename}). ${exportRangeDescription.summary}`,
     );
-  }, [filteredRoutes, orders, clientNameById, tenant]);
+  }, [filteredRoutes, orders, clientNameById, tenant, filterDateRange, exportRangeDescription.summary]);
 
   const selectAllBulkDelete = useCallback(() => {
     setBulkDeleteSelectedIds(new Set(filteredRoutes.map((r) => r.id)));
@@ -3127,9 +3314,10 @@ export function RoutesPage() {
   const handleAddRoute = async (data: RouteFormData) => {
     setNewRouteError(null);
     try {
+      const sequence = parseRouteSequenceInput(data.guiaInterna);
       await addRoute({
         name: data.name,
-        ...(data.code ? { code: data.code } : {}),
+        ...(sequence != null ? { guiaInterna: sequence } : {}),
         ...(data.notes ? { notes: data.notes } : {}),
         ...(data.clientId ? { clientId: data.clientId } : {}),
       });
@@ -3167,7 +3355,7 @@ export function RoutesPage() {
           <input
             type="search"
             name="route-search"
-            placeholder="Buscar folio, nombre, chofer…"
+            placeholder="Buscar n° ruta, nombre, chofer…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoComplete="off"
@@ -3216,15 +3404,24 @@ export function RoutesPage() {
           </Button>
         ) : null}
 
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<Download size={14} aria-hidden />}
-          onClick={handleExportRoutes}
-          disabled={filteredRoutes.length === 0}
-        >
-          Exportar
-        </Button>
+        <div className="flex flex-col items-stretch sm:items-end gap-0.5">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Download size={14} aria-hidden />}
+            onClick={handleExportRoutes}
+            disabled={filteredRoutes.length === 0}
+            aria-describedby="routes-export-range-hint"
+          >
+            Exportar CSV
+          </Button>
+          <p
+            id="routes-export-range-hint"
+            className="hidden sm:block text-[10px] leading-snug text-stone-500 dark:text-stone-400 max-w-[11rem] text-right"
+          >
+            {exportRangeDescription.short}
+          </p>
+        </div>
 
         {/* Toggle de layout */}
         <div className="flex items-center rounded-lg border border-stone-300 dark:border-stone-600 overflow-hidden shrink-0" role="group" aria-label="Cambiar vista">
@@ -3322,7 +3519,7 @@ export function RoutesPage() {
 
           {/* Filtro por cliente (cuenta mandante) */}
           <div className="space-y-2">
-            <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Cliente</p>
+            <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Cuenta</p>
             <Select
               id="routes-filter-client"
               label="Cuenta mandante"
@@ -3350,8 +3547,9 @@ export function RoutesPage() {
             <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Rango de fechas">
               {(
                 [
-                  { value: '7d',  label: 'Últimos 7 días' },
+                  { value: '7d', label: 'Últimos 7 días' },
                   { value: '30d', label: 'Últimos 30 días' },
+                  { value: 'month', label: 'Mes en curso' },
                   { value: '90d', label: 'Últimos 90 días' },
                   { value: 'all', label: 'Todo el historial' },
                 ] as const
@@ -3371,6 +3569,10 @@ export function RoutesPage() {
                 </button>
               ))}
             </div>
+            <p className="text-xs text-stone-600 dark:text-stone-400 leading-relaxed rounded-lg bg-stone-50 dark:bg-stone-900/50 border border-stone-200/80 dark:border-stone-700/60 px-3 py-2">
+              <span className="font-medium text-stone-700 dark:text-stone-300">Exportar CSV</span>
+              {' '}usa el mismo período y filtros del listado. {exportFiltersDescription}
+            </p>
           </div>
 
           <div className="flex justify-end border-t border-stone-100 dark:border-stone-800 pt-3">
@@ -3472,6 +3674,7 @@ export function RoutesPage() {
                     >
                       {filterDateRange === '7d' && '7 días'}
                       {filterDateRange === '30d' && '30 días'}
+                      {filterDateRange === 'month' && 'Mes en curso'}
                       {filterDateRange === '90d' && '90 días'}
                       {filterDateRange === 'all' && 'Todo el historial'}
                     </button>
@@ -3490,7 +3693,7 @@ export function RoutesPage() {
                       className="text-xs rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-2 py-1 text-stone-700 dark:text-stone-200"
                       aria-label="Ordenar rutas"
                     >
-                      <option value="code">Folio</option>
+                      <option value="code">N° Ruta</option>
                       <option value="fecha">Fecha</option>
                       <option value="pedidos">Pedidos</option>
                       <option value="status">Estado</option>
@@ -3563,7 +3766,7 @@ export function RoutesPage() {
                               </th>
                             ) : null}
                             {[
-                              { label: 'Folio', col: 'code' as RouteSortKey, align: 'left' as const },
+                              { label: 'N° Ruta', col: 'code' as RouteSortKey, align: 'left' as const },
                               { label: 'Nombre', col: 'name' as RouteSortKey, align: 'left' as const },
                               { label: 'Estado', col: 'status' as RouteSortKey, align: 'left' as const },
                               { label: 'Fecha', col: 'fecha' as RouteSortKey, align: 'left' as const },
@@ -3685,6 +3888,7 @@ export function RoutesPage() {
         size="md"
       >
         <RouteForm
+          suggestedSequence={suggestNextRouteSequence(routes)}
           onSubmit={handleAddRoute}
           onCancel={() => {
             setNewRouteError(null);
@@ -3720,7 +3924,7 @@ export function RoutesPage() {
               <ul className="mt-3 space-y-1 text-xs font-mono text-stone-600 dark:text-stone-400">
                 {bulkDeleteTargets.map((r) => (
                   <li key={r.id} translate="no">
-                    {r.code}
+                    N° {formatRouteDisplayLabel(r)}
                     {r.name ? ` — ${r.name}` : ''}
                   </li>
                 ))}
@@ -3728,7 +3932,7 @@ export function RoutesPage() {
             ) : (
               <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">
                 Incluye{' '}
-                {bulkDeleteTargets.slice(0, 3).map((r) => r.code).join(', ')}
+                {bulkDeleteTargets.slice(0, 3).map((r) => `N° ${formatRouteDisplayLabel(r)}`).join(', ')}
                 {' '}y {bulkDeleteTargets.length - 3} más…
               </p>
             )}

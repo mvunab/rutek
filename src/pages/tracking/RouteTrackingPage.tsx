@@ -1,6 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Loader2, Building2, MapPin, Package, Copy, Check, Share2, HelpCircle } from 'lucide-react';
+import {
+  Loader2,
+  Building2,
+  MapPin,
+  Package,
+  Copy,
+  Check,
+  HelpCircle,
+  Truck,
+  XCircle,
+} from 'lucide-react';
+import { TRACKING_BRAND } from '../../lib/trackingTheme';
+import { useForceLightTheme } from '../../hooks/useForceLightTheme';
+import {
+  TrackingOrderStatusMarker,
+  trackingOrderAccentClass,
+} from '../../components/tracking/TrackingOrderStatusMarker';
+import { TrackingStatusLegend } from '../../components/tracking/TrackingStatusLegend';
+import { RouteProgressWay } from '../../components/tracking/RouteProgressWay';
+import { computeRouteProgress, orderWayStepIndex, ROUTE_WAY_STEP_LABELS } from '../../lib/routeTrackingReport';
+
+const BX_BLUE = TRACKING_BRAND.blue;
+const BX_LIGHT = TRACKING_BRAND.light;
+const BX_DEW = TRACKING_BRAND.dew;
 
 function resolveApi(): string {
   const fromEnv = import.meta.env.VITE_API_URL;
@@ -37,6 +60,7 @@ type RouteTrackingInfo = {
 };
 
 export function RouteTrackingPage() {
+  useForceLightTheme();
   const { token: paramToken } = useParams();
   const token = useMemo(() => resolveRouteTrackingToken(paramToken), [paramToken]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +107,11 @@ export function RouteTrackingPage() {
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'es'));
   }, [info?.orders]);
 
+  const routeProgress = useMemo(
+    () => computeRouteProgress(info?.orders ?? []),
+    [info?.orders],
+  );
+
   const publicUrl = useMemo(() => {
     if (!token) return '';
     try {
@@ -99,128 +128,191 @@ export function RouteTrackingPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  if (loading) {
+    return (
+      <div
+        className="min-h-screen bg-gray-50 flex items-center justify-center text-stone-900"
+        style={{ colorScheme: 'light' }}
+      >
+        <div className="flex flex-col items-center gap-3 text-stone-500" role="status" aria-live="polite">
+          <Loader2
+            className="size-10 animate-spin motion-reduce:animate-none"
+            style={{ color: BX_BLUE }}
+            aria-hidden
+          />
+          <p className="text-sm font-medium">Cargando seguimiento…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !info) {
+    return (
+      <div
+        className="min-h-screen bg-gray-50 flex items-center justify-center px-4 text-stone-900"
+        style={{ colorScheme: 'light' }}
+      >
+        <article className="max-w-md w-full text-center bg-white rounded-2xl shadow-md p-8 border border-stone-100">
+          <XCircle className="size-14 text-red-400 mx-auto mb-4" aria-hidden />
+          <h1 className="text-xl font-extrabold text-stone-900">Link inválido o expirado</h1>
+          <p className="text-sm text-stone-500 mt-2">{error}</p>
+          <p className="text-xs text-stone-400 mt-2">Solicita un nuevo link al operador.</p>
+        </article>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-stone-950">
-      <div className="max-w-3xl mx-auto px-4 py-8 space-y-5">
-        <div className="flex flex-col glass-card p-6 space-y-4 overflow-hidden">
-          <div className="flex w-full items-start justify-between gap-3">
-            <div className="flex flex-col flex-1 min-w-0">
-              <p className="text-2xl font-extrabold leading-tight text-stone-900 dark:text-stone-50">
-                Seguimiento de la ruta{' '}
-                <span
-                  translate="no"
-                  className="block md:inline text-violet-700 dark:text-violet-300 font-mono text-2xl break-words"
+    <div className="min-h-screen bg-gray-50 text-stone-900" style={{ colorScheme: 'light' }}>
+      <div className="mx-auto py-6 sm:py-8 px-4 max-w-[1256px]">
+        <main className="space-y-6">
+          {/* Encabezado tenant */}
+          <div className="rounded-2xl bg-white shadow-md overflow-hidden p-4 sm:p-6">
+            <div className="flex items-center gap-3">
+              {info.tenant.logo ? (
+                <img src={info.tenant.logo} alt="" className="h-9 w-auto" width={90} height={36} />
+              ) : (
+                <div
+                  className="size-9 rounded-lg flex items-center justify-center"
+                  style={{ background: BX_BLUE }}
                 >
-                  {info?.routeCode || '—'}
-                </span>
-              </p>
-              <p className="mt-1 md:mt-2 text-stone-600 dark:text-stone-300 font-semibold break-words">
-                {info?.routeName || '—'}
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <Building2 size={16} className="text-stone-400" aria-hidden />
-                <span className="text-stone-500 dark:text-stone-400 font-extrabold text-xs md:text-sm truncate">
-                  {info?.tenant?.name || '—'}
-                </span>
+                  <Truck className="size-5 text-white" aria-hidden />
+                </div>
+              )}
+              <div>
+                <h1 className="font-bold text-base text-stone-900">Seguimiento de ruta</h1>
+                <p className="text-sm text-stone-600 mt-0.5">{info.tenant.name}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Tarjeta principal */}
+          <div
+            className="flex flex-col rounded-2xl bg-white p-4 sm:p-6 space-y-5 overflow-hidden"
+            style={{ boxShadow: '0 4px 12px 0 rgba(0,0,0,0.08)' }}
+          >
+            <div className="flex w-full items-start justify-between gap-3 flex-wrap">
+              <div className="flex flex-col flex-1 min-w-0">
+                <p className="text-xl sm:text-2xl font-extrabold leading-tight text-stone-900">
+                  Ruta{' '}
+                  <span translate="no" className="block sm:inline break-words tabular-nums" style={{ color: BX_BLUE }}>
+                    {info.routeCode}
+                  </span>
+                </p>
+                <p className="mt-1 text-sm font-semibold text-stone-600 break-words">{info.routeName}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-stone-600">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Building2 size={16} className="text-stone-400" aria-hidden />
+                    {info.clientName || '—'}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Package size={16} className="text-stone-400" aria-hidden />
+                    {info.orders.length} pedido{info.orders.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  aria-label="Compartir"
+                  onClick={() => void handleCopy()}
+                  className="inline-flex items-center justify-center rounded-xl border w-10 h-10 sm:w-auto sm:h-auto sm:px-4 sm:py-2 font-medium bg-white hover:bg-blue-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                  style={{ borderColor: BX_BLUE, color: BX_BLUE }}
+                >
+                  {copied ? <Check className="size-5 sm:mr-2" aria-hidden /> : <Copy className="size-5 sm:mr-2" aria-hidden />}
+                  <span className="hidden sm:inline">{copied ? 'Copiado' : 'Compartir'}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Ayuda"
+                  onClick={() => {
+                    alert('Si necesitas ver direcciones completas, solicita esa información a tu operador.');
+                  }}
+                  className="inline-flex items-center justify-center rounded-xl border w-10 h-10 sm:w-auto sm:h-auto sm:px-4 sm:py-2 font-medium bg-white hover:bg-blue-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                  style={{ borderColor: BX_BLUE, color: BX_BLUE }}
+                >
+                  <HelpCircle className="size-5 sm:mr-2" aria-hidden />
+                  <span className="hidden sm:inline">Ayuda</span>
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
-              <button
-                type="button"
-                aria-label="Compartir"
-                onClick={handleCopy}
-                className="inline-flex items-center justify-center rounded-xl border border-violet-600/60 w-10 h-10 md:w-auto md:h-auto md:px-4 md:py-2 text-violet-700 dark:text-violet-200 font-medium bg-white dark:bg-stone-900 hover:bg-violet-50 dark:hover:bg-violet-950/40 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-              >
-                {copied ? <Check size={18} aria-hidden /> : <Copy size={18} aria-hidden />}
-                <span className="hidden md:inline ml-2">{copied ? 'Copiado' : 'Compartir'}</span>
-              </button>
-              <button
-                type="button"
-                aria-label="Preguntas frecuentes"
-                onClick={() => {
-                  alert('Si necesitas ver direcciones completas, solicita esa información a tu operador.');
-                }}
-                className="inline-flex items-center justify-center rounded-xl border border-violet-600/60 w-10 h-10 md:w-auto md:h-auto md:px-4 md:py-2 text-violet-700 dark:text-violet-200 font-medium bg-white dark:bg-stone-900 hover:bg-violet-50 dark:hover:bg-violet-950/40 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-              >
-                <HelpCircle size={18} aria-hidden />
-                <span className="hidden md:inline ml-2">Ayuda</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-violet-200/70 dark:border-violet-900/60 bg-violet-50/60 dark:bg-violet-950/25 px-4 py-3">
-            <div className="flex flex-wrap gap-3 text-sm text-stone-700 dark:text-stone-200">
+            <div className="rounded-xl px-4 py-3 text-sm text-stone-600" style={{ background: BX_DEW }}>
               <span className="inline-flex items-center gap-2">
-                <Package size={16} aria-hidden />
-                {info?.orders?.length ?? 0} pedido{(info?.orders?.length ?? 0) === 1 ? '' : 's'}
-              </span>
-              {info?.clientName ? (
-                <span className="inline-flex items-center gap-2">
-                  <Share2 size={16} aria-hidden />
-                  Cuenta: {info.clientName}
-                </span>
-              ) : null}
-              <span className="inline-flex items-center gap-2 text-stone-500 dark:text-stone-400">
-                <MapPin size={16} aria-hidden />
-                Solo estados & ciudad (sin direcciones)
+                <MapPin size={16} className="text-stone-500" aria-hidden />
+                Solo estados y ciudad de destino (sin direcciones completas).
               </span>
             </div>
-          </div>
-        </div>
 
-        {loading ? (
-          <div className="glass-card p-6 text-center">
-            <Loader2 className="size-6 animate-spin mx-auto text-stone-400" aria-hidden />
-            <p className="text-sm text-stone-500 dark:text-stone-400 mt-3">Cargando…</p>
-          </div>
-        ) : error ? (
-          <div className="glass-card p-6 text-center border-red-200 dark:border-red-900">
-            <p className="text-sm font-medium text-red-800 dark:text-red-200">{error}</p>
-            <p className="text-xs text-red-700 dark:text-red-300 mt-1">Solicita un nuevo link al operador.</p>
-          </div>
-        ) : info ? (
-          <>
-            <div className="space-y-3">
-              {grouped.map(([city, orders]) => (
-                <div
-                  key={city}
-                  className="glass-card overflow-hidden"
-                >
-                  <div className="px-4 py-3 border-b border-stone-100 dark:border-stone-800 flex items-center gap-2">
-                    <MapPin size={14} className="text-stone-400" aria-hidden />
-                    <p className="text-sm font-semibold text-stone-800 dark:text-stone-100">{city}</p>
-                    <span className="text-xs text-stone-400 dark:text-stone-500">({orders.length})</span>
-                  </div>
-                  <ul className="divide-y divide-stone-100 dark:divide-stone-800">
-                    {orders.map((o) => (
-                      <li key={o.code} className="px-4 py-2.5 flex items-center justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span translate="no" className="font-mono text-xs font-semibold text-stone-700 dark:text-stone-200">
-                              {o.code}
-                            </span>
-                            <span className="text-[11px] text-stone-500 dark:text-stone-400 tabular-nums">
-                              · {Number(o.bultos) || 0} bultos
-                            </span>
-                          </div>
-                          <p className="text-xs text-stone-500 dark:text-stone-400 truncate mt-0.5">
-                            Destinatario: {o.clientName?.trim() || 'Por confirmar'}
-                          </p>
-                        </div>
-                        <span className="text-xs text-stone-500 dark:text-stone-400 shrink-0">
-                          {String(o.status || '').replace(/_/g, ' ')}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+            <div className="w-full rounded-xl border-[1.5px] p-3 sm:p-4" style={{ borderColor: BX_BLUE }}>
+              <RouteProgressWay progress={routeProgress} />
             </div>
-          </>
-        ) : null}
+
+            <TrackingStatusLegend orders={info.orders} />
+          </div>
+
+          <div className="space-y-4">
+            {grouped.map(([city, orders]) => (
+              <div
+                key={city}
+                className="rounded-2xl bg-white overflow-hidden border border-stone-100"
+                style={{ boxShadow: '0 2px 8px 0 rgba(0,0,0,0.06)' }}
+              >
+                <div
+                  className="px-4 py-3 border-b border-stone-100 flex items-center gap-2"
+                  style={{ background: BX_LIGHT }}
+                >
+                  <MapPin size={14} className="text-stone-500" aria-hidden />
+                  <p className="text-sm font-semibold text-stone-800">{city}</p>
+                  <span className="text-xs text-stone-500 tabular-nums">({orders.length})</span>
+                </div>
+                <ul className="divide-y divide-stone-100" role="list">
+                  {orders.map((o) => (
+                    <li
+                      key={o.code}
+                      className={`px-4 py-3 flex items-center justify-between gap-3 border-l-4 bg-white ${trackingOrderAccentClass(o.status)}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 min-w-0">
+                          <span translate="no" className="font-mono text-xs font-bold text-stone-800">
+                            {o.code}
+                          </span>
+                          <span className="text-[11px] text-stone-500 tabular-nums">
+                            {Number(o.bultos) || 0} bulto{(Number(o.bultos) || 0) === 1 ? '' : 's'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-stone-500 truncate mt-0.5">
+                          Destinatario: {o.clientName?.trim() || 'Por confirmar'}
+                        </p>
+                        <p className="text-[10px] text-stone-400 mt-0.5">
+                          Etapa ruta:{' '}
+                          <span className="font-semibold text-stone-600">
+                            {ROUTE_WAY_STEP_LABELS[orderWayStepIndex(o.status, routeProgress.activeIndex)] ?? '—'}
+                          </span>
+                        </p>
+                      </div>
+                      <TrackingOrderStatusMarker status={o.status} className="shrink-0" />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </main>
+
+        <footer className="text-center py-6 text-xs text-stone-400">
+          <p>
+            Reporte válido hasta{' '}
+            {new Date(info.expiresAt).toLocaleDateString('es-CL', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}
+          </p>
+          <p className="mt-1">Powered by Rutek</p>
+        </footer>
       </div>
     </div>
   );
 }
-
