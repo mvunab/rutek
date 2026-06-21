@@ -9,6 +9,7 @@ import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import type { CreateTenantInput } from '../../services/superAdmin.service';
+import { formatTenantPlanLabel } from '../../lib/tenantPlan';
 
 export function SuperAdminDashboard() {
   const navigate = useNavigate();
@@ -135,7 +136,7 @@ export function SuperAdminDashboard() {
           className="px-3 py-2 border border-stone-200 dark:border-stone-700 rounded-lg text-sm bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100"
         >
           <option value="all">Todos los planes</option>
-          <option value="starter">Starter</option>
+          <option value="starter">Standard</option>
           <option value="professional">Professional</option>
           <option value="enterprise">Enterprise</option>
         </select>
@@ -207,7 +208,7 @@ export function SuperAdminDashboard() {
                             tenant.plan === 'enterprise' ? 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400' :
                             tenant.plan === 'professional' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400' :
                             'bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-400'
-                          }`}>{tenant.plan}</span>
+                          }`}>{formatTenantPlanLabel(tenant.plan)}</span>
                           {tenant.city && (
                             <>
                               <span className="text-xs text-stone-300 dark:text-stone-600">·</span>
@@ -378,7 +379,7 @@ export function SuperAdminDashboard() {
                   onChange={(e) => setForm({ ...form, plan: e.target.value as any })}
                   className="w-full px-3 py-2 border border-stone-200 dark:border-stone-700 rounded-lg text-sm bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100"
                 >
-                  <option value="starter">Starter</option>
+                  <option value="starter">Standard</option>
                   <option value="professional">Professional</option>
                   <option value="enterprise">Enterprise</option>
                 </select>

@@ -27,7 +27,7 @@ import { OrderDetailModal } from '../../components/orders/OrderDetailModal';
 import { useRouteImportStore } from '../../store/useRouteImportStore';
 import { toast } from '../../store/useToastStore';
 import { formatAddressLabel, resolveDefaultPickupAddress } from '../../lib/orderAddress';
-import { downloadRoutesExportCsv, describeRoutesExportFilters, describeRoutesExportRange, routesExportCutoff, type RoutesDateRangeFilter } from '../../lib/routesExport';
+import { downloadRoutesExportXlsx, describeRoutesExportFilters, describeRoutesExportRange, routesExportCutoff, type RoutesDateRangeFilter } from '../../lib/routesExport';
 import {
   formatOrderInRouteLabel,
   formatRouteDisplayLabel,
@@ -37,8 +37,10 @@ import {
   resolveRouteSequence,
   suggestNextRouteSequence,
 } from '../../lib/routeSequence';
-import { resolveAssignee, resolveVehicle } from '../../lib/teamAssignment';
-import { isUuidV4 } from '../../lib/uuid';
+import { resolveAssignee, resolveVehicle, buildPartialTeamAssignPayload } from '../../lib/teamAssignment';
+import { applyRangeRules, indicesCoveredByRules, type RangeAssignRule } from '../../lib/rangeAssignRules';
+import { RangeAssignRulesPanel } from '../../components/routes/RangeAssignRulesPanel';
+import { isUuid } from '../../lib/uuid';
 import { photosForOrderOnRoute } from '../../lib/orderPhotos';
 import { RouteValuationPanel } from '../../components/pricing/RouteValuationPanel';
 import { SendTrackingModal } from '../../components/communications/SendTrackingModal';
@@ -155,26 +157,19 @@ function ImportExcelModal({
   const { users, fetchUsers } = useUserStore();
   const { vehicles, fetchVehicles } = useVehicleStore();
   const { updateOrder, fetchOrders } = useOrderStore();
-  const { fetchRoutes } = useRouteStore();
+  const { fetchRoutes, routes } = useRouteStore();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [step, setStep] = useState<'upload' | 'preview' | 'done'>('upload');
   const [routeName, setRouteName] = useState('');
   const [routeDate, setRouteDate] = useState('');
+  const [routeSequence, setRouteSequence] = useState('');
   const [showAllRows, setShowAllRows] = useState(false);
   const [accountClientId, setAccountClientId] = useState('');
   const [rowDriverId, setRowDriverId] = useState<Record<number, string>>({});
   const [rowVehicleId, setRowVehicleId] = useState<Record<number, string>>({});
-  const [assignRules, setAssignRules] = useState<
-    Array<{
-      id: string;
-      from: string;
-      to: string;
-      driverId: string;
-      vehicleId: string;
-    }>
-  >([]);
+  const [assignRules, setAssignRules] = useState<RangeAssignRule[]>([]);
   const [assignBusy, setAssignBusy] = useState(false);
   const [assignProgress, setAssignProgress] = useState<{ done: number; total: number } | null>(null);
 
@@ -183,7 +178,8 @@ function ImportExcelModal({
     void fetchClients();
     void fetchUsers();
     void fetchVehicles();
-  }, [open, fetchClients]);
+    void fetchRoutes();
+  }, [open, fetchClients, fetchRoutes]);
 
   const handleClose = useCallback(() => {
     reset();
@@ -191,6 +187,7 @@ function ImportExcelModal({
     setStep('upload');
     setRouteName('');
     setRouteDate('');
+    setRouteSequence('');
     setShowAllRows(false);
     setAccountClientId('');
     setRowDriverId({});
@@ -213,6 +210,7 @@ function ImportExcelModal({
     if (p) {
       setRouteName(filenameBase(f.name));
       setRouteDate(p.route_date ?? '');
+      setRouteSequence(String(p.route_number ?? '').trim());
       setStep('preview');
       if (p.rows.length === 0) {
         toast.warning('Sin pedidos detectados', 'El Excel no contiene filas de datos válidas. Verifica el formato.');
@@ -225,17 +223,36 @@ function ImportExcelModal({
     }
   };
 
+  const parsedRouteSequence = parseRouteSequenceInput(routeSequence);
+  const duplicateSequenceError =
+    confirmError?.includes('Ya existe una ruta con el N°') ?? false;
+  const suggestedRouteSequence = useMemo(
+    () => suggestNextRouteSequence(routes, accountClientId.trim() || undefined),
+    [routes, accountClientId],
+  );
+  const excelRouteNumber =
+    preview?.route_number != null && String(preview.route_number).trim() !== ''
+      ? String(preview.route_number)
+      : null;
+
   const handleConfirm = async () => {
     if (!file) return;
+    if (parsedRouteSequence == null) {
+      toast.warning('N° de ruta inválido', 'Ingresa un número entero positivo para la ficha.');
+      return;
+    }
     const res = await confirmImport(file, {
       routeName: routeName.trim() || undefined,
       routeDate: routeDate || undefined,
       driverNameHint: preview?.driver_name_hint || undefined,
       clientId: accountClientId.trim() || undefined,
+      routeNumber: parsedRouteSequence,
     });
     if (!res) {
       const err = useRouteImportStore.getState().confirmError;
-      if (err) toast.error('Error al importar', err);
+      if (err && !err.includes('Ya existe una ruta con el N°')) {
+        toast.error('Error al importar', err);
+      }
       return;
     }
 
@@ -245,7 +262,7 @@ function ImportExcelModal({
 
       // Notificación de éxito
       toast.info(
-        `Ruta N° ${preview?.route_number ?? res.route_number ?? res.route_code} importada`,
+        `Ruta N° ${parsedRouteSequence ?? preview?.route_number ?? res.route_number ?? res.route_code} importada`,
         `${res.orders_created} pedido${res.orders_created !== 1 ? 's' : ''} creados · cuenta: ${res.client_name || 'Sin asignar'}`,
       );
 
@@ -299,10 +316,10 @@ function ImportExcelModal({
             }
 
             await updateOrder(orderId, {
-              ...(dId && isUuidV4(dId)
+              ...(dId && isUuid(dId)
                 ? { driverId: dId, driverName: driverById.get(dId) ?? null }
                 : {}),
-              ...(vId && isUuidV4(vId)
+              ...(vId && isUuid(vId)
                 ? { vehicleId: vId, vehiclePlate: vehicleById.get(vId) ?? null }
                 : {}),
             });
@@ -339,20 +356,14 @@ function ImportExcelModal({
   const applyRules = useCallback(() => {
     const total = previewRows.length;
     if (total === 0) return;
+    const applied = applyRangeRules(total, assignRules);
     const nextDriver: Record<number, string> = {};
     const nextVehicle: Record<number, string> = {};
-
-    for (const r of assignRules) {
-      const from = Math.max(1, Math.floor(Number(r.from.trim()) || 1));
-      const to = Math.min(total, Math.floor(Number(r.to.trim()) || total));
-      if (to < from) continue;
-      for (let idx1 = from; idx1 <= to; idx1++) {
-        const i = idx1 - 1; // 0-based
-        if (r.driverId) nextDriver[i] = r.driverId;
-        if (r.vehicleId) nextVehicle[i] = r.vehicleId;
-      }
+    for (const [iStr, vals] of Object.entries(applied)) {
+      const i = Number(iStr);
+      if (vals.driverId) nextDriver[i] = vals.driverId;
+      if (vals.vehicleId) nextVehicle[i] = vals.vehicleId;
     }
-
     setRowDriverId(nextDriver);
     setRowVehicleId(nextVehicle);
   }, [assignRules, previewRows.length]);
@@ -416,9 +427,42 @@ function ImportExcelModal({
           </div>
         )}
         {confirmError && (
-          <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 px-3 py-2.5" role="alert">
-            <AlertCircle size={16} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" aria-hidden />
-            <p className="text-xs text-red-700 dark:text-red-300">{confirmError}</p>
+          <div
+            className={clsx(
+              'flex items-start gap-2 rounded-lg border px-3 py-2.5',
+              duplicateSequenceError
+                ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800'
+                : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900',
+            )}
+            role="alert"
+          >
+            <AlertCircle
+              size={16}
+              className={clsx(
+                'shrink-0 mt-0.5',
+                duplicateSequenceError
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-red-600 dark:text-red-400',
+              )}
+              aria-hidden
+            />
+            <div className="min-w-0 space-y-1">
+              <p
+                className={clsx(
+                  'text-xs',
+                  duplicateSequenceError
+                    ? 'text-amber-800 dark:text-amber-200'
+                    : 'text-red-700 dark:text-red-300',
+                )}
+              >
+                {confirmError}
+              </p>
+              {duplicateSequenceError ? (
+                <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                  Corrige el N° consecutivo abajo e intenta de nuevo.
+                </p>
+              ) : null}
+            </div>
           </div>
         )}
 
@@ -433,7 +477,7 @@ function ImportExcelModal({
               <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
                 N°{' '}
                 <span translate="no" className="font-mono font-bold">
-                  {preview?.route_number ?? lastResult.route_code}
+                  {parsedRouteSequence ?? preview?.route_number ?? lastResult.route_code}
                 </span>
                 {' '}· {lastResult.orders_created} pedidos creados
                 {lastResult.client_name ? ` · cuenta: ${lastResult.client_name}` : ''}
@@ -447,9 +491,8 @@ function ImportExcelModal({
         {step === 'preview' && preview && (
           <>
             {/* Metadata del Excel */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[
-                { label: 'N° de ruta', value: String(preview.route_number) },
                 { label: 'Empresa', value: preview.transport_company || '—' },
                 { label: 'Flete', value: preview.flete_type || '—' },
                 { label: 'Total bultos', value: String(preview.total_bultos_declared) },
@@ -484,6 +527,44 @@ function ImportExcelModal({
                 />
               </div>
               <div>
+                <Input
+                  id="import-route-sequence"
+                  label="N° consecutivo de ruta"
+                  name="import_route_sequence"
+                  inputMode="numeric"
+                  value={routeSequence}
+                  onChange={(e) => {
+                    setRouteSequence(e.target.value);
+                    if (confirmError) useRouteImportStore.setState({ confirmError: null });
+                  }}
+                  autoComplete="off"
+                  hint={
+                    excelRouteNumber
+                      ? `Leído del Excel: ${excelRouteNumber}. Cambialo si ese N° ya existe en el sistema.`
+                      : 'Ingresa el N° correlativo de la ficha.'
+                  }
+                  error={
+                    parsedRouteSequence == null && routeSequence.trim() !== ''
+                      ? 'Debe ser un entero positivo.'
+                      : duplicateSequenceError
+                        ? 'Este N° ya está en uso.'
+                        : undefined
+                  }
+                />
+                {duplicateSequenceError ? (
+                  <button
+                    type="button"
+                    className="mt-1.5 text-xs font-medium text-primary-700 dark:text-primary-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+                    onClick={() => {
+                      setRouteSequence(String(suggestedRouteSequence));
+                      useRouteImportStore.setState({ confirmError: null });
+                    }}
+                  >
+                    Usar siguiente disponible (N° {suggestedRouteSequence})
+                  </button>
+                ) : null}
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-stone-700 dark:text-stone-300 mb-1.5">
                   Nombre de la ruta
                 </label>
@@ -509,180 +590,20 @@ function ImportExcelModal({
               </div>
             </div>
 
-            {/* Constructor de reglas de asignación */}
-            <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/70 dark:bg-stone-900/40 overflow-hidden">
-              {/* Header */}
-              <div className="flex items-start justify-between gap-3 px-3 pt-2.5 pb-2 border-b border-stone-100 dark:border-stone-800">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-stone-700 dark:text-stone-200 uppercase tracking-wide leading-none">
-                    Asignación por rangos
-                  </p>
-                  <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-1 leading-snug">
-                    Ej: filas 1–10 → chofer A · 11–24 → chofer B. Si se solapan, gana la última.
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
-                  <button
-                    type="button"
-                    disabled={previewRows.length === 0}
-                    title="Crear una regla que cubre todos los pedidos"
-                    onClick={() => {
-                      if (previewRows.length === 0) return;
-                      setAssignRules([
-                        {
-                          id: `all-${Date.now()}`,
-                          from: '1',
-                          to: String(previewRows.length),
-                          driverId: '',
-                          vehicleId: '',
-                        },
-                      ]);
-                    }}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-50 dark:hover:bg-stone-700 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
-                  >
-                    <ListChecks size={13} aria-hidden />
-                    Todos
-                  </button>
-                  <button
-                    type="button"
-                    disabled={previewRows.length === 0}
-                    onClick={() => {
-                      const total = previewRows.length || 1;
-                      setAssignRules((prev) => [
-                        ...prev,
-                        {
-                          id: `r-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                          from: '1',
-                          to: String(total),
-                          driverId: '',
-                          vehicleId: '',
-                        },
-                      ]);
-                    }}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
-                  >
-                    <Plus size={13} aria-hidden />
-                    Agregar
-                  </button>
-                </div>
-              </div>
-
-              {/* Lista de reglas / empty state */}
-              {assignRules.length === 0 ? (
-                <div className="px-3 py-5 text-center">
-                  <p className="text-xs text-stone-400 dark:text-stone-500">
-                    Sin reglas aún — pulsa <span className="font-medium text-stone-500 dark:text-stone-400">&ldquo;Agregar&rdquo;</span> o <span className="font-medium text-stone-500 dark:text-stone-400">&ldquo;Todos&rdquo;</span> para empezar.
-                  </p>
-                </div>
-              ) : (
-                <div className="px-3 py-2 space-y-1.5">
-                  {assignRules.map((r, rIdx) => (
-                    <div
-                      key={r.id}
-                      className="flex items-end gap-2 bg-stone-50/80 dark:bg-stone-800/50 rounded-lg px-2 pt-2 pb-1.5"
-                    >
-                      <span className="shrink-0 mb-[18px] size-5 flex items-center justify-center rounded-full bg-stone-200 dark:bg-stone-700 text-[10px] font-bold text-stone-600 dark:text-stone-300 tabular-nums">
-                        {rIdx + 1}
-                      </span>
-                      <div className="w-[60px] shrink-0">
-                        <Input
-                          label="Desde"
-                          value={r.from}
-                          onChange={(e) =>
-                            setAssignRules((prev) =>
-                              prev.map((x) => (x.id === r.id ? { ...x, from: e.target.value } : x)),
-                            )
-                          }
-                          name={`rule-from-${r.id}`}
-                          autoComplete="off"
-                        />
-                      </div>
-                      <span className="text-stone-400 dark:text-stone-500 text-sm mb-[18px]">–</span>
-                      <div className="w-[60px] shrink-0">
-                        <Input
-                          label="Hasta"
-                          value={r.to}
-                          onChange={(e) =>
-                            setAssignRules((prev) =>
-                              prev.map((x) => (x.id === r.id ? { ...x, to: e.target.value } : x)),
-                            )
-                          }
-                          name={`rule-to-${r.id}`}
-                          autoComplete="off"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <Select
-                          label="Chofer"
-                          value={r.driverId}
-                          onChange={(e) =>
-                            setAssignRules((prev) =>
-                              prev.map((x) => (x.id === r.id ? { ...x, driverId: e.target.value } : x)),
-                            )
-                          }
-                          options={[
-                            { value: '', label: 'Sin chofer' },
-                            ...drivers.map((d) => ({ value: d.id, label: d.name })),
-                          ]}
-                          autoComplete="off"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <Select
-                          label="Vehículo"
-                          value={r.vehicleId}
-                          onChange={(e) =>
-                            setAssignRules((prev) =>
-                              prev.map((x) => (x.id === r.id ? { ...x, vehicleId: e.target.value } : x)),
-                            )
-                          }
-                          options={[
-                            { value: '', label: 'Sin vehículo' },
-                            ...vehiclesSorted.map((v) => ({
-                              value: v.id,
-                              label: `${v.plate} · ${v.brand} ${v.model}`,
-                            })),
-                          ]}
-                          autoComplete="off"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        className="shrink-0 mb-[18px] p-1.5 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 transition-colors"
-                        aria-label="Eliminar regla"
-                        onClick={() => setAssignRules((prev) => prev.filter((x) => x.id !== r.id))}
-                      >
-                        <X size={14} aria-hidden />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {assignRules.length > 0 && (
-                <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-stone-100 dark:border-stone-800">
-                  <button
-                    type="button"
-                    className="text-xs text-stone-400 hover:text-red-600 dark:hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded transition-colors"
-                    onClick={() => {
-                      setRowDriverId({});
-                      setRowVehicleId({});
-                      setAssignRules([]);
-                    }}
-                  >
-                    Limpiar todo
-                  </button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={applyRules}
-                    disabled={previewRows.length === 0 || assignRules.length === 0}
-                  >
-                    Aplicar reglas
-                  </Button>
-                </div>
-              )}
-            </div>
+            <RangeAssignRulesPanel
+              total={previewRows.length}
+              rules={assignRules}
+              onRulesChange={(next) => {
+                setAssignRules(next);
+                if (next.length === 0) {
+                  setRowDriverId({});
+                  setRowVehicleId({});
+                }
+              }}
+              onApplyRules={applyRules}
+              drivers={drivers}
+              vehicles={vehiclesSorted}
+            />
 
             {preview.driver_name_hint && (
               <p className="text-xs text-stone-500 dark:text-stone-400">
@@ -779,7 +700,7 @@ function ImportExcelModal({
                 onClick={() => void handleConfirm()}
                 loading={confirmLoading}
                 icon={<FileSpreadsheet size={15} />}
-                disabled={assignBusy}
+                disabled={assignBusy || parsedRouteSequence == null}
               >
                 Crear ruta y {previewRows.length} pedidos
               </Button>
@@ -1460,13 +1381,9 @@ function RouteDetailSidePanel({
     plate: string;
     otherCodes: string[];
     bulk?: boolean;
-    bulkOrderIds?: string[];
   } | null>(null);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
-  const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(() => new Set());
-  const [bulkDraftDriver, setBulkDraftDriver] = useState('');
-  const [bulkDraftPeoneta, setBulkDraftPeoneta] = useState('');
-  const [bulkDraftVehicle, setBulkDraftVehicle] = useState('');
+  const [bulkAssignRules, setBulkAssignRules] = useState<RangeAssignRule[]>([]);
   const [bulkDraftCity, setBulkDraftCity] = useState('');
   const [bulkDraftRegion, setBulkDraftRegion] = useState('');
   const [bulkAssignBusy, setBulkAssignBusy] = useState(false);
@@ -1491,7 +1408,7 @@ function RouteDetailSidePanel({
   const driversList = useMemo(
     () =>
       users
-        .filter((u) => u.role === 'driver' && u.active && isUuidV4(u.id))
+        .filter((u) => u.role === 'driver' && u.active && isUuid(u.id))
         .toSorted((a, b) => a.name.localeCompare(b.name, 'es')),
     [users],
   );
@@ -1499,7 +1416,7 @@ function RouteDetailSidePanel({
   const peonetasList = useMemo(
     () =>
       users
-        .filter((u) => u.role === 'peoneta' && u.active && isUuidV4(u.id))
+        .filter((u) => u.role === 'peoneta' && u.active && isUuid(u.id))
         .toSorted((a, b) => a.name.localeCompare(b.name, 'es')),
     [users],
   );
@@ -1628,9 +1545,9 @@ function RouteDetailSidePanel({
     if (bulkAssignOpen) closeBulkAssign();
     setEditingOrderId(null);
     setExpandedOrderId(o.id);
-    const draftDriver = o.driverId && isUuidV4(o.driverId) ? o.driverId : '';
-    const draftPeoneta = o.peonetaId && isUuidV4(o.peonetaId) ? o.peonetaId : '';
-    const draftVehicle = o.vehicleId && isUuidV4(o.vehicleId) ? o.vehicleId : '';
+    const draftDriver = o.driverId && isUuid(o.driverId) ? o.driverId : '';
+    const draftPeoneta = o.peonetaId && isUuid(o.peonetaId) ? o.peonetaId : '';
+    const draftVehicle = o.vehicleId && isUuid(o.vehicleId) ? o.vehicleId : '';
     setOrderDraftDriver(draftDriver);
     setOrderDraftPeoneta(draftPeoneta);
     setOrderDraftVehicle(draftVehicle);
@@ -1722,10 +1639,7 @@ function RouteDetailSidePanel({
 
   const closeBulkAssign = () => {
     setBulkAssignOpen(false);
-    setBulkSelectedIds(new Set());
-    setBulkDraftDriver('');
-    setBulkDraftPeoneta('');
-    setBulkDraftVehicle('');
+    setBulkAssignRules([]);
     setBulkDraftCity('');
     setBulkDraftRegion('');
   };
@@ -1735,45 +1649,24 @@ function RouteDetailSidePanel({
     handleCancelOrderAssign();
     setEditingOrderId(null);
     setBulkAssignOpen(true);
-    setBulkSelectedIds(new Set(assigned.map((o) => o.id)));
+    setBulkAssignRules([]);
   };
 
-  const toggleBulkOrder = (orderId: string) => {
-    setBulkSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(orderId)) next.delete(orderId);
-      else next.add(orderId);
-      return next;
-    });
-  };
+  const performBulkApplyRules = async () => {
+    if (bulkAssignRules.length === 0) {
+      setActionError('Agrega al menos una regla de asignación.');
+      return;
+    }
 
-  const selectAllBulk = () => setBulkSelectedIds(new Set(assigned.map((o) => o.id)));
-  const selectNoneBulk = () => setBulkSelectedIds(new Set());
-
-  const performBulkApply = async (orderIds: string[]) => {
+    const hasTeam = bulkAssignRules.some(
+      (r) => r.driverId || r.vehicleId || r.peonetaId,
+    );
     const city = bulkDraftCity.trim();
     const region = bulkDraftRegion.trim();
-    const driver = resolveAssignee(bulkDraftDriver, driversList);
-    const peoneta = resolveAssignee(bulkDraftPeoneta, peonetasList);
-    const vehicle = resolveVehicle(bulkDraftVehicle, vehiclesSorted);
-    const hasTeam = Boolean(driver || peoneta || vehicle);
     const hasLocation = Boolean(city || region);
 
     if (!hasTeam && !hasLocation) {
-      setActionError('Completa al menos un campo para aplicar.');
-      return;
-    }
-
-    if (bulkDraftDriver.trim() && !driver) {
-      setActionError('Selecciona un chofer válido de la lista.');
-      return;
-    }
-    if (bulkDraftPeoneta.trim() && !peoneta) {
-      setActionError('Selecciona una peoneta válida de la lista.');
-      return;
-    }
-    if (bulkDraftVehicle.trim() && !vehicle) {
-      setActionError('Selecciona un vehículo válido de la lista.');
+      setActionError('Completa chofer, peoneta o vehículo en al menos una regla, o una ubicación.');
       return;
     }
 
@@ -1783,18 +1676,60 @@ function RouteDetailSidePanel({
 
     try {
       if (hasTeam) {
-        await assignDriverToOrders(route.id, {
-          driverId: driver?.id ?? null,
-          driverName: driver?.name ?? null,
-          peonetaId: peoneta?.id ?? null,
-          peonetaName: peoneta?.name ?? null,
-          vehicleId: vehicle?.id ?? null,
-          vehiclePlate: vehicle?.plate ?? null,
-          orderIds,
-        });
+        for (const rule of bulkAssignRules) {
+          const from = Math.max(1, Math.floor(Number(rule.from.trim()) || 1));
+          const to = Math.min(
+            assigned.length,
+            Math.floor(Number(rule.to.trim()) || assigned.length),
+          );
+          if (to < from) continue;
+          if (!rule.driverId && !rule.vehicleId && !rule.peonetaId) continue;
+
+          const orderIds = assigned.slice(from - 1, to).map((o) => o.id);
+          if (orderIds.length === 0) continue;
+
+          const driver = rule.driverId
+            ? resolveAssignee(rule.driverId, driversList)
+            : null;
+          const peoneta = rule.peonetaId
+            ? resolveAssignee(rule.peonetaId, peonetasList)
+            : null;
+          const vehicle = rule.vehicleId
+            ? resolveVehicle(rule.vehicleId, vehiclesSorted)
+            : null;
+
+          if (rule.driverId && !driver) {
+            throw new Error('Selecciona un chofer válido de la lista.');
+          }
+          if (rule.peonetaId && !peoneta) {
+            throw new Error('Selecciona una peoneta válida de la lista.');
+          }
+          if (rule.vehicleId && !vehicle) {
+            throw new Error('Selecciona un vehículo válido de la lista.');
+          }
+
+          await assignDriverToOrders(
+            route.id,
+            buildPartialTeamAssignPayload({
+              driverDraft: rule.driverId,
+              peonetaDraft: rule.peonetaId ?? '',
+              vehicleDraft: rule.vehicleId,
+              driver,
+              peoneta,
+              vehicle,
+              orderIds,
+            }),
+          );
+        }
       }
 
       if (hasLocation) {
+        const covered = indicesCoveredByRules(assigned.length, bulkAssignRules);
+        const orderIds =
+          covered.length > 0
+            ? covered.map((i) => assigned[i]!.id)
+            : assigned.map((o) => o.id);
+
         const results = await Promise.allSettled(
           orderIds.map(async (orderId) => {
             const order = assigned.find((o) => o.id === orderId);
@@ -1823,18 +1758,15 @@ function RouteDetailSidePanel({
       if (locationError) {
         setActionError(locationError);
       } else {
+        const covered = hasTeam
+          ? indicesCoveredByRules(assigned.length, bulkAssignRules).length
+          : assigned.length;
         toast.info(
-          `Cambios aplicados a ${orderIds.length} pedido${orderIds.length === 1 ? '' : 's'}`,
+          `Cambios aplicados a ${covered} pedido${covered === 1 ? '' : 's'}`,
         );
-        if (hasTeam) {
-          setBulkDraftDriver('');
-          setBulkDraftPeoneta('');
-          setBulkDraftVehicle('');
-        }
-        if (hasLocation) {
-          setBulkDraftCity('');
-          setBulkDraftRegion('');
-        }
+        setBulkAssignRules([]);
+        setBulkDraftCity('');
+        setBulkDraftRegion('');
       }
     } catch (err) {
       let msg = 'No se pudieron aplicar los cambios.';
@@ -1856,25 +1788,28 @@ function RouteDetailSidePanel({
     }
   };
 
-  const handleBulkApply = () => {
-    const ids = [...bulkSelectedIds];
-    if (ids.length === 0) {
-      setActionError('Selecciona al menos un pedido en la lista.');
-      return;
-    }
-    const hasTeam = Boolean(bulkDraftDriver || bulkDraftPeoneta || bulkDraftVehicle);
-    const v = bulkDraftVehicle ? vehiclesSorted.find((x) => x.id === bulkDraftVehicle) : null;
-    if (hasTeam && v && ids.length > 1) {
+  const handleBulkApplyRules = () => {
+    for (const rule of bulkAssignRules) {
+      if (!rule.vehicleId) continue;
+      const from = Math.max(1, Math.floor(Number(rule.from.trim()) || 1));
+      const to = Math.min(
+        assigned.length,
+        Math.floor(Number(rule.to.trim()) || assigned.length),
+      );
+      if (to < from) continue;
+      const orderIds = assigned.slice(from - 1, to).map((o) => o.id);
+      if (orderIds.length <= 1) continue;
+      const v = vehiclesSorted.find((x) => x.id === rule.vehicleId);
+      if (!v) continue;
       setSameVehicleConfirm({
-        orderId: ids[0]!,
+        orderId: orderIds[0]!,
         plate: v.plate,
-        otherCodes: assigned.filter((o) => ids.includes(o.id)).map((o) => o.code),
+        otherCodes: assigned.slice(from - 1, to).map((o) => o.code),
         bulk: true,
-        bulkOrderIds: ids,
       });
       return;
     }
-    void performBulkApply(ids);
+    void performBulkApplyRules();
   };
 
   const getSameVehicleConflict = (
@@ -1928,14 +1863,17 @@ function RouteDetailSidePanel({
 
     try {
       if (orderApplyToAll) {
-        await assignDriverToOrders(route.id, {
-          driverId: driver?.id ?? null,
-          driverName: driver?.name ?? null,
-          peonetaId: peoneta?.id ?? null,
-          peonetaName: peoneta?.name ?? null,
-          vehicleId: vehicle?.id ?? null,
-          vehiclePlate: vehicle?.plate ?? null,
-        });
+        await assignDriverToOrders(
+          route.id,
+          buildPartialTeamAssignPayload({
+            driverDraft: orderDraftDriver,
+            peonetaDraft: orderDraftPeoneta,
+            vehicleDraft: orderDraftVehicle,
+            driver,
+            peoneta,
+            vehicle,
+          }),
+        );
       } else {
         await updateOrder(orderId, {
           driverId: driver?.id ?? null,
@@ -2365,104 +2303,53 @@ function RouteDetailSidePanel({
 
           {bulkAssignOpen && assigned.length > 0 ? (
             <div className="rounded-xl border border-violet-200/80 dark:border-violet-800/60 bg-violet-50/40 dark:bg-violet-950/20 px-3 py-3 space-y-3 animate-toolbar-panel-enter motion-reduce:animate-none">
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <p className="text-xs font-semibold text-stone-800 dark:text-stone-200 tabular-nums">
-                  {bulkSelectedIds.size} pedido{bulkSelectedIds.size === 1 ? '' : 's'} seleccionado
-                  {bulkSelectedIds.size === 1 ? '' : 's'}
+              <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                Los números de pedido coinciden con el orden de la lista ({assigned.length} en total).
+              </p>
+              <RangeAssignRulesPanel
+                total={assigned.length}
+                rules={bulkAssignRules}
+                onRulesChange={setBulkAssignRules}
+                onApplyRules={handleBulkApplyRules}
+                drivers={driversList}
+                vehicles={vehiclesSorted}
+                peonetas={peonetasList}
+                showPeoneta
+                disabled={bulkAssignBusy}
+                applyLabel="Guardar asignación"
+                tone="violet"
+              />
+              <div className="rounded-lg border border-stone-200/80 dark:border-stone-700/80 bg-white/60 dark:bg-stone-900/40 px-3 py-3 space-y-2">
+                <p className="text-xs font-medium text-stone-700 dark:text-stone-300">
+                  Ubicación destino (opcional)
                 </p>
-                <div className="flex items-center gap-1 text-xs">
-                  <button
-                    type="button"
-                    onClick={selectAllBulk}
+                <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                  Se aplica a los pedidos cubiertos por las reglas. Si no hay reglas de equipo, aplica a todos.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <Input
+                    id="bulk-dest-city"
+                    label="Ciudad destino"
+                    name="bulk_dest_city"
+                    placeholder="Ej: Maipú…"
+                    value={bulkDraftCity}
+                    onChange={(e) => setBulkDraftCity(e.target.value)}
                     disabled={bulkAssignBusy}
-                    className="px-2 py-1 rounded-md text-violet-700 dark:text-violet-300 hover:bg-violet-100/80 dark:hover:bg-violet-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-50"
-                  >
-                    Todos
-                  </button>
-                  <span className="text-stone-300 dark:text-stone-600" aria-hidden>
-                    ·
-                  </span>
-                  <button
-                    type="button"
-                    onClick={selectNoneBulk}
+                    autoComplete="off"
+                    containerClassName="sm:col-span-1"
+                  />
+                  <Select
+                    id="bulk-dest-region"
+                    label="Región destino"
+                    value={bulkDraftRegion}
+                    onChange={(e) => setBulkDraftRegion(e.target.value)}
+                    options={bulkRegionSelectOpts}
                     disabled={bulkAssignBusy}
-                    className="px-2 py-1 rounded-md text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50"
-                  >
-                    Ninguno
-                  </button>
+                    autoComplete="off"
+                    containerClassName="sm:col-span-2"
+                  />
                 </div>
               </div>
-              <p className="text-[11px] text-stone-500 dark:text-stone-400">
-                Marca pedidos abajo y completa solo los campos que quieras cambiar.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Select
-                  id="bulk-driver"
-                  label="Chofer"
-                  value={bulkDraftDriver}
-                  onChange={(e) => setBulkDraftDriver(e.target.value)}
-                  options={driverSelectOpts}
-                  disabled={bulkAssignBusy}
-                  autoComplete="off"
-                />
-                <Select
-                  id="bulk-peoneta"
-                  label="Peoneta"
-                  value={bulkDraftPeoneta}
-                  onChange={(e) => setBulkDraftPeoneta(e.target.value)}
-                  options={peonetaSelectOpts}
-                  disabled={bulkAssignBusy}
-                  autoComplete="off"
-                />
-                <Select
-                  id="bulk-vehicle"
-                  label="Vehículo"
-                  value={bulkDraftVehicle}
-                  onChange={(e) => setBulkDraftVehicle(e.target.value)}
-                  options={vehicleSelectOpts}
-                  disabled={bulkAssignBusy}
-                  autoComplete="off"
-                />
-                <Input
-                  id="bulk-dest-city"
-                  label="Ciudad destino"
-                  name="bulk_dest_city"
-                  placeholder="Ej: Maipú…"
-                  value={bulkDraftCity}
-                  onChange={(e) => setBulkDraftCity(e.target.value)}
-                  disabled={bulkAssignBusy}
-                  autoComplete="off"
-                  containerClassName="sm:col-span-1"
-                />
-                <Select
-                  id="bulk-dest-region"
-                  label="Región destino"
-                  value={bulkDraftRegion}
-                  onChange={(e) => setBulkDraftRegion(e.target.value)}
-                  options={bulkRegionSelectOpts}
-                  disabled={bulkAssignBusy}
-                  autoComplete="off"
-                  containerClassName="sm:col-span-2"
-                />
-              </div>
-              <Button
-                type="button"
-                loading={bulkAssignBusy}
-                disabled={
-                  bulkAssignBusy ||
-                  bulkSelectedIds.size === 0 ||
-                  (!bulkDraftDriver &&
-                    !bulkDraftPeoneta &&
-                    !bulkDraftVehicle &&
-                    !bulkDraftCity.trim() &&
-                    !bulkDraftRegion.trim())
-                }
-                onClick={handleBulkApply}
-                className="w-full sm:w-auto"
-              >
-                Aplicar a {bulkSelectedIds.size} pedido
-                {bulkSelectedIds.size === 1 ? '' : 's'}
-              </Button>
             </div>
           ) : null}
 
@@ -2494,7 +2381,6 @@ function RouteDetailSidePanel({
                   Boolean(o.peonetaName?.trim()) ||
                   Boolean(o.vehiclePlate?.trim());
 
-                const isBulkSelected = bulkSelectedIds.has(o.id);
                 const isDelivered = o.status === 'delivered';
                 const isRejected = o.status === 'rejected';
                 const isInTransit = o.status === 'in_transit';
@@ -2511,27 +2397,16 @@ function RouteDetailSidePanel({
                       isDelivered && 'glass-card-order--delivered',
                       isRejected && 'glass-card-order--rejected',
                       isInTransit && 'glass-card-order--in-transit',
-                      bulkAssignOpen && isBulkSelected && 'ring-2 ring-violet-500/50 dark:ring-violet-400/45',
                     )}
                   >
                     <div className="p-3 space-y-3">
                       <div className="flex items-start gap-3 min-w-0">
-                        {bulkAssignOpen ? (
-                          <button
-                            type="button"
-                            role="checkbox"
-                            aria-checked={isBulkSelected}
-                            aria-label={`Seleccionar pedido ${formatOrderInRouteLabel(route, orderIndex)}`}
-                            onClick={() => toggleBulkOrder(o.id)}
-                            className="shrink-0 mt-0.5 p-0.5 rounded-md text-primary-600 dark:text-primary-400 hover:bg-stone-100 dark:hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                          >
-                            {isBulkSelected ? (
-                              <CheckSquare size={20} aria-hidden />
-                            ) : (
-                              <Square size={20} className="text-stone-400" aria-hidden />
-                            )}
-                          </button>
-                        ) : null}
+                        <div
+                          className="shrink-0 flex items-center justify-center size-8 rounded-lg bg-stone-100 dark:bg-stone-800 text-xs font-bold text-stone-600 dark:text-stone-300 tabular-nums"
+                          aria-hidden
+                        >
+                          {orderIndex + 1}
+                        </div>
                         <div
                           className={clsx(
                             'size-9 shrink-0 rounded-xl flex items-center justify-center',
@@ -2713,7 +2588,7 @@ function RouteDetailSidePanel({
                         </div>
                       ) : canManage && bulkAssignOpen ? (
                         <p className="text-[11px] text-stone-500 dark:text-stone-400 pt-1 border-t border-stone-200/70 dark:border-stone-800/70">
-                          Marca los pedidos y usa el panel de arriba para asignar.
+                          Usa los rangos Desde–Hasta del panel superior para asignar por pedido.
                         </p>
                       ) : (
                         <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => setDetailOrder(o)}>
@@ -2934,8 +2809,8 @@ function RouteDetailSidePanel({
           const conf = sameVehicleConfirm;
           setSameVehicleConfirm(null);
           if (!conf) return;
-          if (conf.bulk && conf.bulkOrderIds?.length) {
-            void performBulkApply(conf.bulkOrderIds);
+          if (conf.bulk) {
+            void performBulkApplyRules();
             return;
           }
           if (conf.orderId) void performSaveOrderAssignment(conf.orderId);
@@ -2944,9 +2819,7 @@ function RouteDetailSidePanel({
         message={
           sameVehicleConfirm
             ? sameVehicleConfirm.bulk
-              ? sameVehicleConfirm.bulkOrderIds?.length === assigned.length
-                ? `¿Asignar el mismo vehículo (${sameVehicleConfirm.plate}) a los ${assigned.length} pedidos de esta ruta?`
-                : `¿Asignar el mismo vehículo (${sameVehicleConfirm.plate}) a ${sameVehicleConfirm.bulkOrderIds?.length ?? 0} pedidos seleccionados?`
+              ? `¿Asignar el mismo vehículo (${sameVehicleConfirm.plate}) a los pedidos ${sameVehicleConfirm.otherCodes.join(', ')}?`
               : orderApplyToAll
                 ? `¿Estás seguro de asignar el mismo vehículo (${sameVehicleConfirm.plate}) a los ${sameVehicleConfirm.otherCodes.length} pedidos de esta ruta?`
                 : `¿Estás seguro de asignar el mismo vehículo (${sameVehicleConfirm.plate})? Ya está en el pedido ${sameVehicleConfirm.otherCodes.join(', ')}.`
@@ -3238,7 +3111,7 @@ export function RoutesPage() {
       toast.warning('Sin rutas para exportar', 'Ajusta los filtros o crea rutas primero.');
       return;
     }
-    const { rowCount, routeCount, filename } = downloadRoutesExportCsv(filteredRoutes, orders, {
+    const { rowCount, routeCount, filename } = downloadRoutesExportXlsx(filteredRoutes, orders, {
       clientNames: clientNameById,
       tenant,
       dateRange: filterDateRange,
@@ -3411,7 +3284,7 @@ export function RoutesPage() {
             disabled={filteredRoutes.length === 0}
             aria-describedby="routes-export-range-hint"
           >
-            Exportar CSV
+            Exportar Excel
           </Button>
           <p
             id="routes-export-range-hint"
@@ -3568,7 +3441,7 @@ export function RoutesPage() {
               ))}
             </div>
             <p className="text-xs text-stone-600 dark:text-stone-400 leading-relaxed rounded-lg bg-stone-50 dark:bg-stone-900/50 border border-stone-200/80 dark:border-stone-700/60 px-3 py-2">
-              <span className="font-medium text-stone-700 dark:text-stone-300">Exportar CSV</span>
+              <span className="font-medium text-stone-700 dark:text-stone-300">Exportar Excel</span>
               {' '}usa el mismo período y filtros del listado. {exportFiltersDescription}
             </p>
           </div>

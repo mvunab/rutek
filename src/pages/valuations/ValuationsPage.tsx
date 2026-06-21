@@ -9,6 +9,10 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react';
+import {
+  VALUATION_MODULE_ENABLED,
+  VALUATION_UNDER_CONSTRUCTION_MESSAGE,
+} from '../../lib/valuationModule';
 import { clsx } from 'clsx';
 import { Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -122,6 +126,7 @@ export function ValuationsPage() {
   );
 
   const loadLedger = useCallback(async () => {
+    if (!VALUATION_MODULE_ENABLED) return;
     setLoading(true);
     setError('');
     try {
@@ -147,8 +152,22 @@ export function ValuationsPage() {
   }, [filterDriverId, filterPeonetaId, filterClientId, filterStatus, filterDateRange]);
 
   useEffect(() => {
+    if (!VALUATION_MODULE_ENABLED) {
+      setLoading(false);
+      return;
+    }
     void loadLedger();
   }, [loadLedger]);
+
+  if (!VALUATION_MODULE_ENABLED) {
+    return (
+      <EmptyState
+        icon={<Calculator size={32} aria-hidden />}
+        title="Valorización"
+        description={VALUATION_UNDER_CONSTRUCTION_MESSAGE}
+      />
+    );
+  }
 
   const hasActiveFilters =
     filterDriverId !== 'all' ||

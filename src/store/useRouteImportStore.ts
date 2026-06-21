@@ -49,6 +49,7 @@ interface RouteImportStore {
       routeDate?: string;
       driverNameHint?: string;
       clientId?: string;
+      routeNumber?: string | number;
     },
   ) => Promise<ImportConfirmResult | null>;
   reset: () => void;
@@ -101,6 +102,9 @@ export const useRouteImportStore = create<RouteImportStore>((set) => ({
       if (opts.routeDate) params.set('route_date', opts.routeDate);
       if (opts.driverNameHint) params.set('driver_name_hint', opts.driverNameHint);
       if (opts.clientId) params.set('client_id', opts.clientId);
+      if (opts.routeNumber != null && String(opts.routeNumber).trim() !== '') {
+        params.set('route_number', String(opts.routeNumber).trim());
+      }
       const qs = params.toString() ? `?${params.toString()}` : '';
       const result = await api.postForm<ImportConfirmResult>(
         `/route-import/confirm${qs}`,

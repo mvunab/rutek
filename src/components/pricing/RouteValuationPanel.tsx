@@ -4,6 +4,7 @@ import { clsx } from 'clsx';
 import { Button } from '../ui/Button';
 import { api, ApiError } from '../../lib/api';
 import { formatCLP, normalizeRouteValuation } from '../../lib/pricingProfile';
+import { VALUATION_MODULE_ENABLED } from '../../lib/valuationModule';
 import type { RouteValuation } from '../../types/pricing';
 
 export function RouteValuationPanel({
@@ -22,6 +23,7 @@ export function RouteValuationPanel({
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
+    if (!VALUATION_MODULE_ENABLED) return;
     setLoading(true);
     setError('');
     try {
@@ -41,8 +43,14 @@ export function RouteValuationPanel({
   }, [routeId]);
 
   useEffect(() => {
+    if (!VALUATION_MODULE_ENABLED) {
+      setLoading(false);
+      return;
+    }
     void load();
   }, [load, refreshKey]);
+
+  if (!VALUATION_MODULE_ENABLED) return null;
 
   const handleCompute = async () => {
     setComputing(true);

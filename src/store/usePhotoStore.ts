@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { PhotoType, RoutePhoto } from '../types';
 import { api, isNetworkError } from '../lib/api';
+import { normalizeMediaUrl } from '../lib/mediaUrl';
 
 interface PhotoStore {
   photos: RoutePhoto[];
@@ -33,8 +34,8 @@ export function mapRoutePhotoFromApi(row: Record<string, unknown>): RoutePhoto {
     vehiclePlate: String(row.vehicle_plate ?? ''),
     fecha: String(row.fecha ?? ''),
     hora: String(row.hora ?? ''),
-    photoUrl: String(row.photo_url ?? ''),
-    thumbnailUrl: String(row.thumbnail_url ?? ''),
+    photoUrl: normalizeMediaUrl(String(row.photo_url ?? '')),
+    thumbnailUrl: normalizeMediaUrl(String(row.thumbnail_url ?? '')),
     type: mapPhotoType(String(row.type ?? 'otro')),
     description: String(row.description ?? ''),
     clientName: String(row.client_name ?? ''),

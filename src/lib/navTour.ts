@@ -1,4 +1,5 @@
 import type { UserRole } from '../types';
+import { VALUATION_MODULE_ENABLED } from './valuationModule';
 
 export interface NavTourStep {
   id: string;
@@ -82,12 +83,14 @@ const tenantSteps: NavTourStep[] = [
     title: 'Fotos de Ruta',
     body: 'Evidencias fotográficas de inspección y entrega capturadas desde la app móvil en terreno.',
   },
-  {
-    id: 'valorizacion',
-    target: '/valorizacion',
-    title: 'Valorización',
-    body: 'Calcula cobros a clientes y pagos a choferes y peonetas según pedidos entregados.',
-  },
+  ...(VALUATION_MODULE_ENABLED
+    ? [{
+        id: 'valorizacion',
+        target: '/valorizacion',
+        title: 'Valorización',
+        body: 'Calcula cobros a clientes y pagos a choferes y peonetas según pedidos entregados.',
+      }]
+    : []),
   {
     id: 'mis-rutas',
     target: '/mis-rutas',
@@ -157,11 +160,11 @@ const navTargetsByRole: Record<UserRole, Set<string>> = {
   super_admin: new Set(superAdminSteps.map((s) => s.target).filter(Boolean) as string[]),
   admin: new Set([
     '/dashboard', '/rutas', '/clientes', '/vehiculos', '/usuarios',
-    '/fotos', '/valorizacion', 'notifications', '/configuracion',
+    '/fotos', ...(VALUATION_MODULE_ENABLED ? ['/valorizacion'] : []), 'notifications', '/configuracion',
   ]),
   operator: new Set([
     '/dashboard', '/rutas', '/clientes', '/vehiculos',
-    '/fotos', '/valorizacion', 'notifications', '/configuracion',
+    '/fotos', ...(VALUATION_MODULE_ENABLED ? ['/valorizacion'] : []), 'notifications', '/configuracion',
   ]),
   driver: new Set(['/rutas', 'notifications', '/configuracion']),
   peoneta: new Set(['/mis-rutas', 'notifications', '/configuracion']),

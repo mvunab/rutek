@@ -19,6 +19,9 @@ import {
 } from '../../lib/excelFormat';
 import { api, ApiError } from '../../lib/api';
 import { authService } from '../../services/auth.service';
+import {
+  formatTenantPlanLabel,
+} from '../../lib/tenantPlan';
 
 type CompanyForm = {
   name: string;
@@ -203,7 +206,6 @@ export function SettingsPage() {
       address: form.address.trim() || undefined,
       city: form.city.trim() || undefined,
       region: form.region.trim() || undefined,
-      plan: form.plan,
     };
     try {
       const data = await api.patch<DbTenant>('/tenant/profile', payload);
@@ -471,16 +473,12 @@ export function SettingsPage() {
               required
               spellCheck={false}
             />
-            <Select
+            <Input
               label="Plan contratado"
-              value={form.plan}
-              onChange={(e) => set('plan', e.target.value as CompanyForm['plan'])}
-              disabled={!canEditTenant}
-              options={[
-                { value: 'starter', label: 'Starter' },
-                { value: 'professional', label: 'Professional' },
-                { value: 'enterprise', label: 'Enterprise' },
-              ]}
+              value={formatTenantPlanLabel(form.plan)}
+              disabled
+              readOnly
+              hint="El plan lo gestiona el administrador de la plataforma."
             />
             <Input
               label="Email de contacto"

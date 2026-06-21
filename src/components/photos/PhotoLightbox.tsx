@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, MapPin, Package, Calendar } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { RoutePhoto } from '../../types';
+import { normalizeMediaUrl } from '../../lib/mediaUrl';
 
 const PLACEHOLDER_FULL =
   'https://placehold.co/400x300/292524/a8a29e?text=Imagen+no+disponible';
@@ -21,6 +22,7 @@ export function PhotoLightbox({
 }) {
   const idx = Math.min(Math.max(index, 0), photos.length - 1);
   const photo = photos[idx];
+  const photoSrc = normalizeMediaUrl(photo?.photoUrl ?? '');
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -39,14 +41,14 @@ export function PhotoLightbox({
       role="dialog"
       aria-modal="true"
       aria-label={`Evidencia — ${photo.orderCode}`}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-950/92 backdrop-blur-sm p-4 motion-reduce:backdrop-blur-none"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-950 p-4"
       onClick={onClose}
     >
       <button
         type="button"
         onClick={onClose}
         aria-label="Cerrar"
-        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        className="absolute top-4 right-4 p-2 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-100"
       >
         <X size={20} aria-hidden />
       </button>
@@ -59,7 +61,7 @@ export function PhotoLightbox({
             onIndexChange(idx - 1);
           }}
           aria-label="Foto anterior"
-          className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-100"
         >
           <ChevronLeft size={22} aria-hidden />
         </button>
@@ -72,7 +74,7 @@ export function PhotoLightbox({
             onIndexChange(idx + 1);
           }}
           aria-label="Siguiente foto"
-          className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-100"
         >
           <ChevronRight size={22} aria-hidden />
         </button>
@@ -84,7 +86,7 @@ export function PhotoLightbox({
       >
         <div className="relative rounded-xl overflow-hidden shadow-2xl bg-stone-900 max-h-[65vh]">
           <img
-            src={photo.photoUrl}
+            src={photoSrc}
             alt={photo.description || `Evidencia ${photo.orderCode}`}
             width={800}
             height={600}
@@ -93,17 +95,17 @@ export function PhotoLightbox({
               (e.target as HTMLImageElement).src = PLACEHOLDER_FULL;
             }}
           />
-          <div className="absolute bottom-3 right-3 text-xs text-white/60 bg-black/40 px-2 py-1 rounded-full tabular-nums">
+          <div className="absolute bottom-3 right-3 text-xs text-stone-200 bg-stone-950/80 px-2 py-1 rounded-full tabular-nums">
             {idx + 1}&nbsp;/&nbsp;{photos.length}
           </div>
         </div>
 
-        <div className="w-full bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 text-white space-y-1.5 motion-reduce:backdrop-blur-none">
+        <div className="w-full bg-stone-900 border border-stone-700 rounded-xl px-4 py-3 text-stone-100 space-y-1.5">
           {photo.description ? <p className="text-sm font-medium">{photo.description}</p> : null}
-          <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-white/70">
+          <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-stone-300">
             <span className="flex items-center gap-1.5">
               <MapPin size={12} aria-hidden />
-              Ruta&nbsp;<strong className="text-white font-mono">{photo.routeCode}</strong>
+              Ruta&nbsp;<strong className="text-stone-50 font-mono">{photo.routeCode}</strong>
             </span>
             <span className="flex items-center gap-1.5">
               <Package size={12} aria-hidden />
@@ -127,12 +129,12 @@ export function PhotoLightbox({
               aria-pressed={i === idx}
               onClick={() => onIndexChange(i)}
               className={clsx(
-                'shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition-[border-color,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white motion-reduce:transition-none',
-                i === idx ? 'border-white scale-105' : 'border-white/20 hover:border-white/50',
+                'shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition-[border-color,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-100 motion-reduce:transition-none',
+                i === idx ? 'border-stone-100 scale-105' : 'border-stone-600 hover:border-stone-400',
               )}
             >
               <img
-                src={p.thumbnailUrl || p.photoUrl}
+                src={normalizeMediaUrl(p.thumbnailUrl || p.photoUrl)}
                 alt=""
                 aria-hidden
                 width={56}

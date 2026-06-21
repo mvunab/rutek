@@ -82,15 +82,12 @@ function routePatchToApi(data: PatchRouteInput): Record<string, unknown> {
   return out;
 }
 
-/** Body para PATCH /routes/:id/assign-driver (RM-1). */
+/** Body para PATCH /routes/:id/assign-driver (RM-1). Solo incluir campos a modificar. */
 export type AssignDriverToRouteInput = {
-  /** UUID del driver; null para desasignar. */
-  driverId: string | null;
+  driverId?: string | null;
   driverName?: string | null;
-  /** UUID de la peoneta (opcional). */
   peonetaId?: string | null;
   peonetaName?: string | null;
-  /** UUID del vehículo (opcional). */
   vehicleId?: string | null;
   vehiclePlate?: string | null;
   /** Si se indica, solo esos pedidos de la ruta (asignación masiva parcial). */
@@ -205,19 +202,24 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
 
   assignDriverToOrders: async (routeId, input) => {
     try {
-      const body: Record<string, unknown> = {
-        driver_id: normalizeOptionalUuid(input.driverId) ?? null,
-      };
-      if (input.driverName !== undefined) body.driver_name = input.driverName;
+      const body: Record<string, unknown> = {};
+
+      if (input.driverId !== undefined) {
+        body.driver_id = normalizeOptionalUuid(input.driverId) ?? null;
+        if (input.driverName !== undefined) body.driver_name = input.driverName;
+      }
       if (input.peonetaId !== undefined) {
         body.peoneta_id = normalizeOptionalUuid(input.peonetaId) ?? null;
+        if (input.peonetaName !== undefined) body.peoneta_name = input.peonetaName;
       }
-      if (input.peonetaName !== undefined) body.peoneta_name = input.peonetaName;
       if (input.vehicleId !== undefined) {
         body.vehicle_id = normalizeOptionalUuid(input.vehicleId) ?? null;
+        if (input.vehiclePlate !== undefined) body.vehicle_plate = input.vehiclePlate;
       }
-      if (input.vehiclePlate !== undefined) body.vehicle_plate = input.vehiclePlate;
       if (input.orderIds?.length) body.order_ids = input.orderIds;
+
+      if (Object.keys(body).length === 0) return;
+
       await api.patch(`/routes/${routeId}/assign-driver`, body);
       // No llama fetchRoutes aquí — el caller es responsable de refrescar.
     } catch (err) {

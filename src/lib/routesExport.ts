@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import { formatAddressFull, formatAddressLabel } from './orderAddress';
 import { resolveOrderStatusLabel } from './orderStatusLabels';
 import { resolveRouteSequence } from './routeSequence';
@@ -146,12 +147,6 @@ function resolveMandanteName(
   return '';
 }
 
-function csvCell(value: string | number | null | undefined): string {
-  const s = value == null ? '' : String(value);
-  if (/[;"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
 function orderRow(
   route: Route,
   order: Order | null,
@@ -233,7 +228,7 @@ export function buildRoutesExportRows(
   return rows;
 }
 
-export function downloadRoutesExportCsv(
+export function downloadRoutesExportXlsx(
   routes: Route[],
   orders: Order[],
   options?: {
@@ -247,20 +242,29 @@ export function downloadRoutesExportCsv(
 
   const range = describeRoutesExportRange(options?.dateRange ?? '30d');
   const todayIso = new Date().toISOString().slice(0, 10);
-  const filename = `rutek-rutas-${range.filenameSuffix}-${todayIso}.csv`;
+  const filename = `rutek-rutas-${range.filenameSuffix}-${todayIso}.xlsx`;
 
-  const lines = [
-    ROUTES_EXPORT_HEADERS.join(';'),
-    ...dataRows.map((row) => row.map(csvCell).join(';')),
-  ];
-  const csv = `\uFEFF${lines.join('\r\n')}`;
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  const sheet = XLSX.utils.aoa_to_sheet([Array.from(ROUTES_EXPORT_HEADERS), ...dataRows]);
+  sheet['!cols'] = ROUTES_EXPORT_HEADERS.map((header) => ({
+    wch: Math.min(Math.max(header.length + 2, 10), 40),
+  }));
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Rutas');
+  XLSX.writeFile(workbook, filename);
 
   return { rowCount: dataRows.length, routeCount: routes.length, filename };
+}
+
+/** @deprecated Usar {@link downloadRoutesExportXlsx}. */
+export function downloadRoutesExportCsv(
+  routes: Route[],
+  orders: Order[],
+  options?: {
+    clientNames?: Map<string, string>;
+    tenant?: Tenant | null;
+    dateRange?: RoutesDateRangeFilter;
+  },
+): { rowCount: number; routeCount: number; filename: string } {
+  return downloadRoutesExportXlsx(routes, orders, options);
 }

@@ -9,6 +9,7 @@ import {
   normalizePricingProfile,
 } from '../../lib/pricingProfile';
 import type { PricingProfile } from '../../types/pricing';
+import { VALUATION_MODULE_ENABLED } from '../../lib/valuationModule';
 
 function MoneyInput({
   label,
@@ -43,6 +44,10 @@ export function PricingProfileSection() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    if (!VALUATION_MODULE_ENABLED) {
+      setLoading(false);
+      return;
+    }
     void (async () => {
       setLoading(true);
       setError('');
@@ -90,6 +95,8 @@ export function PricingProfileSection() {
       setSaving(false);
     }
   };
+
+  if (!VALUATION_MODULE_ENABLED) return null;
 
   return (
     <Card padding="lg">

@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2, Eye, X, CheckCircle2, AlertCircle, Key, UserPlus 
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { formatTenantPlanLabel } from '../../lib/tenantPlan';
 import type { CreateTenantInput } from '../../services/superAdmin.service';
 
 export function TenantsPage() {
@@ -131,7 +132,7 @@ export function TenantsPage() {
                     tenant.plan === 'professional' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400' :
                     'bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-400'
                   }`}>
-                    {tenant.plan}
+                    {formatTenantPlanLabel(tenant.plan)}
                   </span>
                 </td>
                 <td className="px-5 py-3.5">
@@ -195,7 +196,7 @@ export function TenantsPage() {
                   onChange={(e) => setForm({ ...form, plan: e.target.value as any })}
                   className="w-full px-3 py-2 border border-stone-200 dark:border-stone-700 rounded-lg text-sm bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100"
                 >
-                  <option value="starter">Starter</option>
+                  <option value="starter">Standard</option>
                   <option value="professional">Professional</option>
                   <option value="enterprise">Enterprise</option>
                 </select>
