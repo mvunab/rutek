@@ -14,8 +14,8 @@ export type DeleteRouteResult = {
 /** Cuerpo que espera `POST /routes` (`CreateRouteDto` en rutek-api, snake_case). */
 export type CreateRouteInput = {
   name: string;
-  /** N° consecutivo de hoja de ruta (guía interna). */
-  guiaInterna?: number;
+  /** N° consecutivo de hoja de ruta (obligatorio, único por tenant). */
+  guiaInterna: number;
   notes?: string;
   /** UUID del cliente al que pertenece esta ruta (RM-3). Opcional: si se omite, se infiere del primer pedido asignado. */
   clientId?: string;
@@ -163,12 +163,10 @@ export const useRouteStore = create<RouteStore>((set, get) => ({
   addRoute: async (input) => {
     const body: Record<string, unknown> = {
       name: input.name.trim(),
+      guia_interna: input.guiaInterna,
     };
     if (input.notes?.trim()) body.notes = input.notes.trim();
     if (input.clientId?.trim()) body.client_id = input.clientId.trim();
-    if (input.guiaInterna != null && input.guiaInterna > 0) {
-      body.guia_interna = input.guiaInterna;
-    }
     try {
       const created = await api.post<Record<string, unknown>>('/routes', body);
       set((state) => ({

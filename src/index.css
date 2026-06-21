@@ -157,34 +157,6 @@
     box-shadow: 0 0 0 1px rgba(255, 123, 0, 0.28);
   }
 
-  .glass-btn--idle {
-    color: #78716c;
-    border-color: rgba(120, 113, 108, 0.38);
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.92) 0%,
-      rgba(245, 245, 244, 0.88) 100%
-    );
-    box-shadow: none;
-  }
-
-  .glass-btn--idle:hover:not(:disabled) {
-    color: #9a3412;
-    border-color: rgba(255, 123, 0, 0.45);
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.96) 0%,
-      rgba(255, 247, 237, 0.82) 100%
-    );
-  }
-
-  .glass-btn--disabled {
-    opacity: 0.42;
-    filter: grayscale(0.15);
-    cursor: not-allowed;
-    box-shadow: none;
-  }
-
   .glass-btn--danger {
     color: #b91c1c;
     border-color: rgba(252, 165, 165, 0.65);
@@ -227,30 +199,6 @@
     border-color: #ff7b00;
     background: rgba(255, 123, 0, 0.16);
     box-shadow: 0 0 0 1px rgba(255, 123, 0, 0.35);
-  }
-
-  .dark .glass-btn--idle {
-    color: #a8a29e;
-    border-color: rgba(120, 113, 108, 0.45);
-    background: linear-gradient(
-      180deg,
-      rgba(41, 37, 36, 0.88) 0%,
-      rgba(28, 25, 23, 0.85) 100%
-    );
-  }
-
-  .dark .glass-btn--idle:hover:not(:disabled) {
-    color: #fdba74;
-    border-color: rgba(255, 123, 0, 0.42);
-    background: linear-gradient(
-      180deg,
-      rgba(48, 40, 32, 0.92) 0%,
-      rgba(36, 28, 20, 0.88) 100%
-    );
-  }
-
-  .dark .glass-btn--disabled {
-    opacity: 0.38;
   }
 
   .dark .glass-btn--danger {

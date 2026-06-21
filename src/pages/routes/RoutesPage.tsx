@@ -1154,18 +1154,12 @@ function OrderCardAction({
       className={clsx(
         'glass-btn inline-flex flex-1 items-center justify-center gap-1.5 min-h-[2rem] rounded-lg px-2 py-1.5 text-xs font-medium',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-stone-950',
-        disabled || loading
-          ? 'glass-btn--disabled cursor-not-allowed'
-          : tone === 'danger'
-            ? active
-              ? 'glass-btn--danger glass-btn--active'
-              : 'glass-btn--danger glass-btn--idle'
-            : active
-              ? 'glass-btn--active'
-              : 'glass-btn--idle',
         tone === 'danger'
-          ? 'focus-visible:ring-red-400'
-          : 'focus-visible:ring-[#FF7B00]/45',
+          ? 'glass-btn--danger focus-visible:ring-red-400'
+          : active
+            ? 'glass-btn--active focus-visible:ring-[#FF7B00]/50'
+            : 'focus-visible:ring-[#FF7B00]/45',
+        (disabled || loading) && 'opacity-50 cursor-not-allowed',
       )}
     >
       <span className="shrink-0" aria-hidden="true">
@@ -3315,9 +3309,13 @@ export function RoutesPage() {
     setNewRouteError(null);
     try {
       const sequence = parseRouteSequenceInput(data.guiaInterna);
+      if (sequence == null) {
+        setNewRouteError('Indica un N° de ruta válido (entero positivo).');
+        return;
+      }
       await addRoute({
         name: data.name,
-        ...(sequence != null ? { guiaInterna: sequence } : {}),
+        guiaInterna: sequence,
         ...(data.notes ? { notes: data.notes } : {}),
         ...(data.clientId ? { clientId: data.clientId } : {}),
       });
