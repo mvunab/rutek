@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Building2, Moon, Sun, Monitor, Check, Key, Eye, EyeOff, Tags, Plus, Trash2,
-  FileSpreadsheet, Zap, Upload, X, AlertCircle, Activity, Map,
+  FileSpreadsheet, Zap, Upload, X, AlertCircle, Activity, Map, Smartphone, Download,
 } from 'lucide-react';
 import { PricingProfileSection } from '../../components/pricing/PricingProfileSection';
 import { Card } from '../../components/ui/Card';
@@ -22,6 +22,12 @@ import { authService } from '../../services/auth.service';
 import {
   formatTenantPlanLabel,
 } from '../../lib/tenantPlan';
+import {
+  MOBILE_APP_DOWNLOAD_FILENAME,
+  MOBILE_APP_DOWNLOAD_LABEL,
+  MOBILE_APP_DOWNLOAD_PATH,
+  MOBILE_APP_VERSION,
+} from '../../lib/mobileApp';
 
 type CompanyForm = {
   name: string;
@@ -63,6 +69,39 @@ function tenantToForm(tenant: Tenant): CompanyForm {
 
 function isTenantAdmin(role: string | undefined): boolean {
   return role === 'admin' || role === 'super_admin';
+}
+
+function MobileAppDownloadCard() {
+  return (
+    <Card padding="lg">
+      <div className="flex items-start gap-3 mb-5">
+        <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
+          <Smartphone size={20} aria-hidden="true" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+            App móvil Rutek
+          </h2>
+          <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
+            Instala la app en dispositivos Android para choferes y peonetas en terreno.
+            Versión disponible: <span translate="no">{MOBILE_APP_VERSION}</span>.
+          </p>
+        </div>
+      </div>
+      <a
+        href={MOBILE_APP_DOWNLOAD_PATH}
+        download={MOBILE_APP_DOWNLOAD_FILENAME}
+        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 min-h-11 rounded-xl text-sm font-semibold bg-primary-600 hover:bg-primary-700 text-white shadow-md shadow-primary-600/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-stone-900"
+      >
+        <Download size={18} aria-hidden="true" />
+        {MOBILE_APP_DOWNLOAD_LABEL}
+      </a>
+      <p className="text-xs text-stone-500 dark:text-stone-400 mt-3 max-w-prose">
+        En Android puede ser necesario permitir la instalación desde fuentes desconocidas.
+        Si el navegador bloquea la descarga, mantén pulsado el enlace y elige «Descargar enlace».
+      </p>
+    </Card>
+  );
 }
 
 function NavTourSettingsCard() {
@@ -270,6 +309,7 @@ export function SettingsPage() {
     return (
       <div className="mx-auto max-w-3xl space-y-8">
         <NavTourSettingsCard />
+        <MobileAppDownloadCard />
         <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/20 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-amber-900 dark:text-amber-200">
             {loadError || 'No hay empresa asociada a tu cuenta.'}
@@ -345,6 +385,8 @@ export function SettingsPage() {
       </Card>
 
       <NavTourSettingsCard />
+
+      <MobileAppDownloadCard />
 
       {canEditTenant && (
         <Card padding="lg">

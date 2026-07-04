@@ -47,6 +47,9 @@ import { SendTrackingModal } from '../../components/communications/SendTrackingM
 import { usePhotoStore } from '../../store/usePhotoStore';
 import { PhotoLightbox } from '../../components/photos/PhotoLightbox';
 import { OrderInspectionThumbnails } from '../../components/photos/OrderInspectionThumbnails';
+import { OrderDeliveryReceiverInfo } from '../../components/orders/OrderDeliveryReceiverInfo';
+import { pickDeliveryReceiverForOrder } from '../../lib/deliveryReceiver';
+import type { DbDeliveryRecord } from '../../types/api';
 import type { RoutePhoto } from '../../types';
 
 // ─── Panel resize ─────────────────────────────────────────────────────────────
@@ -1391,6 +1394,24 @@ function RouteDetailSidePanel({
     photos: RoutePhoto[];
     index: number;
   } | null>(null);
+  const [routeDeliveryRecords, setRouteDeliveryRecords] = useState<DbDeliveryRecord[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await api.get<DbDeliveryRecord[]>(`/routes/${route.id}/delivery-records`);
+        if (!cancelled) {
+          setRouteDeliveryRecords(Array.isArray(data) ? data : []);
+        }
+      } catch {
+        if (!cancelled) setRouteDeliveryRecords([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [route.id]);
 
   const assigned = useMemo(
     () =>
@@ -2388,6 +2409,9 @@ function RouteDetailSidePanel({
                 const inspectionPhotos = isDelivered
                   ? photosForOrderOnRoute(photos, route, o)
                   : [];
+                const deliveryReceiver = isDelivered
+                  ? pickDeliveryReceiverForOrder(routeDeliveryRecords, o.id)
+                  : null;
 
                 return (
                   <li
@@ -2515,6 +2539,14 @@ function RouteDetailSidePanel({
                           <p className="text-xs text-stone-500 dark:text-stone-400 truncate mt-2">
                             <span className="font-medium text-stone-600 dark:text-stone-300">{destinatario}</span>
                           </p>
+
+                          {deliveryReceiver ? (
+                            <OrderDeliveryReceiverInfo
+                              className="mt-2.5"
+                              name={deliveryReceiver.name}
+                              rut={deliveryReceiver.rut}
+                            />
+                          ) : null}
 
                           {inspectionPhotos.length > 0 ? (
                             <OrderInspectionThumbnails

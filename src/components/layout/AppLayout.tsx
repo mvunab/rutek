@@ -21,7 +21,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   '/usuarios':      { title: 'Usuarios Sistema', subtitle: 'Administradores, operadores, repartidores, peonetas y clientes de la plataforma' },
   '/fotos':         { title: 'Admin. Fotos',      subtitle: 'Fotografías de inspección y entrega desde la app móvil' },
   '/valorizacion':  { title: 'Valorización',      subtitle: 'Cobro a clientes y pago a choferes y peonetas por pedido' },
-  '/configuracion': { title: 'Configuración',     subtitle: 'Tema de la interfaz y datos de la empresa' },
+  '/configuracion': { title: 'Configuración',     subtitle: 'Tema, app móvil y datos de la empresa' },
   '/vehiculos':     { title: 'Vehículos',         subtitle: 'Flota, VIN, mantención y vencimientos de documentación con alertas' },
   '/mis-rutas':     { title: 'Mis Rutas',          subtitle: 'Pedidos que tienes asignados en las rutas de hoy' },
 };

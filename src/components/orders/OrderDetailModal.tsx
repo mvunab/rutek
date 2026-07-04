@@ -6,6 +6,9 @@ import type { Order, OrderStatusEvent } from '../../types';
 import { api } from '../../lib/api';
 import { resolveOrderStatusLabel } from '../../lib/orderStatusLabels';
 import { formatAddressLabel } from '../../lib/orderAddress';
+import { pickDeliveryReceiverForOrder } from '../../lib/deliveryReceiver';
+import { OrderDeliveryReceiverInfo } from './OrderDeliveryReceiverInfo';
+import type { DbDeliveryRecord } from '../../types/api';
 import { useAuthStore } from '../../store/useAuthStore';
 
 function statusIcon(status: string) {
@@ -111,6 +114,35 @@ export function OrderDetailModal({
   const guideIsLikelyImg =
     !!guide &&
     /\.(png|jpe?g|gif|webp)(\?|$)/i.test(guide);
+  const [deliveryReceiver, setDeliveryReceiver] = useState<{
+    name: string;
+    rut: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (order.status !== 'delivered' || !order.routeId) {
+      setDeliveryReceiver(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await api.get<DbDeliveryRecord[]>(
+          `/routes/${order.routeId}/delivery-records`,
+        );
+        if (!cancelled) {
+          setDeliveryReceiver(
+            pickDeliveryReceiverForOrder(Array.isArray(data) ? data : [], order.id),
+          );
+        }
+      } catch {
+        if (!cancelled) setDeliveryReceiver(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [order.id, order.routeId, order.status]);
 
   return (
     <Modal open onClose={onClose} title={`Pedido ${order.code}`} size="lg">
@@ -161,6 +193,13 @@ export function OrderDetailModal({
           </p>
           <p className="text-sm text-stone-800 dark:text-stone-100">{order.clientName}</p>
         </div>
+
+        {order.status === 'delivered' && deliveryReceiver ? (
+          <OrderDeliveryReceiverInfo
+            name={deliveryReceiver.name}
+            rut={deliveryReceiver.rut}
+          />
+        ) : null}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
           <div className="rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-2">

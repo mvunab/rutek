@@ -99,6 +99,9 @@ export function OrderForm({
       : {}),
     ...effectiveInitial,
   }));
+  const [bultosText, setBultosText] = useState(() =>
+    String(effectiveInitial.bultos ?? emptyOrderForm.bultos),
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { clients } = useClientStore();
 
@@ -128,6 +131,12 @@ export function OrderForm({
     });
   }, [form.clientId, lockedClientId, clients]);
 
+  useEffect(() => {
+    const next = effectiveInitial.bultos ?? emptyOrderForm.bultos;
+    setBultosText(String(next));
+    setForm((prev) => ({ ...prev, bultos: next }));
+  }, [effectiveInitial.bultos]);
+
   const setField =
     (field: keyof OrderFormData) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -145,7 +154,8 @@ export function OrderForm({
     if (!form.destCity.trim()) errs.destCity = 'Requerido';
     if (!form.destRegion.trim()) errs.destRegion = 'Selecciona la región de entrega';
     if (!form.estimatedDelivery) errs.estimatedDelivery = 'Requerido';
-    if (!form.bultos || form.bultos < 1) errs.bultos = 'Indica al menos 1 bulto';
+    const bultos = Number.parseInt(bultosText.trim(), 10);
+    if (!Number.isFinite(bultos) || bultos < 1) errs.bultos = 'Indica al menos 1 bulto';
     return errs;
   };
 
@@ -155,7 +165,8 @@ export function OrderForm({
       setErrors(errs);
       return;
     }
-    await onSubmit(form);
+    const bultos = Number.parseInt(bultosText.trim(), 10);
+    await onSubmit({ ...form, bultos });
   };
 
   const clientOptions = clients.reduce<{ value: string; label: string }[]>(
@@ -184,13 +195,13 @@ export function OrderForm({
           inputMode="numeric"
           min={1}
           step={1}
-          value={Number.isNaN(form.bultos) ? 1 : form.bultos}
-          onChange={(e) =>
-            setForm((prev) => ({
-              ...prev,
-              bultos: Math.max(1, Math.floor(Number(e.target.value) || 1)),
-            }))
-          }
+          value={bultosText}
+          onChange={(e) => {
+            const raw = e.target.value;
+            if (raw !== '' && !/^\d+$/.test(raw)) return;
+            setBultosText(raw);
+            setErrors((prev) => ({ ...prev, bultos: '' }));
+          }}
           error={errors.bultos}
         />
       </div>
