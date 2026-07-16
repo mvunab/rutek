@@ -6,8 +6,11 @@ import type { Order, OrderStatusEvent } from '../../types';
 import { api } from '../../lib/api';
 import { resolveOrderStatusLabel } from '../../lib/orderStatusLabels';
 import { formatAddressLabel } from '../../lib/orderAddress';
-import { pickDeliveryReceiverForOrder } from '../../lib/deliveryReceiver';
+import { pickDeliveryReceiverForOrder, pickRejectionInfoForOrder } from '../../lib/deliveryReceiver';
+import { parseOrderReferenceFields } from '../../lib/orderReferenceFields';
 import { OrderDeliveryReceiverInfo } from './OrderDeliveryReceiverInfo';
+import { OrderReferenceInfo } from './OrderReferenceInfo';
+import { OrderRejectionInfo } from './OrderRejectionInfo';
 import type { DbDeliveryRecord } from '../../types/api';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -105,10 +108,14 @@ export function OrderDetailModal({
   order,
   onClose,
   routeLabel,
+  onReactivate,
+  reactivating = false,
 }: {
   order: Order;
   onClose: () => void;
   routeLabel?: string;
+  onReactivate?: () => void;
+  reactivating?: boolean;
 }) {
   const guide = order.dispatchGuideUrl?.trim();
   const guideIsLikelyImg =
@@ -118,10 +125,16 @@ export function OrderDetailModal({
     name: string;
     rut: string;
   } | null>(null);
+  const [rejectionInfo, setRejectionInfo] = useState<{
+    motivo: string;
+    obs: string;
+  } | null>(null);
+  const referenceFields = parseOrderReferenceFields(order.notes);
 
   useEffect(() => {
-    if (order.status !== 'delivered' || !order.routeId) {
+    if (!order.routeId || (order.status !== 'delivered' && order.status !== 'rejected')) {
       setDeliveryReceiver(null);
+      setRejectionInfo(null);
       return;
     }
     let cancelled = false;
@@ -130,13 +143,24 @@ export function OrderDetailModal({
         const data = await api.get<DbDeliveryRecord[]>(
           `/routes/${order.routeId}/delivery-records`,
         );
+        const records = Array.isArray(data) ? data : [];
         if (!cancelled) {
           setDeliveryReceiver(
-            pickDeliveryReceiverForOrder(Array.isArray(data) ? data : [], order.id),
+            order.status === 'delivered'
+              ? pickDeliveryReceiverForOrder(records, order.id, order.code)
+              : null,
+          );
+          setRejectionInfo(
+            order.status === 'rejected'
+              ? pickRejectionInfoForOrder(records, order.id, order.code)
+              : null,
           );
         }
       } catch {
-        if (!cancelled) setDeliveryReceiver(null);
+        if (!cancelled) {
+          setDeliveryReceiver(null);
+          setRejectionInfo(null);
+        }
       }
     })();
     return () => {
@@ -194,10 +218,25 @@ export function OrderDetailModal({
           <p className="text-sm text-stone-800 dark:text-stone-100">{order.clientName}</p>
         </div>
 
+        {referenceFields ? <OrderReferenceInfo fields={referenceFields} /> : null}
+
         {order.status === 'delivered' && deliveryReceiver ? (
           <OrderDeliveryReceiverInfo
             name={deliveryReceiver.name}
             rut={deliveryReceiver.rut}
+          />
+        ) : null}
+
+        {order.status === 'rejected' ? (
+          <OrderRejectionInfo
+            info={
+              rejectionInfo ?? {
+                motivo: 'Pedido rechazado',
+                obs: '',
+              }
+            }
+            onReactivate={onReactivate}
+            reactivating={reactivating}
           />
         ) : null}
 
@@ -258,12 +297,12 @@ export function OrderDetailModal({
           </div>
         )}
 
-        {order.notes && (
+        {order.notes && !referenceFields ? (
           <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-lg p-3">
             <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">Notas</p>
             <p className="text-xs text-stone-700 dark:text-stone-300">{order.notes}</p>
           </div>
-        )}
+        ) : null}
 
         <OrderStatusTimeline orderId={order.id} />
 

@@ -213,6 +213,9 @@ export interface Route {
   estimatedDuration: number;
   createdAt: string;
   notes?: string;
+  /** Pedidos rechazados (limbo BO / warning en ruta completada). */
+  rejectedCount?: number;
+  hasRejections?: boolean;
 }
 
 // ─── Vehicles ────────────────────────────────────────────────────────────────

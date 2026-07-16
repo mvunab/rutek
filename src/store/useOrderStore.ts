@@ -22,6 +22,8 @@ interface OrderStore {
   addOrder: (input: OrderCreatePayload) => Promise<Order | undefined>;
   updateOrder: (id: string, data: Partial<Order>) => Promise<void>;
   updateOrderStatus: (id: string, status: string) => Promise<void>;
+  /** Reactiva un pedido rechazado → pending (vuelve al repartidor). */
+  reactivateOrder: (id: string) => Promise<void>;
   assignToRoute: (orderId: string, routeId: string) => Promise<void>;
   /** Quita el pedido de la ruta (`route_id` null) y lo deja pendiente. */
   detachOrderFromRoute: (orderId: string) => Promise<void>;
@@ -286,6 +288,24 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
           }
         : {}),
     });
+  },
+
+  reactivateOrder: async (id) => {
+    try {
+      const updated = await api.patch<Record<string, unknown>>(
+        `/orders/${id}/reactivate`,
+        {},
+      );
+      const mapped = mapOrderFromApi(updated);
+      set((state) => ({
+        orders: state.orders.map((o) => (o.id === id ? mapped : o)),
+        selectedOrder:
+          state.selectedOrder?.id === id ? mapped : state.selectedOrder,
+      }));
+    } catch (err) {
+      if (isNetworkError(err)) return;
+      throw err;
+    }
   },
 
   assignToRoute: async (orderId, routeId) => {

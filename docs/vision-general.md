@@ -148,7 +148,10 @@ erDiagram
 | Entorno | Frontend | API | Base de datos |
 |---------|----------|-----|---------------|
 | Desarrollo local | `:5173` | `:4000` | Docker Postgres local |
+| **Testing** | `http://raspberrypi4b.local` | nginx → `:4000` (Pi en LAN) | Postgres + MinIO en Pi |
 | Producción | `https://rutek.mardev.cl` | nginx → `:4000` | Postgres + MinIO en servidor |
+
+Deploy testing: `rutek-api/deploy/deploy-testing-from-local.sh` (ver `deploy/README-TESTING.md`).
 
 En producción el frontend usa **mismo origen** (`VITE_API_URL` vacío): nginx sirve la SPA y enruta `/orders`, `/auth`, etc. al API.
 

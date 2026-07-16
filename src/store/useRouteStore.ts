@@ -55,6 +55,8 @@ function mapRouteFromApi(row: Record<string, unknown>): Route {
     clientId: row.client_id != null ? String(row.client_id) : null,
     guiaInterna: Number(row.guia_interna ?? 0) || undefined,
     ref: row.ref != null ? String(row.ref) : null,
+    rejectedCount: Number(row.rejected_count ?? 0) || 0,
+    hasRejections: Boolean(row.has_rejections) || Number(row.rejected_count ?? 0) > 0,
   };
 }
 

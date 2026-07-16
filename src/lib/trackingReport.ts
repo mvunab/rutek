@@ -1,12 +1,28 @@
 import type { LucideIcon } from 'lucide-react';
 import { Box, Truck, PackageCheck } from 'lucide-react';
 
+export type TrackingPhoto = {
+  id: string;
+  url: string;
+  thumbnailUrl?: string | null;
+  type?: string | null;
+};
+
 export interface TrackingInfo {
   orderCode: string;
   clientName: string;
   status: string;
   estimatedDelivery: string;
   actualDelivery: string | null;
+  /** Hora exacta de entrega (registro de entrega); priorizar sobre actualDelivery. */
+  deliveredAt?: string | null;
+  receiverName?: string | null;
+  receiverRut?: string | null;
+  deliveryObs?: string | null;
+  rejectionMotive?: string | null;
+  rejectionObs?: string | null;
+  rejectedAt?: string | null;
+  photos?: TrackingPhoto[];
   createdAt: string;
   bultos: number;
   origin: { city: string; region: string };
@@ -76,7 +92,9 @@ export function getStatusHeadline(info: TrackingInfo): { title: string; subtitle
     case 'rejected':
       return {
         title: 'Entrega no realizada',
-        subtitle: 'El pedido fue marcado como rechazado. Contacta a tu operador logístico si necesitas ayuda.',
+        subtitle: info.rejectionMotive
+          ? `Motivo: ${info.rejectionMotive}. Contacta a tu operador logístico si necesitas ayuda.`
+          : 'El pedido fue marcado como rechazado. Contacta a tu operador logístico si necesitas ayuda.',
       };
     case 'in_transit':
       return info.driverName
@@ -104,9 +122,11 @@ export function buildTimeline(info: TrackingInfo): TimelineEvent[] {
   const created = new Date(info.createdAt);
   const estimated = new Date(info.estimatedDelivery);
 
-  if (info.actualDelivery) {
+  const deliveredIso = info.deliveredAt ?? info.actualDelivery;
+
+  if (deliveredIso) {
     events.push({
-      at: new Date(info.actualDelivery),
+      at: new Date(deliveredIso),
       title: 'Entregado',
       location: dest,
       done: true,
@@ -115,8 +135,8 @@ export function buildTimeline(info: TrackingInfo): TimelineEvent[] {
   }
 
   if (info.status === 'in_transit' || info.status === 'delivered') {
-    const repartoAt = info.actualDelivery
-      ? new Date(new Date(info.actualDelivery).getTime() - 3 * 3_600_000)
+    const repartoAt = deliveredIso
+      ? new Date(new Date(deliveredIso).getTime() - 3 * 3_600_000)
       : new Date(now.getTime() - 2 * 3_600_000);
     if (info.driverName) {
       events.push({
@@ -151,8 +171,10 @@ export function buildTimeline(info: TrackingInfo): TimelineEvent[] {
 
   if (info.status === 'rejected') {
     events.push({
-      at: now,
-      title: 'Entrega rechazada',
+      at: info.rejectedAt ? new Date(info.rejectedAt) : now,
+      title: info.rejectionMotive
+        ? `Entrega rechazada · ${info.rejectionMotive}`
+        : 'Entrega rechazada',
       location: dest,
       done: true,
       highlight: true,

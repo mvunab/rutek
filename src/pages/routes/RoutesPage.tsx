@@ -3,7 +3,7 @@ import {
   Plus, Search, ChevronUp, ChevronDown,
   Download, RefreshCw, SlidersHorizontal, Package, UserCircle, Route as RouteIcon, Truck,
   Pencil, Trash2, X, Copy, MapPin, Box, ArrowLeft, ArrowRight, Check, FileSpreadsheet, Unlink,
-  CheckCircle2, XCircle, AlertCircle, Eye, LayoutGrid, LayoutList, Share2,
+  CheckCircle2, XCircle, AlertCircle, AlertTriangle, Eye, LayoutGrid, LayoutList, Share2,
   CheckSquare, Square, ListChecks, Maximize2, Minimize2,
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -48,7 +48,10 @@ import { usePhotoStore } from '../../store/usePhotoStore';
 import { PhotoLightbox } from '../../components/photos/PhotoLightbox';
 import { OrderInspectionThumbnails } from '../../components/photos/OrderInspectionThumbnails';
 import { OrderDeliveryReceiverInfo } from '../../components/orders/OrderDeliveryReceiverInfo';
-import { pickDeliveryReceiverForOrder } from '../../lib/deliveryReceiver';
+import { OrderReferenceInfo } from '../../components/orders/OrderReferenceInfo';
+import { OrderRejectionInfo } from '../../components/orders/OrderRejectionInfo';
+import { pickDeliveryReceiverForOrder, pickRejectionInfoForOrder } from '../../lib/deliveryReceiver';
+import { parseOrderReferenceFields } from '../../lib/orderReferenceFields';
 import type { DbDeliveryRecord } from '../../types/api';
 import type { RoutePhoto } from '../../types';
 
@@ -841,7 +844,7 @@ function RouteListItem({
   onBulkToggle,
 }: {
   route: Route;
-  agg: { pedidos: number; bultos: number; delivered: number; vehiclesLabel: string };
+  agg: { pedidos: number; bultos: number; delivered: number; rejected: number; vehiclesLabel: string };
   fecha: string;
   selected: boolean;
   onSelect: () => void;
@@ -849,9 +852,12 @@ function RouteListItem({
   bulkChecked?: boolean;
   onBulkToggle?: () => void;
 }) {
+  const terminalDone = agg.delivered + agg.rejected;
   const deliveryPct =
-    agg.pedidos > 0 ? Math.round((agg.delivered / agg.pedidos) * 100) : 0;
+    agg.pedidos > 0 ? Math.round((terminalDone / agg.pedidos) * 100) : 0;
   const hasDeliveries = agg.delivered > 0;
+  const hasRejections = agg.rejected > 0;
+  const completedWithWarning = route.status === 'completed' && hasRejections;
 
   const handleClick = () => {
     if (bulkMode && onBulkToggle) onBulkToggle();
@@ -871,7 +877,9 @@ function RouteListItem({
           ? 'border-primary-400/80 dark:border-primary-500/70 ring-2 ring-primary-400/20 dark:ring-primary-500/25 shadow-md'
           : !bulkMode && selected
             ? 'border-primary-400/80 dark:border-primary-500/70 ring-2 ring-primary-400/20 dark:ring-primary-500/25 shadow-md'
-            : 'border-stone-200/80 dark:border-stone-700/70',
+            : completedWithWarning
+              ? 'border-red-300/90 dark:border-red-800/70'
+              : 'border-stone-200/80 dark:border-stone-700/70',
       )}
     >
       <div className="flex items-start gap-3">
@@ -904,6 +912,13 @@ function RouteListItem({
           </p>
           <div className="flex items-center gap-2 flex-wrap mt-0.5 text-[11px] text-stone-500 dark:text-stone-400 tabular-nums">
             <RouteStatusBadge status={route.status} />
+            {hasRejections ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-50 px-2 py-0.5 font-semibold text-red-800 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200">
+                <AlertTriangle size={11} aria-hidden />
+                {agg.rejected} rechazo{agg.rejected !== 1 ? 's' : ''}
+                {route.status === 'completed' ? ' · revisar' : ''}
+              </span>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[11px] text-stone-400 dark:text-stone-500 tabular-nums">
             <span>{fecha}</span>
@@ -928,10 +943,13 @@ function RouteListItem({
               aria-valuenow={deliveryPct}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label={`${agg.delivered} de ${agg.pedidos} pedidos entregados`}
+              aria-label={`${terminalDone} de ${agg.pedidos} pedidos resueltos`}
             >
               <div
-                className="h-full rounded-full bg-emerald-500 transition-[width] duration-300 motion-reduce:transition-none"
+                className={clsx(
+                  'h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none',
+                  hasRejections ? 'bg-red-500' : 'bg-emerald-500',
+                )}
                 style={{ width: `${deliveryPct}%` }}
               />
             </div>
@@ -966,7 +984,7 @@ function RouteTableRow({
   onBulkToggle,
 }: {
   route: Route;
-  agg: { pedidos: number; bultos: number; delivered: number; vehiclesLabel: string; driversLabel: string };
+  agg: { pedidos: number; bultos: number; delivered: number; rejected: number; vehiclesLabel: string; driversLabel: string };
   fecha: string;
   selected: boolean;
   onSelect: () => void;
@@ -1013,7 +1031,15 @@ function RouteTableRow({
         <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{route.name}</p>
       </td>
       <td className="px-4 py-2.5 align-middle whitespace-nowrap">
-        <RouteStatusBadge status={route.status} />
+        <div className="flex flex-col gap-1 items-start">
+          <RouteStatusBadge status={route.status} />
+          {agg.rejected > 0 ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-800 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200">
+              <AlertTriangle size={10} aria-hidden />
+              {agg.rejected} rechazo{agg.rejected !== 1 ? 's' : ''}
+            </span>
+          ) : null}
+        </div>
       </td>
       <td className="px-4 py-2.5 align-middle whitespace-nowrap text-xs text-stone-500 dark:text-stone-400 tabular-nums">
         {fecha}
@@ -1147,7 +1173,7 @@ function orderToFormData(order: Order): OrderFormData {
 }
 
 type SortDir = 'asc' | 'desc' | null;
-type RouteSortKey = 'code' | 'name' | 'status' | 'pedidos' | 'bultos' | 'fecha' | 'driverName' | 'vehiclePlate';
+type RouteSortKey = 'code' | 'name' | 'status' | 'pedidos' | 'bultos' | 'fecha' | 'createdAt' | 'driverName' | 'vehiclePlate';
 
 const ROUTE_STATUSES: RouteStatus[] = ['not_started', 'in_progress', 'completed', 'cancelled'];
 
@@ -1349,7 +1375,7 @@ function RouteDetailSidePanel({
 }) {
   const { user, tenant } = useAuthStore();
   const canManage = user?.role === 'admin' || user?.role === 'operator';
-  const { orders, detachOrderFromRoute, fetchOrders, addOrder, updateOrder } = useOrderStore();
+  const { orders, detachOrderFromRoute, fetchOrders, addOrder, updateOrder, reactivateOrder } = useOrderStore();
   const { fetchRoutes, addOrderToRoute, assignDriverToOrders, deleteRoute, updateRoute } = useRouteStore();
   const { clients, fetchClients } = useClientStore();
   const { users, fetchUsers } = useUserStore();
@@ -1396,6 +1422,19 @@ function RouteDetailSidePanel({
   } | null>(null);
   const [routeDeliveryRecords, setRouteDeliveryRecords] = useState<DbDeliveryRecord[]>([]);
 
+  const assigned = useMemo(
+    () =>
+      orders
+        .filter((o) => o.routeId === route.id)
+        .toSorted((a, b) => a.code.localeCompare(b.code, 'es')),
+    [orders, route.id],
+  );
+
+  const assignedStatusKey = useMemo(
+    () => assigned.map((o) => `${o.id}:${o.status}`).join('|'),
+    [assigned],
+  );
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -1411,15 +1450,22 @@ function RouteDetailSidePanel({
     return () => {
       cancelled = true;
     };
-  }, [route.id]);
+  }, [route.id, assignedStatusKey]);
 
-  const assigned = useMemo(
-    () =>
-      orders
-        .filter((o) => o.routeId === route.id)
-        .toSorted((a, b) => a.code.localeCompare(b.code, 'es')),
-    [orders, route.id],
-  );
+  const handleExportRoute = useCallback(() => {
+    const clientMap = new Map(clients.map((c) => [c.id, c.companyName]));
+    const { rowCount, filename } = downloadRoutesExportXlsx([route], orders, {
+      clientNames: clientMap,
+      tenant,
+      dateRange: 'all',
+      deliveryRecords: routeDeliveryRecords,
+    });
+    if (rowCount === 0) {
+      toast.warning('Sin datos', 'No hay pedidos para exportar en esta ruta.');
+      return;
+    }
+    toast.info('Exportado', `${filename} · ${rowCount} fila${rowCount === 1 ? '' : 's'}.`);
+  }, [route, orders, clients, tenant, routeDeliveryRecords]);
 
   const totals = useMemo(() => {
     const bultos = assigned.reduce((s, o) => s + (Number(o.bultos) || 0), 0);
@@ -1557,6 +1603,25 @@ function RouteDetailSidePanel({
       await fetchRoutes();
     } catch {
       setActionError('No se pudo quitar el pedido de la ruta.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleReactivateOrder = async (orderId: string) => {
+    setActionError(null);
+    setBusyId(orderId);
+    try {
+      await reactivateOrder(orderId);
+      await fetchOrders();
+      await fetchRoutes();
+      toast.info(
+        'Pedido reactivado',
+        'Volvió a pendiente y aparecerá de nuevo al repartidor.',
+      );
+    } catch {
+      setActionError('No se pudo reactivar el pedido rechazado.');
+      toast.error('No se pudo reactivar', 'Revisa la conexión e intenta de nuevo.');
     } finally {
       setBusyId(null);
     }
@@ -1950,8 +2015,9 @@ function RouteDetailSidePanel({
 
   const deliveredCount = assigned.filter((o) => o.status === 'delivered').length;
   const rejectedCount = assigned.filter((o) => o.status === 'rejected').length;
+  const terminalCount = deliveredCount + rejectedCount;
   const deliveryProgressPct =
-    assigned.length > 0 ? Math.round((deliveredCount / assigned.length) * 100) : 0;
+    assigned.length > 0 ? Math.round((terminalCount / assigned.length) * 100) : 0;
 
   const valuationRefreshKey = useMemo(
     () =>
@@ -2099,6 +2165,17 @@ function RouteDetailSidePanel({
             </button>
           ) : null}
           {canManage ? (
+            <button
+              type="button"
+              onClick={() => void handleExportRoute()}
+              className="shrink-0 rounded-lg p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 dark:hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              aria-label="Exportar Excel de esta ruta"
+              title="Exportar Excel de esta ruta"
+            >
+              <Download size={18} aria-hidden />
+            </button>
+          ) : null}
+          {canManage ? (
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -2225,12 +2302,23 @@ function RouteDetailSidePanel({
               {rejectedCount > 0 ? (
                 <span>
                   <span className="text-stone-500">Rechazados </span>
-                  <span className="font-semibold text-red-700 dark:text-red-400 tabular-nums">
+                  <span className="font-semibold text-red-700 dark:text-red-300 tabular-nums inline-flex items-center gap-1">
+                    <AlertTriangle size={12} aria-hidden />
                     {rejectedCount}
+                    <span className="font-normal text-red-600/80 dark:text-red-200/80">· requieren acción</span>
                   </span>
                 </span>
               ) : null}
             </p>
+
+            {rejectedCount > 0 && route.status === 'completed' ? (
+              <div className="mt-2 rounded-lg border border-red-300/90 bg-red-50/80 px-2.5 py-2 dark:border-red-900/60 dark:bg-red-950/40">
+                <p className="text-[11px] text-red-900 dark:text-red-100 leading-snug">
+                  Ruta completada para el repartidor, con {rejectedCount} pedido
+                  {rejectedCount !== 1 ? 's' : ''} en limbo. Reprograma, reasigna o quita de la ruta.
+                </p>
+              </div>
+            ) : null}
 
             {assigned.length > 0 ? (
               <div
@@ -2239,10 +2327,13 @@ function RouteDetailSidePanel({
                 aria-valuenow={deliveryProgressPct}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-label={`Progreso de entrega: ${deliveredCount} de ${assigned.length} pedidos`}
+                aria-label={`Progreso de ruta: ${terminalCount} de ${assigned.length} pedidos resueltos`}
               >
                 <div
-                  className="h-full rounded-full bg-emerald-500 transition-[width] duration-300 motion-reduce:transition-none"
+                  className={clsx(
+                    'h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none',
+                    rejectedCount > 0 ? 'bg-red-500' : 'bg-emerald-500',
+                  )}
                   style={{ width: `${deliveryProgressPct}%` }}
                 />
               </div>
@@ -2406,12 +2497,17 @@ function RouteDetailSidePanel({
                 const isRejected = o.status === 'rejected';
                 const isInTransit = o.status === 'in_transit';
                 const showStatusOnCard = isDelivered || isRejected || isInTransit;
-                const inspectionPhotos = isDelivered
-                  ? photosForOrderOnRoute(photos, route, o)
-                  : [];
+                const inspectionPhotos =
+                  isDelivered || isRejected
+                    ? photosForOrderOnRoute(photos, route, o)
+                    : [];
                 const deliveryReceiver = isDelivered
-                  ? pickDeliveryReceiverForOrder(routeDeliveryRecords, o.id)
+                  ? pickDeliveryReceiverForOrder(routeDeliveryRecords, o.id, o.code)
                   : null;
+                const rejectionInfo = isRejected
+                  ? pickRejectionInfoForOrder(routeDeliveryRecords, o.id, o.code)
+                  : null;
+                const referenceFields = parseOrderReferenceFields(o.notes);
 
                 return (
                   <li
@@ -2540,11 +2636,35 @@ function RouteDetailSidePanel({
                             <span className="font-medium text-stone-600 dark:text-stone-300">{destinatario}</span>
                           </p>
 
+                          {referenceFields ? (
+                            <OrderReferenceInfo className="mt-2.5" fields={referenceFields} />
+                          ) : null}
+
                           {deliveryReceiver ? (
                             <OrderDeliveryReceiverInfo
                               className="mt-2.5"
                               name={deliveryReceiver.name}
                               rut={deliveryReceiver.rut}
+                            />
+                          ) : null}
+
+                          {isRejected ? (
+                            <OrderRejectionInfo
+                              className="mt-2.5"
+                              info={
+                                rejectionInfo ?? {
+                                  motivo: 'Pedido rechazado',
+                                  obs: '',
+                                }
+                              }
+                              onReactivate={
+                                canManage
+                                  ? () => {
+                                      void handleReactivateOrder(o.id);
+                                    }
+                                  : undefined
+                              }
+                              reactivating={busyId === o.id}
                             />
                           ) : null}
 
@@ -2734,6 +2854,16 @@ function RouteDetailSidePanel({
           order={detailOrder}
           onClose={() => setDetailOrder(null)}
           routeLabel={formatRouteDisplayTitle(route)}
+          onReactivate={
+            canManage && detailOrder.status === 'rejected'
+              ? () => {
+                  void handleReactivateOrder(detailOrder.id).then(() => {
+                    setDetailOrder(null);
+                  });
+                }
+              : undefined
+          }
+          reactivating={busyId === detailOrder.id}
         />
       ) : null}
 
@@ -2912,7 +3042,14 @@ export function RoutesPage() {
   const routeAggById = useMemo(() => {
     const map = new Map<
       string,
-      { pedidos: number; bultos: number; delivered: number; vehiclesLabel: string; driversLabel: string }
+      {
+        pedidos: number;
+        bultos: number;
+        delivered: number;
+        rejected: number;
+        vehiclesLabel: string;
+        driversLabel: string;
+      }
     >();
     for (const r of routes) {
       const pedidosEnRuta = orders.filter((o) => o.routeId === r.id);
@@ -2920,6 +3057,7 @@ export function RoutesPage() {
         pedidos: pedidosEnRuta.length,
         bultos: pedidosEnRuta.reduce((s, o) => s + (Number(o.bultos) || 0), 0),
         delivered: pedidosEnRuta.filter((o) => o.status === 'delivered').length,
+        rejected: pedidosEnRuta.filter((o) => o.status === 'rejected').length,
         vehiclesLabel: summarizeRouteVehicles(pedidosEnRuta, r.vehiclePlate),
         driversLabel: summarizeRouteAssignees(pedidosEnRuta, 'driverName'),
       });
@@ -2927,7 +3065,7 @@ export function RoutesPage() {
     return map;
   }, [routes, orders]);
 
-  const [sortCol, setSortCol] = useState<RouteSortKey | null>('code');
+  const [sortCol, setSortCol] = useState<RouteSortKey | null>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
   const [filterRouteStatus, setFilterRouteStatus] = useState<RouteStatus | 'all'>('all');
@@ -3060,8 +3198,8 @@ export function RoutesPage() {
 
     if (sortCol && sortDir) {
       data = data.toSorted((a, b) => {
-        const aggA = routeAggById.get(a.id) ?? { pedidos: 0, bultos: 0, delivered: 0, vehiclesLabel: '', driversLabel: '' };
-        const aggB = routeAggById.get(b.id) ?? { pedidos: 0, bultos: 0, delivered: 0, vehiclesLabel: '', driversLabel: '' };
+        const aggA = routeAggById.get(a.id) ?? { pedidos: 0, bultos: 0, delivered: 0, rejected: 0, vehiclesLabel: '', driversLabel: '' };
+        const aggB = routeAggById.get(b.id) ?? { pedidos: 0, bultos: 0, delivered: 0, rejected: 0, vehiclesLabel: '', driversLabel: '' };
         let av: string | number = '';
         let bv: string | number = '';
         switch (sortCol) {
@@ -3091,6 +3229,10 @@ export function RoutesPage() {
           case 'fecha':
             av = routeDateKey(a);
             bv = routeDateKey(b);
+            break;
+          case 'createdAt':
+            av = a.createdAt;
+            bv = b.createdAt;
             break;
           case 'driverName':
             av = aggA.driversLabel;
@@ -3138,15 +3280,44 @@ export function RoutesPage() {
     [filterDateRange, filterRouteStatus, filterClientId, clients, search],
   );
 
-  const handleExportRoutes = useCallback(() => {
+  const handleExportRoutes = useCallback(async () => {
     if (filteredRoutes.length === 0) {
       toast.warning('Sin rutas para exportar', 'Ajusta los filtros o crea rutas primero.');
       return;
+    }
+
+    // Misma fuente que el detalle de ruta (donde sí se ve el receptor).
+    // Evita /delivery-records global, que puede fallar o vaciarse con mucho volumen.
+    let deliveryRecords: DbDeliveryRecord[] = [];
+    try {
+      const chunks = await Promise.all(
+        filteredRoutes.map(async (route) => {
+          try {
+            const data = await api.get<DbDeliveryRecord[]>(
+              `/routes/${route.id}/delivery-records`,
+            );
+            return Array.isArray(data) ? data : [];
+          } catch {
+            return [] as DbDeliveryRecord[];
+          }
+        }),
+      );
+      const byId = new Map<string, DbDeliveryRecord>();
+      for (const rec of chunks.flat()) {
+        if (rec?.id) byId.set(rec.id, rec);
+      }
+      deliveryRecords = [...byId.values()];
+    } catch {
+      toast.warning(
+        'Sin registros de entrega',
+        'Se exportará sin receptor ni hora de entrega. Revisa tu conexión e intenta de nuevo.',
+      );
     }
     const { rowCount, routeCount, filename } = downloadRoutesExportXlsx(filteredRoutes, orders, {
       clientNames: clientNameById,
       tenant,
       dateRange: filterDateRange,
+      deliveryRecords,
     });
     toast.info(
       'Exportación descargada',
@@ -3596,8 +3767,9 @@ export function RoutesPage() {
                       className="text-xs rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-2 py-1 text-stone-700 dark:text-stone-200"
                       aria-label="Ordenar rutas"
                     >
+                      <option value="createdAt">Fecha creación</option>
                       <option value="code">N° Ruta</option>
-                      <option value="fecha">Fecha</option>
+                      <option value="fecha">Fecha planificación</option>
                       <option value="pedidos">Pedidos</option>
                       <option value="status">Estado</option>
                     </select>
@@ -3608,7 +3780,7 @@ export function RoutesPage() {
                 {layout === 'cards' && (
                   <ul className="space-y-2" role="list">
                     {filteredRoutes.map((r) => {
-                      const agg = routeAggById.get(r.id) ?? { pedidos: 0, bultos: 0, delivered: 0, vehiclesLabel: '', driversLabel: '' };
+                      const agg = routeAggById.get(r.id) ?? { pedidos: 0, bultos: 0, delivered: 0, rejected: 0, vehiclesLabel: '', driversLabel: '' };
                       return (
                         <li key={r.id}>
                           <RouteListItem
@@ -3703,7 +3875,7 @@ export function RoutesPage() {
                         </thead>
                         <tbody className="bg-white dark:bg-stone-900">
                           {filteredRoutes.map((r) => {
-                            const agg = routeAggById.get(r.id) ?? { pedidos: 0, bultos: 0, delivered: 0, vehiclesLabel: '', driversLabel: '' };
+                            const agg = routeAggById.get(r.id) ?? { pedidos: 0, bultos: 0, delivered: 0, rejected: 0, vehiclesLabel: '', driversLabel: '' };
                             return (
                               <RouteTableRow
                                 key={r.id}

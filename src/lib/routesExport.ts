@@ -3,6 +3,9 @@ import { formatAddressFull, formatAddressLabel } from './orderAddress';
 import { resolveOrderStatusLabel } from './orderStatusLabels';
 import { resolveRouteSequence } from './routeSequence';
 import { routeStatusLabel, normalizeRouteStatus } from './routeStatusLabels';
+import { parseOrderReferenceFields } from './orderReferenceFields';
+import { formatDeliveryDateTime, pickDeliveryReceiverForOrder } from './deliveryReceiver';
+import type { DbDeliveryRecord } from '../types/api';
 import type { Order, OrderPriority, Route, RouteStatus, Tenant } from '../types';
 
 export type RoutesDateRangeFilter = '7d' | '30d' | 'month' | '90d' | 'all';
@@ -108,6 +111,12 @@ export const ROUTES_EXPORT_HEADERS = [
   'Chofer',
   'Peoneta',
   'Vehículo',
+  'N° OC',
+  'Factura',
+  'Referencia',
+  'Recibido por',
+  'RUT receptor',
+  'Fecha y hora entrega',
 ] as const;
 
 const PRIORITY_LABELS: Record<OrderPriority, string> = {
@@ -150,7 +159,11 @@ function resolveMandanteName(
 function orderRow(
   route: Route,
   order: Order | null,
-  options?: { clientNames?: Map<string, string>; tenant?: Tenant | null },
+  options?: {
+    clientNames?: Map<string, string>;
+    tenant?: Tenant | null;
+    deliveryRecords?: DbDeliveryRecord[];
+  },
 ): string[] {
   const status = normalizeRouteStatus(route.status);
   const mandante = resolveMandanteName(route, order, options?.clientNames);
@@ -174,8 +187,22 @@ function orderRow(
       '',
       '',
       '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
     ];
   }
+
+  const refs = parseOrderReferenceFields(order.notes);
+  const receiver = options?.deliveryRecords
+    ? pickDeliveryReceiverForOrder(options.deliveryRecords, order.id, order.code)
+    : null;
+  const deliveredAt =
+    receiver?.deliveredAt ??
+    (order.status === 'delivered' ? order.actualDelivery?.trim() || null : null);
 
   return [
     formatRouteSequence(route),
@@ -195,6 +222,12 @@ function orderRow(
     order.driverName?.trim() || '',
     order.peonetaName?.trim() || '',
     order.vehiclePlate?.trim() || '',
+    refs?.numeroOc ?? '',
+    refs?.factura ?? '',
+    refs?.referencia ?? '',
+    receiver?.name ?? '',
+    receiver?.rut ?? '',
+    formatDeliveryDateTime(deliveredAt),
   ];
 }
 
@@ -202,7 +235,11 @@ function orderRow(
 export function buildRoutesExportRows(
   routes: Route[],
   orders: Order[],
-  options?: { clientNames?: Map<string, string>; tenant?: Tenant | null },
+  options?: {
+    clientNames?: Map<string, string>;
+    tenant?: Tenant | null;
+    deliveryRecords?: DbDeliveryRecord[];
+  },
 ): string[][] {
   const ordersByRoute = new Map<string, Order[]>();
   for (const order of orders) {
@@ -235,6 +272,7 @@ export function downloadRoutesExportXlsx(
     clientNames?: Map<string, string>;
     tenant?: Tenant | null;
     dateRange?: RoutesDateRangeFilter;
+    deliveryRecords?: DbDeliveryRecord[];
   },
 ): { rowCount: number; routeCount: number; filename: string } {
   const dataRows = buildRoutesExportRows(routes, orders, options);
@@ -264,6 +302,7 @@ export function downloadRoutesExportCsv(
     clientNames?: Map<string, string>;
     tenant?: Tenant | null;
     dateRange?: RoutesDateRangeFilter;
+    deliveryRecords?: DbDeliveryRecord[];
   },
 ): { rowCount: number; routeCount: number; filename: string } {
   return downloadRoutesExportXlsx(routes, orders, options);

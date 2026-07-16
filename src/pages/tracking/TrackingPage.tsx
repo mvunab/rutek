@@ -12,6 +12,7 @@ import {
   ChevronDown,
   XCircle,
   Check,
+  Package,
   Loader2,
 } from 'lucide-react';
 import {
@@ -23,9 +24,11 @@ import {
   groupTimelineByDate,
   formatTime,
 } from '../../lib/trackingReport';
+import { formatDeliveryDateTime } from '../../lib/deliveryReceiver';
 import { TRACKING_BRAND } from '../../lib/trackingTheme';
 import { useForceLightTheme } from '../../hooks/useForceLightTheme';
 import { TrackingOrderStatusMarker } from '../../components/tracking/TrackingOrderStatusMarker';
+import { TrackingEvidenceGallery } from '../../components/tracking/TrackingEvidenceGallery';
 
 /** Azul corporativo estilo referencia */
 const BX_BLUE = TRACKING_BRAND.blue;
@@ -167,6 +170,70 @@ function ShipmentDetailsCard({ info }: { info: TrackingInfo }) {
                 <p className="text-xs text-stone-500 mt-0.5 break-words">{info.destination.street}</p>
               </div>
             </div>
+            {(info.receiverName || info.receiverRut) ? (
+              <div className="flex items-start gap-2 sm:col-span-2">
+                <Check className="size-5 shrink-0 text-emerald-600 mt-0.5" aria-hidden />
+                <div>
+                  <p className="text-sm text-emerald-800">
+                    <span className="font-extrabold">Recibido por: </span>
+                    {info.receiverName?.trim() || '—'}
+                    {info.receiverRut?.trim() ? (
+                      <span translate="no" className="tabular-nums"> · RUT {info.receiverRut.trim()}</span>
+                    ) : null}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+            {info.deliveredAt || info.actualDelivery ? (
+              <div className="flex items-start gap-2 sm:col-span-2">
+                <Package className="size-5 shrink-0 text-stone-500 mt-0.5" aria-hidden />
+                <div>
+                  <p className="text-sm text-stone-600">
+                    <span className="font-extrabold">Entregado: </span>
+                    <span className="tabular-nums">
+                      {formatDeliveryDateTime(info.deliveredAt ?? info.actualDelivery)}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            ) : null}
+            {info.status === 'rejected' && (info.rejectionMotive || info.rejectedAt) ? (
+              <div className="flex items-start gap-2 sm:col-span-2">
+                <XCircle className="size-5 shrink-0 text-red-500 mt-0.5" aria-hidden />
+                <div>
+                  {info.rejectionMotive ? (
+                    <p className="text-sm text-red-800">
+                      <span className="font-extrabold">Motivo: </span>
+                      {info.rejectionMotive}
+                    </p>
+                  ) : null}
+                  {info.rejectionObs ? (
+                    <p className="text-xs text-stone-500 mt-0.5">{info.rejectionObs}</p>
+                  ) : null}
+                  {info.rejectedAt ? (
+                    <p className="text-xs text-stone-500 mt-0.5 tabular-nums">
+                      Registrado: {formatDeliveryDateTime(info.rejectedAt)}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {info.deliveryObs ? (
+              <div className="sm:col-span-2">
+                <p className="text-sm text-stone-600">
+                  <span className="font-extrabold">Observaciones: </span>
+                  {info.deliveryObs}
+                </p>
+              </div>
+            ) : null}
+            <TrackingEvidenceGallery
+              photos={info.photos}
+              title={
+                info.status === 'rejected'
+                  ? 'Evidencias del rechazo'
+                  : 'Evidencias de entrega'
+              }
+            />
           </div>
         </div>
       </div>

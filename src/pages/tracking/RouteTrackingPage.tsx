@@ -20,6 +20,8 @@ import {
 import { TrackingStatusLegend } from '../../components/tracking/TrackingStatusLegend';
 import { RouteProgressWay } from '../../components/tracking/RouteProgressWay';
 import { computeRouteProgress, orderWayStepIndex, ROUTE_WAY_STEP_LABELS } from '../../lib/routeTrackingReport';
+import { formatDeliveryDateTime } from '../../lib/deliveryReceiver';
+import { TrackingEvidenceGallery, type TrackingPhoto } from '../../components/tracking/TrackingEvidenceGallery';
 
 const BX_BLUE = TRACKING_BRAND.blue;
 const BX_LIGHT = TRACKING_BRAND.light;
@@ -46,6 +48,8 @@ function resolveRouteTrackingToken(paramToken?: string): string {
 
 type RouteTrackingInfo = {
   routeCode: string;
+  routeNumber?: string;
+  routeDisplay?: string;
   routeName: string;
   clientName: string;
   tenant: { name: string; logo: string | null };
@@ -55,6 +59,13 @@ type RouteTrackingInfo = {
     bultos: number;
     clientName: string;
     destination: { city: string };
+    numeroOc?: string | null;
+    factura?: string | null;
+    referencia?: string | null;
+    receiverName?: string | null;
+    receiverRut?: string | null;
+    deliveredAt?: string | null;
+    photos?: TrackingPhoto[];
   }>;
   expiresAt: string;
 };
@@ -194,12 +205,13 @@ export function RouteTrackingPage() {
             <div className="flex w-full items-start justify-between gap-3 flex-wrap">
               <div className="flex flex-col flex-1 min-w-0">
                 <p className="text-xl sm:text-2xl font-extrabold leading-tight text-stone-900">
-                  Ruta{' '}
                   <span translate="no" className="block sm:inline break-words tabular-nums" style={{ color: BX_BLUE }}>
-                    {info.routeCode}
+                    {info.routeDisplay ?? info.routeName ?? info.routeCode}
                   </span>
                 </p>
-                <p className="mt-1 text-sm font-semibold text-stone-600 break-words">{info.routeName}</p>
+                {info.routeName && info.routeDisplay ? (
+                  <p className="mt-1 text-sm font-semibold text-stone-600 break-words">{info.routeName}</p>
+                ) : null}
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-stone-600">
                   <span className="inline-flex items-center gap-1.5">
                     <Building2 size={16} className="text-stone-400" aria-hidden />
@@ -271,28 +283,61 @@ export function RouteTrackingPage() {
                   {orders.map((o) => (
                     <li
                       key={o.code}
-                      className={`px-4 py-3 flex items-center justify-between gap-3 border-l-4 bg-white ${trackingOrderAccentClass(o.status)}`}
+                      className={`px-4 py-3 border-l-4 bg-white ${trackingOrderAccentClass(o.status)}`}
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2 min-w-0">
-                          <span translate="no" className="font-mono text-xs font-bold text-stone-800">
-                            {o.code}
-                          </span>
-                          <span className="text-[11px] text-stone-500 tabular-nums">
-                            {Number(o.bultos) || 0} bulto{(Number(o.bultos) || 0) === 1 ? '' : 's'}
-                          </span>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2 min-w-0">
+                            <span translate="no" className="font-mono text-xs font-bold text-stone-800">
+                              {o.code}
+                            </span>
+                            <span className="text-[11px] text-stone-500 tabular-nums">
+                              {Number(o.bultos) || 0} bulto{(Number(o.bultos) || 0) === 1 ? '' : 's'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-stone-500 truncate mt-0.5">
+                            Destinatario: {o.clientName?.trim() || 'Por confirmar'}
+                          </p>
+                          {(o.numeroOc || o.factura || o.referencia) ? (
+                            <p className="text-[11px] text-stone-600 mt-1 break-words">
+                              {[
+                                o.numeroOc ? `OC: ${o.numeroOc}` : null,
+                                o.factura ? `Factura: ${o.factura}` : null,
+                                o.referencia ? `Ref: ${o.referencia}` : null,
+                              ].filter(Boolean).join(' · ')}
+                            </p>
+                          ) : null}
+                          {(o.receiverName || o.receiverRut) ? (
+                            <p className="text-[11px] text-emerald-700 mt-0.5 break-words">
+                              Recibido por: {o.receiverName?.trim() || '—'}
+                              {o.receiverRut?.trim() ? (
+                                <span translate="no" className="tabular-nums"> · RUT {o.receiverRut.trim()}</span>
+                              ) : null}
+                            </p>
+                          ) : null}
+                          {o.deliveredAt ? (
+                            <p className="text-[11px] text-stone-600 mt-0.5 tabular-nums">
+                              Entregado: {formatDeliveryDateTime(o.deliveredAt)}
+                            </p>
+                          ) : null}
+                          <p className="text-[10px] text-stone-400 mt-0.5">
+                            Etapa ruta:{' '}
+                            <span className="font-semibold text-stone-600">
+                              {ROUTE_WAY_STEP_LABELS[orderWayStepIndex(o.status, routeProgress.activeIndex)] ?? '—'}
+                            </span>
+                          </p>
+                          <TrackingEvidenceGallery
+                            photos={o.photos}
+                            compact
+                            title={
+                              o.status === 'rejected'
+                                ? 'Evidencias del rechazo'
+                                : 'Evidencias'
+                            }
+                          />
                         </div>
-                        <p className="text-xs text-stone-500 truncate mt-0.5">
-                          Destinatario: {o.clientName?.trim() || 'Por confirmar'}
-                        </p>
-                        <p className="text-[10px] text-stone-400 mt-0.5">
-                          Etapa ruta:{' '}
-                          <span className="font-semibold text-stone-600">
-                            {ROUTE_WAY_STEP_LABELS[orderWayStepIndex(o.status, routeProgress.activeIndex)] ?? '—'}
-                          </span>
-                        </p>
+                        <TrackingOrderStatusMarker status={o.status} className="shrink-0" />
                       </div>
-                      <TrackingOrderStatusMarker status={o.status} className="shrink-0" />
                     </li>
                   ))}
                 </ul>
