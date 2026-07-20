@@ -32,6 +32,53 @@ export interface ImportConfirmResult {
   backup_url: string;
 }
 
+export type FormatEvalSignals = {
+  detection: number;
+  headers: number;
+  rows: number;
+  metadata: number;
+};
+
+export type FormatEvalRanking = {
+  format_id: string;
+  format_name: string;
+  confidence: number;
+  signals: FormatEvalSignals;
+  active: boolean;
+};
+
+export type FormatEvalResult = {
+  rankings: FormatEvalRanking[];
+  selected_format_id: string | null;
+  needs_manual_choice: boolean;
+  threshold: number;
+  reason: string;
+};
+
+export type RouteImportOpts = {
+  routeName?: string;
+  routeDate?: string;
+  driverNameHint?: string;
+  clientId?: string;
+  routeNumber?: string | number;
+  /** Plantilla Excel del tenant; si no se envía, el API usa la activa. */
+  formatId?: string;
+};
+
+function formatApiError(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) {
+    try {
+      const p = JSON.parse(err.body) as { message?: string | string[] };
+      if (typeof p.message === 'string') return p.message;
+      if (Array.isArray(p.message)) return p.message.join(' · ');
+    } catch {
+      /* empty */
+    }
+    return err.body || `Error ${err.status}`;
+  }
+  return err instanceof Error ? err.message : fallback;
+}
+
 interface RouteImportStore {
   preview: ImportPreview | null;
   previewLoading: boolean;
@@ -41,16 +88,14 @@ interface RouteImportStore {
   confirmError: string | null;
   lastResult: ImportConfirmResult | null;
 
-  fetchPreview: (file: File) => Promise<ImportPreview | null>;
+  formatEval: FormatEvalResult | null;
+  evaluateLoading: boolean;
+
+  evaluateFormats: (file: File) => Promise<FormatEvalResult | null>;
+  fetchPreview: (file: File, opts?: { formatId?: string }) => Promise<ImportPreview | null>;
   confirmImport: (
     file: File,
-    opts?: {
-      routeName?: string;
-      routeDate?: string;
-      driverNameHint?: string;
-      clientId?: string;
-      routeNumber?: string | number;
-    },
+    opts?: RouteImportOpts,
   ) => Promise<ImportConfirmResult | null>;
   reset: () => void;
 }
@@ -62,13 +107,48 @@ export const useRouteImportStore = create<RouteImportStore>((set) => ({
   confirmLoading: false,
   confirmError: null,
   lastResult: null,
+  formatEval: null,
+  evaluateLoading: false,
 
-  fetchPreview: async (file) => {
+  evaluateFormats: async (file) => {
+    set({ evaluateLoading: true, formatEval: null, previewError: null });
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const result = await api.postForm<FormatEvalResult>(
+        '/route-import/evaluate',
+        form,
+      );
+      set({ formatEval: result, evaluateLoading: false });
+      return result;
+    } catch (err) {
+      if (isNetworkError(err)) {
+        set({
+          evaluateLoading: false,
+          previewError: 'No se pudo conectar al servidor.',
+        });
+        return null;
+      }
+      set({
+        evaluateLoading: false,
+        previewError: formatApiError(err, 'No se pudo evaluar el Excel.'),
+      });
+      return null;
+    }
+  },
+
+  fetchPreview: async (file, opts = {}) => {
     set({ previewLoading: true, previewError: null, preview: null });
     try {
       const form = new FormData();
       form.append('file', file);
-      const result = await api.postForm<ImportPreview>('/route-import/preview', form);
+      const params = new URLSearchParams();
+      if (opts.formatId?.trim()) params.set('format_id', opts.formatId.trim());
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const result = await api.postForm<ImportPreview>(
+        `/route-import/preview${qs}`,
+        form,
+      );
       set({ preview: result, previewLoading: false });
       return result;
     } catch (err) {
@@ -76,18 +156,10 @@ export const useRouteImportStore = create<RouteImportStore>((set) => ({
         set({ previewLoading: false, previewError: 'No se pudo conectar al servidor.' });
         return null;
       }
-      const msg =
-        err instanceof ApiError
-          ? (() => {
-              try {
-                const p = JSON.parse(err.body) as { message?: string | string[] };
-                if (typeof p.message === 'string') return p.message;
-                if (Array.isArray(p.message)) return p.message.join(' · ');
-              } catch { /* empty */ }
-              return err.body || `Error ${err.status}`;
-            })()
-          : (err instanceof Error ? err.message : 'Error desconocido');
-      set({ previewLoading: false, previewError: msg });
+      set({
+        previewLoading: false,
+        previewError: formatApiError(err, 'Error desconocido'),
+      });
       return null;
     }
   },
@@ -105,6 +177,7 @@ export const useRouteImportStore = create<RouteImportStore>((set) => ({
       if (opts.routeNumber != null && String(opts.routeNumber).trim() !== '') {
         params.set('route_number', String(opts.routeNumber).trim());
       }
+      if (opts.formatId?.trim()) params.set('format_id', opts.formatId.trim());
       const qs = params.toString() ? `?${params.toString()}` : '';
       const result = await api.postForm<ImportConfirmResult>(
         `/route-import/confirm${qs}`,
@@ -117,18 +190,10 @@ export const useRouteImportStore = create<RouteImportStore>((set) => ({
         set({ confirmLoading: false, confirmError: 'No se pudo conectar al servidor.' });
         return null;
       }
-      const msg =
-        err instanceof ApiError
-          ? (() => {
-              try {
-                const p = JSON.parse(err.body) as { message?: string | string[] };
-                if (typeof p.message === 'string') return p.message;
-                if (Array.isArray(p.message)) return p.message.join(' · ');
-              } catch { /* empty */ }
-              return err.body || `Error ${err.status}`;
-            })()
-          : (err instanceof Error ? err.message : 'Error desconocido');
-      set({ confirmLoading: false, confirmError: msg });
+      set({
+        confirmLoading: false,
+        confirmError: formatApiError(err, 'Error desconocido'),
+      });
       return null;
     }
   },
@@ -141,5 +206,7 @@ export const useRouteImportStore = create<RouteImportStore>((set) => ({
       confirmLoading: false,
       confirmError: null,
       lastResult: null,
+      formatEval: null,
+      evaluateLoading: false,
     }),
 }));

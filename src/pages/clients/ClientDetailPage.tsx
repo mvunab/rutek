@@ -35,6 +35,7 @@ import {
   CLIENT_ACTIVITY_KIND_LABELS,
   OPPORTUNITY_STATUS_LABELS,
 } from '../../types/clientCrm';
+import { ClientBillingPanel } from '../../components/billing/ClientBillingPanel';
 
 type TimelineFilter = 'all' | 'crm' | 'orders' | 'opportunities';
 
@@ -307,6 +308,8 @@ export function ClientDetailPage() {
         <StatCard label="Entregados" value={stats.deliveredOrders} icon={<CheckCircle size={16} aria-hidden />} />
         <StatCard label="Oport. abiertas" value={stats.openOpportunities} icon={<Target size={16} aria-hidden />} />
       </div>
+
+      {id ? <ClientBillingPanel clientId={id} /> : null}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
         {/* Timeline */}

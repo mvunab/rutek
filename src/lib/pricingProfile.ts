@@ -2,6 +2,7 @@ import type {
   PricingProfile,
   RouteValuation,
   ValuationLedger,
+  ValuationLedgerItem,
   ValuationLine,
 } from '../types/pricing';
 
@@ -142,38 +143,87 @@ export function normalizeValuationLedger(raw: Record<string, unknown>): Valuatio
   const items = itemsRaw
     .filter((row): row is Record<string, unknown> => Boolean(row && typeof row === 'object'))
     .map((row) => ({
-      orderId: String(row.order_id ?? ''),
-      orderCode: String(row.order_code ?? ''),
-      orderStatus: String(row.order_status ?? ''),
+      orderId: String(row.order_id ?? row.orderId ?? ''),
+      orderCode: String(row.order_code ?? row.orderCode ?? ''),
+      orderStatus: String(row.order_status ?? row.orderStatus ?? ''),
       bultos: numLedger(row.bultos),
-      clientId: String(row.client_id ?? ''),
-      clientName: String(row.client_name ?? ''),
-      routeId: String(row.route_id ?? ''),
-      routeCode: String(row.route_code ?? ''),
-      routeName: String(row.route_name ?? ''),
-      routeCreatedAt: String(row.route_created_at ?? ''),
-      driverId: row.driver_id != null ? String(row.driver_id) : null,
-      driverName: row.driver_name != null ? String(row.driver_name) : null,
-      peonetaId: row.peoneta_id != null ? String(row.peoneta_id) : null,
-      peonetaName: row.peoneta_name != null ? String(row.peoneta_name) : null,
-      clientCharge: numLedger(row.client_charge),
-      driverPay: numLedger(row.driver_pay),
-      peonetaPay: numLedger(row.peoneta_pay),
-      workerPayTotal: numLedger(row.worker_pay_total),
+      clientId: String(row.client_id ?? row.clientId ?? ''),
+      clientName: String(row.client_name ?? row.clientName ?? ''),
+      billingClientId:
+        row.billing_client_id != null
+          ? String(row.billing_client_id)
+          : row.billingClientId != null
+            ? String(row.billingClientId)
+            : null,
+      billingClientName:
+        row.billing_client_name != null
+          ? String(row.billing_client_name)
+          : row.billingClientName != null
+            ? String(row.billingClientName)
+            : null,
+      billingSource: ((): ValuationLedgerItem['billingSource'] => {
+        const s = String(row.billing_source ?? row.billingSource ?? 'pricing_profile');
+        if (s === 'assignment' || s === 'template' || s === 'pricing_profile') return s;
+        return 'pricing_profile';
+      })(),
+      flowName:
+        row.flow_name != null
+          ? String(row.flow_name)
+          : row.flowName != null
+            ? String(row.flowName)
+            : null,
+      routeClientCharge: numLedger(row.route_client_charge ?? row.routeClientCharge),
+      routeId: String(row.route_id ?? row.routeId ?? ''),
+      routeCode: String(row.route_code ?? row.routeCode ?? ''),
+      routeName: String(row.route_name ?? row.routeName ?? ''),
+      routeCreatedAt: String(row.route_created_at ?? row.routeCreatedAt ?? ''),
+      driverId:
+        row.driver_id != null
+          ? String(row.driver_id)
+          : row.driverId != null
+            ? String(row.driverId)
+            : null,
+      driverName:
+        row.driver_name != null
+          ? String(row.driver_name)
+          : row.driverName != null
+            ? String(row.driverName)
+            : null,
+      peonetaId:
+        row.peoneta_id != null
+          ? String(row.peoneta_id)
+          : row.peonetaId != null
+            ? String(row.peonetaId)
+            : null,
+      peonetaName:
+        row.peoneta_name != null
+          ? String(row.peoneta_name)
+          : row.peonetaName != null
+            ? String(row.peonetaName)
+            : null,
+      clientCharge: numLedger(row.client_charge ?? row.clientCharge),
+      driverPay: numLedger(row.driver_pay ?? row.driverPay),
+      peonetaPay: numLedger(row.peoneta_pay ?? row.peonetaPay),
+      workerPayTotal: numLedger(row.worker_pay_total ?? row.workerPayTotal),
       margin: numLedger(row.margin),
-    }));
+    }))
+    .filter((row) => Boolean(row.orderId));
 
   return {
     enabled: Boolean(raw.enabled),
-    profileVersion: numLedger(raw.profile_version, 1),
+    profileVersion: numLedger(raw.profile_version ?? raw.profileVersion, 1),
     currency: 'CLP',
     items,
     summary: {
-      orderCount: numLedger(summaryRaw.order_count),
-      clientCharge: numLedger(summaryRaw.client_charge),
-      driverPay: numLedger(summaryRaw.driver_pay),
-      peonetaPay: numLedger(summaryRaw.peoneta_pay),
-      workerPayTotal: numLedger(summaryRaw.worker_pay_total),
+      orderCount: numLedger(
+        summaryRaw.order_count ?? summaryRaw.orderCount ?? items.length,
+      ),
+      clientCharge: numLedger(summaryRaw.client_charge ?? summaryRaw.clientCharge),
+      driverPay: numLedger(summaryRaw.driver_pay ?? summaryRaw.driverPay),
+      peonetaPay: numLedger(summaryRaw.peoneta_pay ?? summaryRaw.peonetaPay),
+      workerPayTotal: numLedger(
+        summaryRaw.worker_pay_total ?? summaryRaw.workerPayTotal,
+      ),
       margin: numLedger(summaryRaw.margin),
     },
   };

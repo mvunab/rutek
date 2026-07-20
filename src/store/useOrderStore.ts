@@ -234,15 +234,23 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         body.vehicle_id = normalizeOptionalUuid(data.vehicleId) ?? null;
       }
       if (data.vehiclePlate !== undefined) body.vehicle_plate = data.vehiclePlate;
-      if (data.origin !== undefined) {
-        body.origin_street = data.origin.street;
-        body.origin_city = data.origin.city;
-        body.origin_region = data.origin.region;
-      }
       if (data.destination !== undefined) {
         body.destination_street = data.destination.street;
         body.destination_city = data.destination.city;
         body.destination_region = data.destination.region;
+        if (data.destination.coordinates) {
+          body.destination_lat = data.destination.coordinates.lat;
+          body.destination_lng = data.destination.coordinates.lng;
+        }
+      }
+      if (data.origin !== undefined) {
+        body.origin_street = data.origin.street;
+        body.origin_city = data.origin.city;
+        body.origin_region = data.origin.region;
+        if (data.origin.coordinates) {
+          body.origin_lat = data.origin.coordinates.lat;
+          body.origin_lng = data.origin.coordinates.lng;
+        }
       }
       if (data.items !== undefined) body.items = data.items;
       if (data.totalWeight !== undefined) body.total_weight = data.totalWeight;

@@ -1,5 +1,6 @@
-import type { UserRole } from '../types';
-import { VALUATION_MODULE_ENABLED } from './valuationModule';
+import type { Tenant, UserRole } from '../types';
+import { isValuationModuleEnabled } from './valuationModule';
+import { isOrdersMapModuleEnabled } from './ordersMapModule';
 
 export interface NavTourStep {
   id: string;
@@ -35,7 +36,7 @@ export function resetNavTour(userId: string): void {
   }
 }
 
-const tenantSteps: NavTourStep[] = [
+const tenantStepsBase: NavTourStep[] = [
   {
     id: 'intro',
     title: 'Bienvenido a Rutek',
@@ -83,14 +84,18 @@ const tenantSteps: NavTourStep[] = [
     title: 'Fotos de Ruta',
     body: 'Evidencias fotográficas de inspección y entrega capturadas desde la app móvil en terreno.',
   },
-  ...(VALUATION_MODULE_ENABLED
-    ? [{
-        id: 'valorizacion',
-        target: '/valorizacion',
-        title: 'Valorización',
-        body: 'Calcula cobros a clientes y pagos a choferes y peonetas según pedidos entregados.',
-      }]
-    : []),
+  {
+    id: 'mapa-pedidos',
+    target: '/mapa-pedidos',
+    title: 'Mapa de pedidos',
+    body: 'Visualiza entregas en un mapa, filtra por estado y ubica pedidos sin coordenadas.',
+  },
+  {
+    id: 'valorizacion',
+    target: '/valorizacion',
+    title: 'Valorización',
+    body: 'Calcula cobros a clientes y pagos a choferes y peonetas según pedidos entregados.',
+  },
   {
     id: 'mis-rutas',
     target: '/mis-rutas',
@@ -145,39 +150,67 @@ const superAdminSteps: NavTourStep[] = [
     id: 'auditoria',
     target: '/super-admin/auditoria',
     title: 'Auditoría',
-    body: 'Registro de acciones sensibles para trazabilidad y soporte.',
-  },
-  {
-    id: 'configuracion',
-    target: '/configuracion',
-    title: 'Configuración',
-    body: 'Preferencias de tu perfil y ajustes personales de la interfaz.',
+    body: 'Historistro de acciones sensibles realizadas sobre tenants y usuarios.',
   },
 ];
 
-/** Rutas visibles por rol según AppSidebar */
-const navTargetsByRole: Record<UserRole, Set<string>> = {
-  super_admin: new Set(superAdminSteps.map((s) => s.target).filter(Boolean) as string[]),
-  admin: new Set([
-    '/dashboard', '/rutas', '/clientes', '/vehiculos', '/usuarios',
-    '/fotos', ...(VALUATION_MODULE_ENABLED ? ['/valorizacion'] : []), 'notifications', '/configuracion',
-  ]),
-  operator: new Set([
-    '/dashboard', '/rutas', '/clientes', '/vehiculos',
-    '/fotos', ...(VALUATION_MODULE_ENABLED ? ['/valorizacion'] : []), 'notifications', '/configuracion',
-  ]),
-  driver: new Set(['/rutas', 'notifications', '/configuracion']),
-  peoneta: new Set(['/mis-rutas', 'notifications', '/configuracion']),
-  client: new Set(['/pedidos', 'notifications', '/configuracion']),
-};
+function moduleTargets(tenant?: Tenant | null): Set<string> {
+  const set = new Set<string>();
+  if (isValuationModuleEnabled(tenant)) set.add('/valorizacion');
+  if (isOrdersMapModuleEnabled(tenant)) set.add('/mapa-pedidos');
+  return set;
+}
 
-export function getNavTourSteps(role: UserRole, isSuperAdmin: boolean): NavTourStep[] {
+/** Rutas visibles por rol según AppSidebar (+ módulos opcionales del tenant). */
+function navTargetsByRole(
+  role: UserRole,
+  tenant?: Tenant | null,
+): Set<string> {
+  const modules = moduleTargets(tenant);
+  const base: Record<UserRole, string[]> = {
+    super_admin: superAdminSteps.map((s) => s.target).filter(Boolean) as string[],
+    admin: [
+      '/dashboard',
+      '/rutas',
+      '/clientes',
+      '/vehiculos',
+      '/usuarios',
+      '/fotos',
+      'notifications',
+      '/configuracion',
+    ],
+    operator: [
+      '/dashboard',
+      '/rutas',
+      '/clientes',
+      '/vehiculos',
+      '/fotos',
+      'notifications',
+      '/configuracion',
+    ],
+    driver: ['/rutas', 'notifications', '/configuracion'],
+    peoneta: ['/mis-rutas', 'notifications', '/configuracion'],
+    client: ['/pedidos', 'notifications', '/configuracion'],
+  };
+  const allowed = new Set(base[role] ?? []);
+  for (const t of modules) {
+    if (role === 'admin' || role === 'operator') allowed.add(t);
+    if (role === 'driver' && t === '/mapa-pedidos') allowed.add(t);
+  }
+  return allowed;
+}
+
+export function getNavTourSteps(
+  role: UserRole,
+  isSuperAdmin: boolean,
+  tenant?: Tenant | null,
+): NavTourStep[] {
   if (isSuperAdmin || role === 'super_admin') {
     return superAdminSteps;
   }
 
-  const allowed = navTargetsByRole[role] ?? new Set<string>();
-  return tenantSteps.filter((step) => !step.target || allowed.has(step.target));
+  const allowed = navTargetsByRole(role, tenant);
+  return tenantStepsBase.filter((step) => !step.target || allowed.has(step.target));
 }
 
 export const NAV_TOUR_TARGET_ATTR = 'data-nav-tour';

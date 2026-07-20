@@ -4,7 +4,7 @@ import {
   Download, RefreshCw, SlidersHorizontal, Package, UserCircle, Route as RouteIcon, Truck,
   Pencil, Trash2, X, Copy, MapPin, Box, ArrowLeft, ArrowRight, Check, FileSpreadsheet, Unlink,
   CheckCircle2, XCircle, AlertCircle, AlertTriangle, Eye, LayoutGrid, LayoutList, Share2,
-  CheckSquare, Square, ListChecks, Maximize2, Minimize2,
+  CheckSquare, Square, ListChecks, Maximize2, Minimize2, Filter,
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { OrderStatusBadge, RouteStatusBadge } from '../../components/ui/Badge';
@@ -12,7 +12,7 @@ import { ConfirmModal, Modal, TypeToConfirmModal } from '../../components/ui/Mod
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useRouteStore } from '../../store/useRouteStore';
-import type { Route, RouteStatus, Order } from '../../types';
+import type { Route, RouteStatus, Order, OrderStatus } from '../../types';
 import { routeStatusLabel } from '../../lib/routeStatusLabels';
 import { clsx } from 'clsx';
 import { ApiError } from '../../lib/api';
@@ -26,6 +26,8 @@ import { OrderForm, type OrderFormData } from '../../components/orders/OrderForm
 import { OrderDetailModal } from '../../components/orders/OrderDetailModal';
 import { useRouteImportStore } from '../../store/useRouteImportStore';
 import { toast } from '../../store/useToastStore';
+import { normalizeExcelFormatsList } from '../../lib/excelFormat';
+import type { ExcelFormatConfig } from '../../types';
 import { formatAddressLabel, resolveDefaultPickupAddress } from '../../lib/orderAddress';
 import { downloadRoutesExportXlsx, describeRoutesExportFilters, describeRoutesExportRange, routesExportCutoff, type RoutesDateRangeFilter } from '../../lib/routesExport';
 import {
@@ -37,6 +39,8 @@ import {
   resolveRouteSequence,
   suggestNextRouteSequence,
 } from '../../lib/routeSequence';
+import { resolveOrderStatusLabel } from '../../lib/orderStatusLabels';
+import { orderStatusColors } from '../../lib/statusColors';
 import { resolveAssignee, resolveVehicle, buildPartialTeamAssignPayload } from '../../lib/teamAssignment';
 import { applyRangeRules, indicesCoveredByRules, type RangeAssignRule } from '../../lib/rangeAssignRules';
 import { RangeAssignRulesPanel } from '../../components/routes/RangeAssignRulesPanel';
@@ -157,7 +161,7 @@ function ImportExcelModal({
   onClose: () => void;
   onImported: () => void;
 }) {
-  const { fetchPreview, confirmImport, preview, previewLoading, previewError, confirmLoading, confirmError, lastResult, reset } =
+  const { fetchPreview, confirmImport, evaluateFormats, preview, previewLoading, previewError, confirmLoading, confirmError, lastResult, formatEval, evaluateLoading, reset } =
     useRouteImportStore();
   const { clients, fetchClients } = useClientStore();
   const { users, fetchUsers } = useUserStore();
@@ -178,6 +182,9 @@ function ImportExcelModal({
   const [assignRules, setAssignRules] = useState<RangeAssignRule[]>([]);
   const [assignBusy, setAssignBusy] = useState(false);
   const [assignProgress, setAssignProgress] = useState<{ done: number; total: number } | null>(null);
+  const [excelFormats, setExcelFormats] = useState<ExcelFormatConfig[]>([]);
+  const [formatId, setFormatId] = useState('');
+  const [formatAutoPicked, setFormatAutoPicked] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -185,6 +192,18 @@ function ImportExcelModal({
     void fetchUsers();
     void fetchVehicles();
     void fetchRoutes();
+    void (async () => {
+      try {
+        const data = await api.get<unknown>('/tenant/excel-formats');
+        const list = normalizeExcelFormatsList(data);
+        setExcelFormats(list);
+        const active = list.find((f) => f.active);
+        setFormatId(active?.id ?? list[0]?.id ?? '');
+      } catch {
+        setExcelFormats([]);
+        setFormatId('');
+      }
+    })();
   }, [open, fetchClients, fetchRoutes]);
 
   const handleClose = useCallback(() => {
@@ -201,33 +220,92 @@ function ImportExcelModal({
     setAssignRules([]);
     setAssignBusy(false);
     setAssignProgress(null);
+    setFormatId('');
+    setFormatAutoPicked(false);
     onClose();
   }, [reset, onClose]);
 
   const filenameBase = (name: string) => name.replace(/\.(xlsx|xls)$/i, '').trim();
+
+  const runPreview = useCallback(
+    async (f: File, selectedFormatId: string) => {
+      setShowAllRows(false);
+      const p = await fetchPreview(f, {
+        formatId: selectedFormatId.trim() || undefined,
+      });
+      if (p) {
+        setRouteName(filenameBase(f.name));
+        setRouteDate(p.route_date ?? '');
+        setRouteSequence(String(p.route_number ?? '').trim());
+        setStep('preview');
+        if (p.rows.length === 0) {
+          toast.warning(
+            'Sin pedidos detectados',
+            'El Excel no contiene filas de datos válidas. Verifica el formato o cambia la plantilla.',
+          );
+        } else {
+          toast.info(
+            `Preview lista · ${p.rows.length} pedidos`,
+            `Ruta N° ${p.route_number} · ${p.transport_company || 'sin empresa'}`,
+          );
+        }
+      } else {
+        setStep('upload');
+        const err = useRouteImportStore.getState().previewError;
+        if (err) toast.error('Error al leer el Excel', err);
+      }
+    },
+    [fetchPreview],
+  );
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     setFile(f);
     setStep('upload');
-    setShowAllRows(false);
-    const p = await fetchPreview(f);
-    if (p) {
-      setRouteName(filenameBase(f.name));
-      setRouteDate(p.route_date ?? '');
-      setRouteSequence(String(p.route_number ?? '').trim());
-      setStep('preview');
-      if (p.rows.length === 0) {
-        toast.warning('Sin pedidos detectados', 'El Excel no contiene filas de datos válidas. Verifica el formato.');
-      } else {
-        toast.info(`Preview lista · ${p.rows.length} pedidos`, `Ruta N° ${p.route_number} · ${p.transport_company || 'sin empresa'}`);
+    setFormatAutoPicked(false);
+
+    let chosenFormatId = formatId;
+    if (excelFormats.length > 0) {
+      const evalResult = await evaluateFormats(f);
+      if (evalResult?.selected_format_id) {
+        chosenFormatId = evalResult.selected_format_id;
+        setFormatId(chosenFormatId);
+        setFormatAutoPicked(true);
+        toast.info('Plantilla detectada', evalResult.reason);
+      } else if (evalResult?.rankings[0]) {
+        chosenFormatId = evalResult.rankings[0].format_id;
+        setFormatId(chosenFormatId);
+        setFormatAutoPicked(false);
+        toast.warning('Elige la plantilla', evalResult.reason);
       }
-    } else {
-      const err = useRouteImportStore.getState().previewError;
-      if (err) toast.error('Error al leer el Excel', err);
     }
+
+    await runPreview(f, chosenFormatId);
   };
+
+  const handleFormatChange = async (nextId: string) => {
+    setFormatId(nextId);
+    setFormatAutoPicked(false);
+    if (!file || step === 'done') return;
+    await runPreview(file, nextId);
+  };
+
+  const formatSelectOptions = useMemo(() => {
+    if (excelFormats.length === 0) {
+      return [{ value: '', label: 'Detección automática (sin plantillas)' }];
+    }
+    const confById = new Map(
+      (formatEval?.rankings ?? []).map((r) => [r.format_id, r.confidence]),
+    );
+    return excelFormats.map((f) => {
+      const conf = confById.get(f.id);
+      const pct =
+        conf != null ? ` · ${Math.round(conf * 100)}%` : '';
+      const base = f.active ? `${f.name} (predeterminada)` : f.name;
+      return { value: f.id, label: `${base}${pct}` };
+    });
+  }, [excelFormats, formatEval]);
 
   const parsedRouteSequence = parseRouteSequenceInput(routeSequence);
   const duplicateSequenceError =
@@ -253,6 +331,7 @@ function ImportExcelModal({
       driverNameHint: preview?.driver_name_hint || undefined,
       clientId: accountClientId.trim() || undefined,
       routeNumber: parsedRouteSequence,
+      formatId: formatId.trim() || undefined,
     });
     if (!res) {
       const err = useRouteImportStore.getState().confirmError;
@@ -379,6 +458,91 @@ function ImportExcelModal({
   return (
     <Modal open={open} onClose={handleClose} title="Importar desde Excel" size="2xl">
       <div className="space-y-5">
+        {step !== 'done' && (
+          <div className="space-y-2">
+            <Select
+              label="Plantilla de importación"
+              value={formatId}
+              onChange={(e) => void handleFormatChange(e.target.value)}
+              disabled={previewLoading || confirmLoading || evaluateLoading}
+              options={formatSelectOptions}
+              hint={
+                excelFormats.length > 0
+                  ? formatAutoPicked
+                    ? 'Detectada automáticamente (≥80% confianza). Puedes cambiarla si hace falta.'
+                    : formatEval?.needs_manual_choice
+                      ? 'Revisa el ranking y elige la plantilla correcta.'
+                      : 'Elige la plantilla según el formato del Excel.'
+                  : 'No hay plantillas configuradas. Se usará la detección automática del archivo.'
+              }
+            />
+
+            {formatEval && formatEval.rankings.length > 0 ? (
+              <div
+                className={clsx(
+                  'rounded-xl border px-3 py-2.5 space-y-2',
+                  formatEval.needs_manual_choice
+                    ? 'border-amber-200 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/30'
+                    : 'border-emerald-200 bg-emerald-50/70 dark:border-emerald-800 dark:bg-emerald-950/30',
+                )}
+                role="status"
+              >
+                <p
+                  className={clsx(
+                    'text-[11px] leading-snug',
+                    formatEval.needs_manual_choice
+                      ? 'text-amber-900 dark:text-amber-200'
+                      : 'text-emerald-900 dark:text-emerald-200',
+                  )}
+                >
+                  {formatEval.reason}
+                </p>
+                <ul className="space-y-1">
+                  {formatEval.rankings.slice(0, 4).map((r, idx) => {
+                    const active = formatId === r.format_id;
+                    const pct = Math.round(r.confidence * 100);
+                    return (
+                      <li key={r.format_id}>
+                        <button
+                          type="button"
+                          disabled={previewLoading || confirmLoading || evaluateLoading}
+                          onClick={() => void handleFormatChange(r.format_id)}
+                          className={clsx(
+                            'w-full flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left cursor-pointer transition-colors duration-200',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
+                            active
+                              ? 'border-primary-400 bg-primary-50 dark:border-primary-600 dark:bg-primary-950/40'
+                              : 'border-stone-200 bg-white hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-950 dark:hover:bg-stone-800',
+                          )}
+                        >
+                          <span className="text-[10px] font-semibold tabular-nums text-stone-400 w-4 shrink-0">
+                            {idx + 1}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-stone-800 dark:text-stone-100">
+                            {r.format_name}
+                          </span>
+                          <span
+                            className={clsx(
+                              'shrink-0 tabular-nums text-[11px] font-semibold rounded-md px-1.5 py-0.5',
+                              pct >= 80
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200'
+                                : pct >= 50
+                                  ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200'
+                                  : 'bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300',
+                            )}
+                          >
+                            {pct}%
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        )}
+
         {/* Step: upload */}
         {step !== 'done' && (
           <div>
@@ -393,10 +557,11 @@ function ImportExcelModal({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
+              disabled={previewLoading || confirmLoading || evaluateLoading}
               className={clsx(
                 'w-full rounded-xl border-2 border-dashed p-6 flex flex-col items-center gap-2 transition-colors text-center',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-                previewLoading
+                previewLoading || evaluateLoading
                   ? 'opacity-60 cursor-wait border-stone-300 dark:border-stone-700'
                   : file
                     ? 'border-emerald-300 bg-emerald-50/60 dark:border-emerald-700 dark:bg-emerald-950/30'
@@ -408,7 +573,9 @@ function ImportExcelModal({
                 className={file ? 'text-emerald-600 dark:text-emerald-400' : 'text-stone-400'}
                 aria-hidden
               />
-              {previewLoading ? (
+              {evaluateLoading ? (
+                <p className="text-sm text-stone-500">Evaluando plantillas…</p>
+              ) : previewLoading ? (
                 <p className="text-sm text-stone-500">Leyendo archivo…</p>
               ) : file ? (
                 <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300 truncate max-w-xs">
@@ -1361,6 +1528,18 @@ function RouteDetailPlaceholder() {
   );
 }
 
+/** Pedido sin chofer, peoneta ni vehículo asignados. */
+function isOrderUnassigned(o: Order): boolean {
+  return !(
+    (o.driverId && isUuid(o.driverId)) ||
+    Boolean(o.driverName?.trim()) ||
+    (o.peonetaId && isUuid(o.peonetaId)) ||
+    Boolean(o.peonetaName?.trim()) ||
+    (o.vehicleId && isUuid(o.vehicleId)) ||
+    Boolean(o.vehiclePlate?.trim())
+  );
+}
+
 /** Panel lateral: detalle de ruta y gestión de pedidos (estilo container). */
 function RouteDetailSidePanel({
   route,
@@ -1421,6 +1600,9 @@ function RouteDetailSidePanel({
     index: number;
   } | null>(null);
   const [routeDeliveryRecords, setRouteDeliveryRecords] = useState<DbDeliveryRecord[]>([]);
+  type OrderListFilter = 'all' | 'open' | 'terminal' | 'unassigned' | OrderStatus;
+
+  const [orderStatusFilter, setOrderStatusFilter] = useState<OrderListFilter>('all');
 
   const assigned = useMemo(
     () =>
@@ -1429,6 +1611,106 @@ function RouteDetailSidePanel({
         .toSorted((a, b) => a.code.localeCompare(b.code, 'es')),
     [orders, route.id],
   );
+
+  const filteredAssigned = useMemo(() => {
+    if (orderStatusFilter === 'all') return assigned;
+    if (orderStatusFilter === 'unassigned') {
+      return assigned.filter(isOrderUnassigned);
+    }
+    if (orderStatusFilter === 'open') {
+      return assigned.filter((o) => o.status === 'pending' || o.status === 'in_transit');
+    }
+    if (orderStatusFilter === 'terminal') {
+      return assigned.filter((o) => o.status === 'delivered' || o.status === 'rejected');
+    }
+    return assigned.filter((o) => o.status === orderStatusFilter);
+  }, [assigned, orderStatusFilter]);
+
+  const assignedIndexById = useMemo(() => {
+    const map = new Map<string, number>();
+    assigned.forEach((o, i) => map.set(o.id, i));
+    return map;
+  }, [assigned]);
+
+  useEffect(() => {
+    setOrderStatusFilter('all');
+  }, [route.id]);
+
+  const orderFilterChips = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const o of assigned) {
+      counts.set(o.status, (counts.get(o.status) ?? 0) + 1);
+    }
+    const openCount =
+      (counts.get('pending') ?? 0) + (counts.get('in_transit') ?? 0);
+    const terminalCount =
+      (counts.get('delivered') ?? 0) + (counts.get('rejected') ?? 0);
+    const unassignedCount = assigned.filter(isOrderUnassigned).length;
+
+    type Chip = {
+      value: OrderListFilter;
+      label: string;
+      count: number;
+      dotClass?: string;
+      accent?: 'amber' | 'stone' | 'status';
+    };
+
+    const chips: Chip[] = [
+      { value: 'all', label: 'Todos', count: assigned.length, accent: 'stone' },
+    ];
+    if (unassignedCount > 0) {
+      chips.push({
+        value: 'unassigned',
+        label: 'Sin asignar',
+        count: unassignedCount,
+        accent: 'amber',
+        dotClass: 'bg-amber-500',
+      });
+    }
+    if (openCount > 0) {
+      chips.push({
+        value: 'open',
+        label: 'Abiertos',
+        count: openCount,
+        accent: 'stone',
+        dotClass: 'bg-primary-500',
+      });
+    }
+    if (terminalCount > 0) {
+      chips.push({
+        value: 'terminal',
+        label: 'Cerrados',
+        count: terminalCount,
+        accent: 'stone',
+        dotClass: 'bg-stone-400',
+      });
+    }
+    const preferred = ['pending', 'in_transit', 'delivered', 'rejected'];
+    const seen = new Set<string>();
+    for (const slug of preferred) {
+      const n = counts.get(slug);
+      if (!n) continue;
+      seen.add(slug);
+      chips.push({
+        value: slug,
+        label: resolveOrderStatusLabel(slug, tenant),
+        count: n,
+        accent: 'status',
+        dotClass: orderStatusColors(slug).dot,
+      });
+    }
+    for (const [slug, n] of counts) {
+      if (seen.has(slug)) continue;
+      chips.push({
+        value: slug,
+        label: resolveOrderStatusLabel(slug, tenant),
+        count: n,
+        accent: 'status',
+        dotClass: orderStatusColors(slug).dot,
+      });
+    }
+    return chips;
+  }, [assigned, tenant]);
 
   const assignedStatusKey = useMemo(
     () => assigned.map((o) => `${o.id}:${o.status}`).join('|'),
@@ -2358,40 +2640,116 @@ function RouteDetailSidePanel({
           ) : null}
 
           <div
-            className="sticky top-0 z-[1] flex flex-wrap items-center justify-between gap-2 py-2 px-2 -mx-0.5 mb-1 rounded-xl border border-stone-200/80 dark:border-stone-700/80 bg-white/75 dark:bg-stone-900/55 backdrop-blur-sm shadow-sm"
+            className="sticky top-0 z-[1] space-y-2.5 py-2.5 px-2.5 -mx-0.5 mb-1 rounded-xl border border-stone-200 dark:border-stone-700 bg-surface dark:bg-stone-900"
             role="toolbar"
             aria-label="Acciones sobre pedidos de la ruta"
           >
-            <h3 className="text-[10px] font-semibold text-stone-500 dark:text-stone-500 uppercase tracking-wider px-0.5">
-              Pedidos en ruta
-            </h3>
-            {canManage ? (
-              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  icon={<Plus size={14} aria-hidden />}
-                  onClick={openCreateOrder}
-                  disabled={busyId === 'create' || bulkAssignBusy || createOrderOpen}
-                  className={clsx(createOrderOpen && 'ring-2 ring-primary-400/60 ring-offset-1 dark:ring-offset-stone-950')}
-                  aria-pressed={createOrderOpen}
-                >
-                  Nuevo pedido
-                </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0 px-0.5">
+                <h3 className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
+                  Pedidos en ruta
+                </h3>
                 {assigned.length > 0 ? (
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400 tabular-nums mt-0.5">
+                    {orderStatusFilter === 'all' ? (
+                      <>{assigned.length} en total</>
+                    ) : (
+                      <>
+                        <span className="font-medium text-stone-700 dark:text-stone-200">
+                          {filteredAssigned.length}
+                        </span>
+                        <span className="text-stone-400"> / {assigned.length}</span>
+                        {orderStatusFilter !== 'all' ? (
+                          <button
+                            type="button"
+                            onClick={() => setOrderStatusFilter('all')}
+                            className="ml-2 text-primary-700 dark:text-primary-300 hover:underline cursor-pointer transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded"
+                          >
+                            Limpiar filtro
+                          </button>
+                        ) : null}
+                      </>
+                    )}
+                  </p>
+                ) : null}
+              </div>
+              {canManage ? (
+                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                   <Button
                     type="button"
-                    variant={bulkAssignOpen ? 'violet' : 'violet-soft'}
+                    variant="primary"
                     size="sm"
-                    icon={<ListChecks size={14} aria-hidden />}
-                    onClick={() => (bulkAssignOpen ? closeBulkAssign() : openBulkAssign())}
-                    disabled={bulkAssignBusy || orderAssignBusy !== null || busyId === 'create'}
-                    aria-pressed={bulkAssignOpen}
+                    icon={<Plus size={14} aria-hidden />}
+                    onClick={openCreateOrder}
+                    disabled={busyId === 'create' || bulkAssignBusy || createOrderOpen}
+                    className={clsx(createOrderOpen && 'ring-2 ring-primary-400/60 ring-offset-1 dark:ring-offset-stone-950')}
+                    aria-pressed={createOrderOpen}
                   >
-                    {bulkAssignOpen ? 'Listo' : 'Asignación masiva'}
+                    Nuevo pedido
                   </Button>
-                ) : null}
+                  {assigned.length > 0 ? (
+                    <Button
+                      type="button"
+                      variant={bulkAssignOpen ? 'violet' : 'violet-soft'}
+                      size="sm"
+                      icon={<ListChecks size={14} aria-hidden />}
+                      onClick={() => (bulkAssignOpen ? closeBulkAssign() : openBulkAssign())}
+                      disabled={bulkAssignBusy || orderAssignBusy !== null || busyId === 'create'}
+                      aria-pressed={bulkAssignOpen}
+                    >
+                      {bulkAssignOpen ? 'Listo' : 'Asignación masiva'}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            {assigned.length > 0 ? (
+              <div
+                className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-0.5 px-0.5 scrollbar-thin"
+                role="group"
+                aria-label="Filtrar pedidos"
+              >
+                {orderFilterChips.map((chip) => {
+                  const active = orderStatusFilter === chip.value;
+                  return (
+                    <button
+                      key={chip.value}
+                      type="button"
+                      onClick={() => setOrderStatusFilter(chip.value)}
+                      aria-pressed={active}
+                      className={clsx(
+                        'inline-flex items-center gap-1.5 shrink-0 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium cursor-pointer',
+                        'transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
+                        active
+                          ? chip.accent === 'amber'
+                            ? 'border-amber-400 bg-amber-50 text-amber-950 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-100'
+                            : 'border-primary-400 bg-primary-50 text-primary-900 dark:border-primary-600 dark:bg-primary-950/40 dark:text-primary-100'
+                          : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50 hover:border-stone-300 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-stone-800',
+                      )}
+                    >
+                      {chip.dotClass ? (
+                        <span
+                          className={clsx('size-1.5 rounded-full shrink-0', chip.dotClass)}
+                          aria-hidden
+                        />
+                      ) : null}
+                      <span className="whitespace-nowrap">{chip.label}</span>
+                      <span
+                        className={clsx(
+                          'tabular-nums rounded-md px-1 py-px text-[10px] font-semibold',
+                          active
+                            ? chip.accent === 'amber'
+                              ? 'bg-amber-200/80 text-amber-950 dark:bg-amber-900/60 dark:text-amber-100'
+                              : 'bg-primary-200/70 text-primary-900 dark:bg-primary-900/50 dark:text-primary-100'
+                            : 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400',
+                        )}
+                      >
+                        {chip.count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             ) : null}
           </div>
@@ -2478,9 +2836,26 @@ function RouteDetailSidePanel({
               <Package size={24} className="mx-auto text-stone-400 dark:text-stone-600 mb-1.5" aria-hidden />
               <p className="text-xs text-stone-500">Ningún pedido en esta ruta aún.</p>
             </div>
+          ) : filteredAssigned.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-stone-300 bg-stone-100/80 dark:border-stone-700 dark:bg-stone-900/30 py-8 text-center space-y-2">
+              <Filter size={22} className="mx-auto text-stone-400 dark:text-stone-600" aria-hidden />
+              <p className="text-xs text-stone-500">
+                {orderStatusFilter === 'unassigned'
+                  ? 'Ningún pedido sin asignación en esta ruta.'
+                  : 'Ningún pedido con ese estado en esta ruta.'}
+              </p>
+              <button
+                type="button"
+                className="text-[11px] font-medium text-primary-700 dark:text-primary-300 hover:underline cursor-pointer"
+                onClick={() => setOrderStatusFilter('all')}
+              >
+                Ver todos ({assigned.length})
+              </button>
+            </div>
           ) : (
             <ul className="space-y-2">
-              {assigned.map((o, orderIndex) => {
+              {filteredAssigned.map((o) => {
+                const orderIndex = assignedIndexById.get(o.id) ?? 0;
                 const destinatario = o.clientName?.trim() || 'Por confirmar';
                 const originParts = orderAddressParts(o.origin);
                 const destParts = orderAddressParts(o.destination);

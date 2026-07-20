@@ -135,6 +135,8 @@ export const superAdminService = {
       route_number_col?: number;
       data_start_row?: number;
     };
+    valuation_module_enabled?: boolean;
+    orders_map_module_enabled?: boolean;
   }) {
     return api.patch(`/super-admin/tenants/${tenantId}/features`, patch);
   },

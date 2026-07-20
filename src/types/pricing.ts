@@ -70,8 +70,17 @@ export interface ValuationLedgerItem {
   orderCode: string;
   orderStatus: string;
   bultos: number;
+  /** Destino / nombre en el pedido (puede diferir del mandante). */
   clientId: string;
   clientName: string;
+  /** Cliente mandante de la ruta (dueño del flujo de cobro). */
+  billingClientId: string | null;
+  billingClientName: string | null;
+  /** assignment = flujo del cliente; pricing_profile = fallback tenant. */
+  billingSource: 'assignment' | 'pricing_profile' | 'template';
+  flowName: string | null;
+  /** Cobro total de la ruta según el flujo (antes de repartir a pedidos). */
+  routeClientCharge: number;
   routeId: string;
   routeCode: string;
   routeName: string;

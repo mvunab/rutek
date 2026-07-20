@@ -29,6 +29,7 @@ export interface DbTenant {
   region: string | null;
   logo: string | null;
   custom_order_statuses?: Json;
+  feature_flags?: Json;
   created_at: string;
   updated_at: string;
 }

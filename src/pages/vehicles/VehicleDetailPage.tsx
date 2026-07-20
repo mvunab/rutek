@@ -42,18 +42,23 @@ function StatCard({
   label,
   value,
   icon,
+  accent,
 }: {
   label: string;
   value: ReactNode;
   icon: ReactNode;
+  accent: string;
 }) {
   return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-4 shadow-sm">
-      <div className="flex items-center gap-2 mb-2 text-stone-500 dark:text-stone-400">
+    <div className="relative overflow-hidden rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-4 shadow-sm">
+      <div className={clsx('absolute inset-y-0 left-0 w-1', accent)} aria-hidden />
+      <div className="flex items-center gap-2 mb-2 text-stone-600 dark:text-stone-400 pl-1.5">
         {icon}
-        <p className="text-xs">{label}</p>
+        <p className="text-xs font-medium">{label}</p>
       </div>
-      <p className="text-2xl font-semibold text-stone-900 dark:text-stone-100 tabular-nums">{value}</p>
+      <p className="text-2xl font-semibold text-stone-900 dark:text-stone-100 tabular-nums pl-1.5">
+        {value}
+      </p>
     </div>
   );
 }
@@ -61,7 +66,7 @@ function StatCard({
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between py-3 border-b border-stone-100 dark:border-stone-800 last:border-0">
-      <dt className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
+      <dt className="text-xs font-medium uppercase tracking-wide text-stone-600 dark:text-stone-400">
         {label}
       </dt>
       <dd className="text-sm text-stone-900 dark:text-stone-100 min-w-0">{children}</dd>
@@ -195,10 +200,17 @@ export function VehicleDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
-        <p className="text-sm text-stone-500" role="status" aria-live="polite">
-          Cargando ficha del vehículo…
-        </p>
+      <div className="p-6 max-w-6xl mx-auto space-y-4" role="status" aria-live="polite">
+        <p className="text-sm text-stone-600 dark:text-stone-400">Cargando ficha del vehículo…</p>
+        <div className="h-28 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-100/80 dark:bg-stone-900 animate-pulse" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-20 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-100/80 dark:bg-stone-900 animate-pulse"
+            />
+          ))}
+        </div>
       </div>
     );
   }
@@ -219,11 +231,16 @@ export function VehicleDetailPage() {
           className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-6"
           role="alert"
         >
-          <p className="text-sm text-red-800 dark:text-red-200">{error ?? 'Vehículo no encontrado.'}</p>
+          <p className="text-sm text-red-800 dark:text-red-200 flex items-center gap-2">
+            <AlertTriangle size={16} aria-hidden className="shrink-0" />
+            {error ?? 'Vehículo no encontrado.'}
+          </p>
         </div>
       </div>
     );
   }
+
+  const alertCount = complianceSummary?.alertCount ?? 0;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -269,7 +286,7 @@ export function VehicleDetailPage() {
               <Truck size={28} className="text-primary-600 dark:text-primary-400" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400 mb-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-stone-600 dark:text-stone-400 mb-1">
                 Patente
               </p>
               <h1
@@ -278,11 +295,11 @@ export function VehicleDetailPage() {
               >
                 {vehicle.plate}
               </h1>
-              <p className="text-base text-stone-600 dark:text-stone-300 mt-1">
+              <p className="text-base text-stone-700 dark:text-stone-300 mt-1">
                 {vehicle.brand} {vehicle.model}{' '}
-                <span className="tabular-nums text-stone-500 dark:text-stone-400">{vehicle.year}</span>
+                <span className="tabular-nums text-stone-600 dark:text-stone-400">{vehicle.year}</span>
               </p>
-              <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
+              <p className="text-sm text-stone-600 dark:text-stone-400 mt-0.5">
                 {VEHICLE_TYPE_LABELS[vehicle.type]}
               </p>
             </div>
@@ -291,19 +308,27 @@ export function VehicleDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={clsx(
-                'inline-flex px-3 py-1.5 rounded-full text-xs font-medium border',
+                'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border',
                 vehicle.available
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                  : 'bg-stone-100 text-stone-600 border-stone-200 dark:bg-stone-800 dark:text-stone-400 dark:border-stone-700',
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800'
+                  : 'bg-stone-100 text-stone-700 border-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700',
               )}
             >
+              <span
+                className={clsx(
+                  'size-2 rounded-full shrink-0',
+                  vehicle.available
+                    ? 'bg-emerald-500 motion-safe:animate-pulse'
+                    : 'bg-stone-400',
+                )}
+                aria-hidden
+              />
               {vehicle.available ? 'Activo' : 'Inactivo'}
             </span>
-            {(complianceSummary?.alertCount ?? 0) > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-200">
+            {alertCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-100 text-amber-950 border border-amber-200 dark:bg-amber-900/50 dark:text-amber-100 dark:border-amber-800">
                 <AlertTriangle size={14} aria-hidden />
-                {complianceSummary!.alertCount}{' '}
-                {complianceSummary!.alertCount === 1 ? 'alerta' : 'alertas'}
+                {alertCount} {alertCount === 1 ? 'alerta' : 'alertas'}
               </span>
             )}
           </div>
@@ -314,22 +339,32 @@ export function VehicleDetailPage() {
         <StatCard
           label="Rutas asignadas"
           value={routeCount}
-          icon={<MapPin size={16} className="text-blue-600 dark:text-blue-400" aria-hidden />}
+          accent="bg-primary-500"
+          icon={<MapPin size={16} className="text-primary-600 dark:text-primary-400" aria-hidden />}
         />
         <StatCard
           label="Pedidos con este vehículo"
           value={orderCount}
-          icon={<Package size={16} className="text-amber-600 dark:text-amber-400" aria-hidden />}
+          accent="bg-amber-500"
+          icon={<Package size={16} className="text-amber-700 dark:text-amber-400" aria-hidden />}
         />
         <StatCard
           label="Capacidad"
           value={formatVehicleCapacity(vehicle.capacity)}
+          accent="bg-violet-500"
           icon={<Gauge size={16} className="text-violet-600 dark:text-violet-400" aria-hidden />}
         />
         <StatCard
           label="Alertas documentación"
-          value={complianceSummary?.alertCount ?? 0}
-          icon={<AlertTriangle size={16} className="text-red-600 dark:text-red-400" aria-hidden />}
+          value={alertCount}
+          accent={alertCount > 0 ? 'bg-red-500' : 'bg-stone-300 dark:bg-stone-600'}
+          icon={
+            <AlertTriangle
+              size={16}
+              className={alertCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-stone-500'}
+              aria-hidden
+            />
+          }
         />
       </div>
 
@@ -365,7 +400,7 @@ export function VehicleDetailPage() {
             <Hash size={16} className="text-stone-400" aria-hidden />
             <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">Resumen operativo</h2>
           </div>
-          <div className="p-5 space-y-3 text-sm text-stone-600 dark:text-stone-300">
+          <div className="p-5 space-y-3 text-sm text-stone-700 dark:text-stone-300">
             <p>
               Este vehículo aparece en{' '}
               <strong className="text-stone-900 dark:text-stone-100 tabular-nums">{routeCount}</strong>{' '}
@@ -373,7 +408,7 @@ export function VehicleDetailPage() {
               <strong className="text-stone-900 dark:text-stone-100 tabular-nums">{orderCount}</strong>{' '}
               {orderCount === 1 ? 'pedido' : 'pedidos'}.
             </p>
-            <p className="text-xs text-stone-500 dark:text-stone-400">
+            <p className="text-xs text-stone-600 dark:text-stone-400">
               Los contadores incluyen asignaciones a nivel de ruta y de pedido individual.
             </p>
           </div>
@@ -385,8 +420,8 @@ export function VehicleDetailPage() {
           <h2 id="vehicle-compliance-heading" className="text-sm font-semibold text-stone-900 dark:text-stone-100">
             Documentación y vencimientos
           </h2>
-          <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-            Mantención, permiso de circulación y revisión técnica. Puedes adjuntar foto o PDF en cada tarjeta (almacenado en MinIO).
+          <p className="text-xs text-stone-600 dark:text-stone-400 mt-0.5">
+            Mantención, permiso de circulación y revisión técnica. Puedes adjuntar foto o PDF en cada tarjeta.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -420,29 +455,38 @@ export function VehicleDetailPage() {
           <div className="px-5 py-4 border-b border-stone-100 dark:border-stone-800 flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">Rutas recientes</h2>
             {routeCount > RECENT_LIMIT && (
-              <span className="text-xs text-stone-500 tabular-nums">Mostrando {RECENT_LIMIT} de {routeCount}</span>
+              <span className="text-xs text-stone-500 tabular-nums">
+                Mostrando {RECENT_LIMIT} de {routeCount}
+              </span>
             )}
           </div>
           {relatedRoutes.length === 0 ? (
-            <p className="px-5 py-8 text-sm text-stone-500 dark:text-stone-400 text-center">
+            <p className="px-5 py-8 text-sm text-stone-600 dark:text-stone-400 text-center">
               Sin rutas asignadas a este vehículo.
             </p>
           ) : (
             <ul className="divide-y divide-stone-100 dark:divide-stone-800">
               {relatedRoutes.map((route) => (
                 <li key={route.id}>
-                  <div className="flex items-center justify-between gap-3 px-5 py-3.5">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/rutas')}
+                    className="w-full text-left flex items-center justify-between gap-3 px-5 py-3.5 cursor-pointer transition-colors duration-200 hover:bg-stone-50 dark:hover:bg-stone-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500/40"
+                  >
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-stone-900 dark:text-stone-100 truncate" translate="no">
+                      <p
+                        className="text-sm font-medium text-stone-900 dark:text-stone-100 truncate"
+                        translate="no"
+                      >
                         {formatRouteDisplayTitle(route)}
                       </p>
-                      <p className="text-xs text-stone-500 dark:text-stone-400 truncate tabular-nums">
+                      <p className="text-xs text-stone-600 dark:text-stone-400 truncate tabular-nums">
                         N° {formatRouteDisplayLabel(route)} · {formatVehicleDate(route.createdAt)} ·{' '}
                         {routeStatusLabel(route.status)}
                       </p>
                     </div>
                     <RouteStatusBadge status={route.status} />
-                  </div>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -453,26 +497,37 @@ export function VehicleDetailPage() {
           <div className="px-5 py-4 border-b border-stone-100 dark:border-stone-800 flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">Pedidos recientes</h2>
             {orderCount > RECENT_LIMIT && (
-              <span className="text-xs text-stone-500 tabular-nums">Mostrando {RECENT_LIMIT} de {orderCount}</span>
+              <span className="text-xs text-stone-500 tabular-nums">
+                Mostrando {RECENT_LIMIT} de {orderCount}
+              </span>
             )}
           </div>
           {relatedOrders.length === 0 ? (
-            <p className="px-5 py-8 text-sm text-stone-500 dark:text-stone-400 text-center">
+            <p className="px-5 py-8 text-sm text-stone-600 dark:text-stone-400 text-center">
               Sin pedidos asignados a este vehículo.
             </p>
           ) : (
             <ul className="divide-y divide-stone-100 dark:divide-stone-800">
               {relatedOrders.map((order) => (
-                <li key={order.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-stone-900 dark:text-stone-100 truncate" translate="no">
-                      {order.code}
-                    </p>
-                    <p className="text-xs text-stone-500 dark:text-stone-400 truncate">
-                      {order.clientName} · {order.destination?.city || '—'}
-                    </p>
-                  </div>
-                  <OrderStatusBadge status={order.status} />
+                <li key={order.id}>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/rutas')}
+                    className="w-full text-left flex items-center justify-between gap-3 px-5 py-3.5 cursor-pointer transition-colors duration-200 hover:bg-stone-50 dark:hover:bg-stone-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500/40"
+                  >
+                    <div className="min-w-0">
+                      <p
+                        className="text-sm font-medium text-stone-900 dark:text-stone-100 truncate"
+                        translate="no"
+                      >
+                        {order.code}
+                      </p>
+                      <p className="text-xs text-stone-600 dark:text-stone-400 truncate">
+                        {order.clientName} · {order.destination?.city || '—'}
+                      </p>
+                    </div>
+                    <OrderStatusBadge status={order.status} />
+                  </button>
                 </li>
               ))}
             </ul>

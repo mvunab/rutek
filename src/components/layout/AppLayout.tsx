@@ -6,6 +6,7 @@ import { AppSidebar } from './AppSidebar';
 import { NavbarTour } from '../onboarding/NavbarTour';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Activity } from 'lucide-react';
+import { TenantRealtimeSync } from '../system/TenantRealtimeSync';
 
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   '/dashboard':     { title: 'Dashboard',         subtitle: 'Resumen operacional en tiempo real' },
@@ -20,14 +21,16 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   },
   '/usuarios':      { title: 'Usuarios Sistema', subtitle: 'Administradores, operadores, repartidores, peonetas y clientes de la plataforma' },
   '/fotos':         { title: 'Admin. Fotos',      subtitle: 'Fotografías de inspección y entrega desde la app móvil' },
-  '/valorizacion':  { title: 'Valorización',      subtitle: 'Cobro a clientes y pago a choferes y peonetas por pedido' },
+  '/mapa-pedidos': { title: 'Mapa de pedidos',   subtitle: 'Ubicaciones de entrega con filtros y resumen por estado' },
+  '/valorizacion':  { title: 'Valorización',      subtitle: 'Plantillas por cliente, cobros y pagos por pedido' },
+  '/valorizacion/flujos': { title: 'Flujos de cobro', subtitle: 'Plantillas y negociación de tarifas por cliente' },
   '/configuracion': { title: 'Configuración',     subtitle: 'Tema, app móvil y datos de la empresa' },
   '/vehiculos':     { title: 'Vehículos',         subtitle: 'Flota, VIN, mantención y vencimientos de documentación con alertas' },
   '/mis-rutas':     { title: 'Mis Rutas',          subtitle: 'Pedidos que tienes asignados en las rutas de hoy' },
 };
 
 export function AppLayout() {
-  const { user, isAuthenticated, isSuperAdmin, loading, restoreSession } = useAuthStore();
+  const { user, tenant, isAuthenticated, isSuperAdmin, loading, restoreSession } = useAuthStore();
   const location = useLocation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
@@ -78,6 +81,7 @@ export function AppLayout() {
   const inSuperAdmin = isSuperAdmin || location.pathname.startsWith('/super-admin');
   const vehicleDetailMatch = /^\/vehiculos\/[^/]+$/.test(location.pathname);
   const clientDetailMatch = /^\/clientes\/[^/]+$/.test(location.pathname);
+  const billingFlowsMatch = location.pathname.startsWith('/valorizacion/flujos');
   const pageInfo = vehicleDetailMatch
     ? {
         title: 'Ficha de vehículo',
@@ -88,7 +92,9 @@ export function AppLayout() {
           title: 'Ficha de cliente',
           subtitle: 'Actividad comercial, oportunidades e historial de pedidos',
         }
-      : pageTitles[location.pathname] ?? { title: 'Rutek' };
+      : billingFlowsMatch
+        ? pageTitles['/valorizacion/flujos']
+        : pageTitles[location.pathname] ?? { title: 'Rutek' };
   /** Rutas usa layout de altura fija: scroll solo en listado y panel de detalle. */
   const isRoutesPage = location.pathname === '/rutas';
 
@@ -113,10 +119,13 @@ export function AppLayout() {
           userId={user.id}
           role={user.role}
           isSuperAdmin={isSuperAdmin}
+          tenant={tenant}
           onPrepareSidebar={prepareSidebarForTour}
           onTourEnd={handleTourEnd}
         />
       )}
+
+      {!isSuperAdmin && <TenantRealtimeSync />}
 
       {/* Content column */}
       <div className="flex flex-col flex-1 min-w-0 min-h-0">

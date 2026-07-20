@@ -10,13 +10,14 @@ import {
   markNavTourCompleted,
   type NavTourStep,
 } from '../../lib/navTour';
-import type { UserRole } from '../../types';
+import type { Tenant, UserRole } from '../../types';
 import { useNavTourStore } from '../../store/useNavTourStore';
 
 interface NavbarTourProps {
   userId: string;
   role: UserRole;
   isSuperAdmin: boolean;
+  tenant?: Tenant | null;
   onPrepareSidebar: () => void;
   onTourEnd?: () => void;
 }
@@ -89,6 +90,7 @@ export function NavbarTour({
   userId,
   role,
   isSuperAdmin,
+  tenant = null,
   onPrepareSidebar,
   onTourEnd,
 }: NavbarTourProps) {
@@ -144,23 +146,23 @@ export function NavbarTour({
   const startNonce = useNavTourStore((s) => s.startNonce);
 
   const beginTour = useCallback(() => {
-    const tourSteps = getNavTourSteps(role, isSuperAdmin);
+    const tourSteps = getNavTourSteps(role, isSuperAdmin, tenant);
     if (tourSteps.length <= 1) return;
     onPrepareSidebar();
     setSteps(tourSteps);
     setStepIndex(0);
     setActive(true);
-  }, [role, isSuperAdmin, onPrepareSidebar]);
+  }, [role, isSuperAdmin, tenant, onPrepareSidebar]);
 
   useEffect(() => {
     if (isNavTourCompleted(userId)) return;
 
-    const tourSteps = getNavTourSteps(role, isSuperAdmin);
+    const tourSteps = getNavTourSteps(role, isSuperAdmin, tenant);
     if (tourSteps.length <= 1) return;
 
     const timer = window.setTimeout(beginTour, START_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [userId, role, isSuperAdmin, beginTour]);
+  }, [userId, role, isSuperAdmin, tenant, beginTour]);
 
   useEffect(() => {
     if (startNonce === 0) return;

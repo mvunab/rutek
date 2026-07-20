@@ -4,7 +4,8 @@ import { clsx } from 'clsx';
 import { Button } from '../ui/Button';
 import { api, ApiError } from '../../lib/api';
 import { formatCLP, normalizeRouteValuation } from '../../lib/pricingProfile';
-import { VALUATION_MODULE_ENABLED } from '../../lib/valuationModule';
+import { isValuationModuleEnabled } from '../../lib/valuationModule';
+import { useAuthStore } from '../../store/useAuthStore';
 import type { RouteValuation } from '../../types/pricing';
 
 export function RouteValuationPanel({
@@ -17,13 +18,15 @@ export function RouteValuationPanel({
   /** Incrementar para recargar tras cambios en pedidos. */
   refreshKey?: number;
 }) {
+  const tenant = useAuthStore((s) => s.tenant);
+  const valuationEnabled = isValuationModuleEnabled(tenant);
   const [valuation, setValuation] = useState<RouteValuation | null>(null);
   const [loading, setLoading] = useState(true);
   const [computing, setComputing] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    if (!VALUATION_MODULE_ENABLED) return;
+    if (!valuationEnabled) return;
     setLoading(true);
     setError('');
     try {
@@ -40,17 +43,17 @@ export function RouteValuationPanel({
     } finally {
       setLoading(false);
     }
-  }, [routeId]);
+  }, [routeId, valuationEnabled]);
 
   useEffect(() => {
-    if (!VALUATION_MODULE_ENABLED) {
+    if (!valuationEnabled) {
       setLoading(false);
       return;
     }
     void load();
-  }, [load, refreshKey]);
+  }, [load, refreshKey, valuationEnabled]);
 
-  if (!VALUATION_MODULE_ENABLED) return null;
+  if (!valuationEnabled) return null;
 
   const handleCompute = async () => {
     setComputing(true);
@@ -82,7 +85,7 @@ export function RouteValuationPanel({
     }
     return (
       <p className="text-xs text-stone-500 dark:text-stone-400">
-        Valorización desactivada. Actívala en Configuración → Valorización de rutas.
+        Valorización desactivada. Actívala en Valorización → Tarifas del tenant.
       </p>
     );
   }

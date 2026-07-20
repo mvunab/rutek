@@ -80,6 +80,11 @@ function mapTenantFromDb(raw: DbTenant): Tenant {
     ...(customOrderStatuses?.length
       ? { customOrderStatuses }
       : {}),
+    ...(raw.feature_flags &&
+    typeof raw.feature_flags === 'object' &&
+    !Array.isArray(raw.feature_flags)
+      ? { featureFlags: raw.feature_flags as Record<string, unknown> }
+      : {}),
   };
 }
 

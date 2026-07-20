@@ -12,6 +12,8 @@ import type { UserRole } from '../../types';
 import { useToastStore } from '../../store/useToastStore';
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { NAV_TOUR_TARGET_ATTR } from '../../lib/navTour';
+import { isValuationModuleEnabled } from '../../lib/valuationModule';
+import { isOrdersMapModuleEnabled } from '../../lib/ordersMapModule';
 
 interface NavItem {
   to: string;
@@ -29,6 +31,7 @@ const tenantNavItems: NavItem[] = [
   { to: '/vehiculos',  icon: <Car size={18} />,             label: 'Vehículos',        roles: ['admin', 'operator'] },
   { to: '/usuarios',   icon: <UserCircle2 size={18} />,     label: 'Usuarios Sistema', roles: ['admin'] },
   { to: '/fotos',      icon: <Images size={18} />,          label: 'Fotos de Ruta',    roles: ['admin', 'operator'] },
+  { to: '/mapa-pedidos', icon: <Map size={18} />,         label: 'Mapa pedidos',     roles: ['admin', 'operator', 'driver'] },
   { to: '/valorizacion', icon: <Calculator size={18} />,    label: 'Valorización',     roles: ['admin', 'operator'] },
   { to: '/mis-rutas',  icon: <Truck size={18} />,           label: 'Mis Rutas',         roles: ['peoneta'] },
 ];
@@ -94,8 +97,17 @@ export function AppSidebar({ mobileOpen, onMobileClose, tourForceExpanded = fals
   const filteredItems = useMemo(() => {
     if (!user) return [];
     const items = inSuperAdmin ? superAdminNavItems : tenantNavItems;
-    return items.filter(item => item.roles.includes(user.role));
-  }, [user, inSuperAdmin]);
+    return items.filter((item) => {
+      if (!item.roles.includes(user.role)) return false;
+      if (item.to === '/valorizacion' && !isValuationModuleEnabled(tenant)) {
+        return false;
+      }
+      if (item.to === '/mapa-pedidos' && !isOrdersMapModuleEnabled(tenant)) {
+        return false;
+      }
+      return true;
+    });
+  }, [user, inSuperAdmin, tenant]);
 
   const handleLogout = () => {
     logout();

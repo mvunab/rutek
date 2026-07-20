@@ -3,7 +3,6 @@ import {
   Building2, Moon, Sun, Monitor, Check, Key, Eye, EyeOff, Tags, Plus, Trash2,
   FileSpreadsheet, Zap, Upload, X, AlertCircle, Activity, Map, Smartphone, Download,
 } from 'lucide-react';
-import { PricingProfileSection } from '../../components/pricing/PricingProfileSection';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input, Select } from '../../components/ui/Input';
@@ -679,7 +678,6 @@ export function SettingsPage() {
 
       {canEditTenant && (
         <>
-          <PricingProfileSection />
           <ExcelFormatsSection />
         </>
       )}
@@ -880,7 +878,7 @@ function ExcelFormatsSection() {
             Formatos de importación Excel
           </h2>
           <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
-            Define plantillas personalizadas para importar rutas desde Excel. El formato activo se aplica automáticamente al importar.
+            Define plantillas personalizadas para importar rutas desde Excel. Al importar puedes elegir cuál usar; la marcada como activa es la predeterminada.
           </p>
         </div>
         <Button
@@ -1274,7 +1272,7 @@ function ExcelFormatsSection() {
                 5. Regla de detección automática <span className="normal-case font-normal text-stone-400">(opcional)</span>
               </p>
               <p className="text-xs text-stone-400 dark:text-stone-500 mb-3">
-                Si se define, Rutek identificará este formato cuando la celda indicada contenga el valor exacto. Si no, se usará el formato activo siempre.
+                Si se define, Rutek puede identificar este formato cuando la celda indicada contenga el valor exacto. Al importar, de todos modos puedes elegir la plantilla manualmente.
               </p>
               <div className="flex flex-wrap gap-3 items-end">
                 <Input

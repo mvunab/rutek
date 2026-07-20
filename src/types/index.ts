@@ -48,6 +48,8 @@ export interface Tenant {
   region?: string;
   /** Estados de pedido extra definidos por el admin del tenant (`slug` → `label`). */
   customOrderStatuses?: { slug: string; label: string }[];
+  /** Feature flags del tenant (módulos opcionales). */
+  featureFlags?: Record<string, unknown>;
 }
 
 // ─── Auth / Users ─────────────────────────────────────────────────────────────

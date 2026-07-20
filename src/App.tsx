@@ -55,6 +55,16 @@ const ValuationsPage = lazy(() =>
     default: m.ValuationsPage,
   })),
 );
+const OrdersMapPage = lazy(() =>
+  import('./pages/orders/OrdersMapPage').then((m) => ({
+    default: m.OrdersMapPage,
+  })),
+);
+const BillingFlowsPage = lazy(() =>
+  import('./pages/billing/BillingFlowsPage').then((m) => ({
+    default: m.BillingFlowsPage,
+  })),
+);
 const SuperAdminDashboard = lazy(() =>
   import('./pages/super-admin/SuperAdminDashboard').then((m) => ({
     default: m.SuperAdminDashboard,
@@ -241,6 +251,38 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <ValuationsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="mapa-pedidos"
+                element={
+                  <ProtectedRoute>
+                    <OrdersMapPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="valorizacion/flujos"
+                element={
+                  <ProtectedRoute>
+                    <BillingFlowsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="valorizacion/flujos/nuevo"
+                element={
+                  <ProtectedRoute>
+                    <BillingFlowsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="valorizacion/flujos/:templateId"
+                element={
+                  <ProtectedRoute>
+                    <BillingFlowsPage />
                   </ProtectedRoute>
                 }
               />

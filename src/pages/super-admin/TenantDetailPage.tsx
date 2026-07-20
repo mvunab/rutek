@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Shield, Trash2, X, CheckCircle2, AlertCircle, Package, Truck, Users, Building2, Key, Pencil, FileSpreadsheet, Settings2 } from 'lucide-react';
+import { ArrowLeft, Plus, Shield, Trash2, X, CheckCircle2, AlertCircle, Package, Truck, Users, Building2, Key, Pencil, FileSpreadsheet, Settings2, Calculator, MapPin } from 'lucide-react';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { ApiError } from '../../lib/api';
 import { Button } from '../../components/ui/Button';
@@ -192,6 +192,8 @@ export function TenantDetailPage() {
   const stats = (selectedTenant as any)?.stats;
   const featureFlags: Record<string, unknown> = (selectedTenant as any)?.feature_flags ?? {};
   const excelEnabled = featureFlags['excel_import_enabled'] !== false; // default true
+  const valuationEnabled = featureFlags['valuation_module_enabled'] === true;
+  const ordersMapEnabled = featureFlags['orders_map_module_enabled'] === true;
   const excelConfig = (featureFlags['excel_import_config'] as Record<string, number> | undefined) ?? {};
 
   const handleToggleFeature = async (flag: string, value: boolean) => {
@@ -304,12 +306,22 @@ export function TenantDetailPage() {
 
           {/* ── Feature Flags ── */}
           <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2.5 px-5 py-4 border-b border-stone-100 dark:border-stone-800">
-              <Settings2 size={16} className="text-violet-500" aria-hidden />
-              <h2 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Features y configuración</h2>
-              {featuresSaving && (
-                <span className="ml-auto text-[11px] text-stone-400 animate-pulse">Guardando…</span>
-              )}
+            <div className="px-5 py-4 border-b border-stone-100 dark:border-stone-800">
+              <div className="flex items-center gap-2.5">
+                <Settings2 size={16} className="text-violet-500 shrink-0" aria-hidden />
+                <h2 className="text-sm font-semibold text-stone-800 dark:text-stone-100">
+                  Módulos y configuración del tenant
+                </h2>
+                {featuresSaving && (
+                  <span className="ml-auto text-[11px] text-stone-400 animate-pulse">
+                    Guardando…
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-1.5 pl-[26px]">
+                Activa o desactiva módulos opcionales (valorización, mapa de pedidos, Excel). Los
+                usuarios del tenant deben volver a iniciar sesión para ver el cambio en el menú.
+              </p>
             </div>
 
             {featuresError && (
@@ -392,6 +404,95 @@ export function TenantDetailPage() {
                       </p>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Valorización / flujos de cobro */}
+              <div className="flex items-start gap-4 px-5 py-4">
+                <div className="flex items-center justify-center size-9 rounded-lg bg-violet-50 dark:bg-violet-950/30 shrink-0 mt-0.5">
+                  <Calculator size={17} className="text-violet-600 dark:text-violet-400" aria-hidden />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-stone-800 dark:text-stone-100">
+                        Módulo de valorización
+                      </p>
+                      <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                        Activa cobros por cliente, flujos de tarifa y el libro de valorización en el tenant.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={valuationEnabled}
+                      aria-label="Habilitar módulo de valorización"
+                      disabled={featuresSaving}
+                      onClick={() =>
+                        void handleToggleFeature(
+                          'valuation_module_enabled',
+                          !valuationEnabled,
+                        )
+                      }
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
+                        valuationEnabled
+                          ? 'bg-violet-500 dark:bg-violet-600'
+                          : 'bg-stone-200 dark:bg-stone-700'
+                      } disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block size-5 rounded-full bg-white shadow-md transition-transform ${
+                          valuationEnabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mapa de pedidos */}
+              <div className="flex items-start gap-4 px-5 py-4 border-t border-stone-100 dark:border-stone-800">
+                <div className="flex items-center justify-center size-9 rounded-lg bg-sky-50 dark:bg-sky-950/30 shrink-0 mt-0.5">
+                  <MapPin size={17} className="text-sky-600 dark:text-sky-400" aria-hidden />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-stone-800 dark:text-stone-100">
+                        Mapa de pedidos
+                      </p>
+                      <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                        Muestra pedidos en un mapa con filtros por estado y un resumen rápido.
+                        Requiere coordenadas de destino en los pedidos.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={ordersMapEnabled}
+                      aria-label="Habilitar mapa de pedidos"
+                      disabled={featuresSaving}
+                      onClick={() =>
+                        void handleToggleFeature(
+                          'orders_map_module_enabled',
+                          !ordersMapEnabled,
+                        )
+                      }
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
+                        ordersMapEnabled
+                          ? 'bg-sky-500 dark:bg-sky-600'
+                          : 'bg-stone-200 dark:bg-stone-700'
+                      } disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block size-5 rounded-full bg-white shadow-md transition-transform ${
+                          ordersMapEnabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
