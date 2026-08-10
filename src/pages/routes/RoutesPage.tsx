@@ -3,7 +3,7 @@ import {
   Plus, Search, ChevronUp, ChevronDown,
   Download, RefreshCw, SlidersHorizontal, Package, UserCircle, Route as RouteIcon, Truck,
   Pencil, Trash2, X, Copy, MapPin, Box, ArrowLeft, ArrowRight, Check, FileSpreadsheet, Unlink,
-  CheckCircle2, XCircle, AlertCircle, AlertTriangle, Eye, LayoutGrid, LayoutList, Share2,
+  CheckCircle2, XCircle, AlertTriangle, LayoutGrid, LayoutList, Share2,
   CheckSquare, Square, ListChecks, Maximize2, Minimize2, Filter,
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -24,10 +24,7 @@ import { useUserStore } from '../../store/useUserStore';
 import { useVehicleStore } from '../../store/useVehicleStore';
 import { OrderForm, type OrderFormData } from '../../components/orders/OrderForm';
 import { OrderDetailModal } from '../../components/orders/OrderDetailModal';
-import { useRouteImportStore } from '../../store/useRouteImportStore';
 import { toast } from '../../store/useToastStore';
-import { normalizeExcelFormatsList } from '../../lib/excelFormat';
-import type { ExcelFormatConfig } from '../../types';
 import { formatAddressLabel, resolveDefaultPickupAddress } from '../../lib/orderAddress';
 import { downloadRoutesExportXlsx, describeRoutesExportFilters, describeRoutesExportRange, routesExportCutoff, type RoutesDateRangeFilter } from '../../lib/routesExport';
 import {
@@ -42,7 +39,7 @@ import {
 import { resolveOrderStatusLabel } from '../../lib/orderStatusLabels';
 import { orderStatusColors } from '../../lib/statusColors';
 import { resolveAssignee, resolveVehicle, buildPartialTeamAssignPayload } from '../../lib/teamAssignment';
-import { applyRangeRules, indicesCoveredByRules, type RangeAssignRule } from '../../lib/rangeAssignRules';
+import { indicesCoveredByRules, type RangeAssignRule } from '../../lib/rangeAssignRules';
 import { RangeAssignRulesPanel } from '../../components/routes/RangeAssignRulesPanel';
 import { ImportExcelModal } from '../../modules/operations/route-import/ImportExcelModal';
 import { isUuid } from '../../lib/uuid';
@@ -851,12 +848,21 @@ function RouteDetailSidePanel({
     plate: string;
     otherCodes: string[];
     bulk?: boolean;
+    /** Asignación masiva por casillas (no por rangos). */
+    bulkSelect?: boolean;
   } | null>(null);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [bulkAssignRules, setBulkAssignRules] = useState<RangeAssignRule[]>([]);
   const [bulkDraftCity, setBulkDraftCity] = useState('');
   const [bulkDraftRegion, setBulkDraftRegion] = useState('');
   const [bulkAssignBusy, setBulkAssignBusy] = useState(false);
+  /** Selección manual de pedidos (checkboxes) para asignar equipo. */
+  const [orderSelectMode, setOrderSelectMode] = useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(() => new Set());
+  const [selectDraftDriver, setSelectDraftDriver] = useState('');
+  const [selectDraftPeoneta, setSelectDraftPeoneta] = useState('');
+  const [selectDraftVehicle, setSelectDraftVehicle] = useState('');
+  const [selectAssignBusy, setSelectAssignBusy] = useState(false);
   const [inspectionLightbox, setInspectionLightbox] = useState<{
     photos: RoutePhoto[];
     index: number;
@@ -896,6 +902,11 @@ function RouteDetailSidePanel({
 
   useEffect(() => {
     setOrderStatusFilter('all');
+    setOrderSelectMode(false);
+    setSelectedOrderIds(new Set());
+    setSelectDraftDriver('');
+    setSelectDraftPeoneta('');
+    setSelectDraftVehicle('');
   }, [route.id]);
 
   const orderFilterChips = useMemo(() => {
@@ -1173,6 +1184,7 @@ function RouteDetailSidePanel({
 
   const handleOpenOrderAssign = (o: Order) => {
     if (bulkAssignOpen) closeBulkAssign();
+    if (orderSelectMode) closeOrderSelectMode();
     setEditingOrderId(null);
     setExpandedOrderId(o.id);
     const draftDriver = o.driverId && isUuid(o.driverId) ? o.driverId : '';
@@ -1262,6 +1274,7 @@ function RouteDetailSidePanel({
 
   const openCreateOrder = () => {
     if (bulkAssignOpen) closeBulkAssign();
+    if (orderSelectMode) closeOrderSelectMode();
     handleCancelOrderAssign();
     setEditingOrderId(null);
     setCreateOrderOpen(true);
@@ -1274,12 +1287,140 @@ function RouteDetailSidePanel({
     setBulkDraftRegion('');
   };
 
+  const closeOrderSelectMode = () => {
+    setOrderSelectMode(false);
+    setSelectedOrderIds(new Set());
+    setSelectDraftDriver('');
+    setSelectDraftPeoneta('');
+    setSelectDraftVehicle('');
+  };
+
+  const openOrderSelectMode = () => {
+    setCreateOrderOpen(false);
+    handleCancelOrderAssign();
+    setEditingOrderId(null);
+    if (bulkAssignOpen) closeBulkAssign();
+    setOrderSelectMode(true);
+    setSelectedOrderIds(new Set());
+  };
+
+  const toggleOrderSelected = (orderId: string) => {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  const selectAllFilteredOrders = () => {
+    setSelectedOrderIds(new Set(filteredAssigned.map((o) => o.id)));
+  };
+
+  const clearSelectedOrders = () => {
+    setSelectedOrderIds(new Set());
+  };
+
   const openBulkAssign = () => {
     setCreateOrderOpen(false);
     handleCancelOrderAssign();
     setEditingOrderId(null);
+    if (orderSelectMode) closeOrderSelectMode();
     setBulkAssignOpen(true);
     setBulkAssignRules([]);
+  };
+
+  const performAssignSelectedOrders = async () => {
+    const orderIds = [...selectedOrderIds];
+    if (orderIds.length === 0) {
+      setActionError('Selecciona al menos un pedido.');
+      return;
+    }
+
+    const driver = resolveAssignee(selectDraftDriver, driversList);
+    const peoneta = resolveAssignee(selectDraftPeoneta, peonetasList);
+    const vehicle = resolveVehicle(selectDraftVehicle, vehiclesSorted);
+
+    if (selectDraftDriver.trim() && !driver) {
+      setActionError('Selecciona un chofer válido de la lista.');
+      return;
+    }
+    if (selectDraftPeoneta.trim() && !peoneta) {
+      setActionError('Selecciona una peoneta válida de la lista.');
+      return;
+    }
+    if (selectDraftVehicle.trim() && !vehicle) {
+      setActionError('Selecciona un vehículo válido de la lista.');
+      return;
+    }
+
+    const payload = buildPartialTeamAssignPayload({
+      driverDraft: selectDraftDriver,
+      peonetaDraft: selectDraftPeoneta,
+      vehicleDraft: selectDraftVehicle,
+      driver,
+      peoneta,
+      vehicle,
+      orderIds,
+    });
+
+    if (
+      payload.driverId === undefined &&
+      payload.peonetaId === undefined &&
+      payload.vehicleId === undefined
+    ) {
+      setActionError('Elige chofer, peoneta o vehículo para asignar.');
+      return;
+    }
+
+    setSelectAssignBusy(true);
+    setActionError(null);
+    try {
+      await assignDriverToOrders(route.id, payload);
+      await fetchOrders();
+      toast.info(
+        `Asignación aplicada a ${orderIds.length} pedido${orderIds.length === 1 ? '' : 's'}`,
+      );
+      closeOrderSelectMode();
+    } catch (err) {
+      let msg = 'No se pudo asignar a los pedidos seleccionados.';
+      if (err instanceof ApiError) {
+        try {
+          const parsed = JSON.parse(err.body) as { message?: string | string[] };
+          const apiMsg = parsed.message;
+          if (typeof apiMsg === 'string' && apiMsg.length > 0) msg = apiMsg;
+          else if (Array.isArray(apiMsg) && apiMsg.length > 0) msg = apiMsg.join(' · ');
+        } catch {
+          if (err.body) msg = err.body;
+        }
+      } else if (err instanceof Error && err.message) {
+        msg = err.message;
+      }
+      setActionError(msg);
+    } finally {
+      setSelectAssignBusy(false);
+    }
+  };
+
+  const handleAssignSelectedOrders = () => {
+    const orderIds = [...selectedOrderIds];
+    if (orderIds.length === 0) {
+      setActionError('Selecciona al menos un pedido.');
+      return;
+    }
+    if (selectDraftVehicle.trim() && orderIds.length > 1) {
+      const v = vehiclesSorted.find((x) => x.id === selectDraftVehicle);
+      if (v) {
+        setSameVehicleConfirm({
+          orderId: orderIds[0]!,
+          plate: v.plate,
+          otherCodes: assigned.filter((o) => selectedOrderIds.has(o.id)).map((o) => o.code),
+          bulkSelect: true,
+        });
+        return;
+      }
+    }
+    void performAssignSelectedOrders();
   };
 
   const performBulkApplyRules = async () => {
@@ -1950,17 +2091,43 @@ function RouteDetailSidePanel({
                     Nuevo pedido
                   </Button>
                   {assigned.length > 0 ? (
-                    <Button
-                      type="button"
-                      variant={bulkAssignOpen ? 'violet' : 'violet-soft'}
-                      size="sm"
-                      icon={<ListChecks size={14} aria-hidden />}
-                      onClick={() => (bulkAssignOpen ? closeBulkAssign() : openBulkAssign())}
-                      disabled={bulkAssignBusy || orderAssignBusy !== null || busyId === 'create'}
-                      aria-pressed={bulkAssignOpen}
-                    >
-                      {bulkAssignOpen ? 'Listo' : 'Asignación masiva'}
-                    </Button>
+                    <>
+                      <Button
+                        type="button"
+                        variant={orderSelectMode ? 'primary' : 'secondary'}
+                        size="sm"
+                        icon={<CheckSquare size={14} aria-hidden />}
+                        onClick={() =>
+                          orderSelectMode ? closeOrderSelectMode() : openOrderSelectMode()
+                        }
+                        disabled={
+                          bulkAssignBusy ||
+                          selectAssignBusy ||
+                          orderAssignBusy !== null ||
+                          busyId === 'create'
+                        }
+                        aria-pressed={orderSelectMode}
+                      >
+                        {orderSelectMode ? 'Cancelar selección' : 'Seleccionar'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={bulkAssignOpen ? 'violet' : 'violet-soft'}
+                        size="sm"
+                        icon={<ListChecks size={14} aria-hidden />}
+                        onClick={() => (bulkAssignOpen ? closeBulkAssign() : openBulkAssign())}
+                        disabled={
+                          bulkAssignBusy ||
+                          selectAssignBusy ||
+                          orderAssignBusy !== null ||
+                          busyId === 'create' ||
+                          orderSelectMode
+                        }
+                        aria-pressed={bulkAssignOpen}
+                      >
+                        {bulkAssignOpen ? 'Listo' : 'Por rangos'}
+                      </Button>
+                    </>
                   ) : null}
                 </div>
               ) : null}
@@ -2016,7 +2183,7 @@ function RouteDetailSidePanel({
             ) : null}
           </div>
 
-          {canManage && assigned.length > 0 && !bulkAssignOpen ? (
+          {canManage && assigned.length > 0 && !bulkAssignOpen && !orderSelectMode ? (
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500 dark:text-stone-400 px-0.5 -mt-1">
               <span className="inline-flex items-center gap-1">
                 <span className="size-2.5 rounded border border-[#ff7b00] bg-[#ff7b00]/20" aria-hidden />
@@ -2031,6 +2198,98 @@ function RouteDetailSidePanel({
                 Bloqueada
               </span>
             </p>
+          ) : null}
+
+          {orderSelectMode && assigned.length > 0 ? (
+            <div
+              className="rounded-xl border border-primary-200/80 dark:border-primary-800/60 bg-primary-50/40 dark:bg-primary-950/20 px-3 py-3 space-y-3 animate-toolbar-panel-enter motion-reduce:animate-none"
+              role="region"
+              aria-label="Asignación por selección manual"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-stone-600 dark:text-stone-300">
+                  <span className="font-semibold tabular-nums text-stone-800 dark:text-stone-100">
+                    {selectedOrderIds.size}
+                  </span>
+                  {' '}de {filteredAssigned.length} visibles seleccionados
+                  {orderStatusFilter !== 'all' ? (
+                    <span className="text-stone-400"> (filtro activo)</span>
+                  ) : null}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={selectAllFilteredOrders}
+                    disabled={selectAssignBusy || filteredAssigned.length === 0}
+                  >
+                    Todas
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={clearSelectedOrders}
+                    disabled={selectAssignBusy || selectedOrderIds.size === 0}
+                  >
+                    Ninguna
+                  </Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Select
+                  id="select-bulk-driver"
+                  label="Chofer"
+                  value={selectDraftDriver}
+                  onChange={(e) => setSelectDraftDriver(e.target.value)}
+                  options={driverSelectOpts}
+                  disabled={selectAssignBusy}
+                  autoComplete="off"
+                />
+                <Select
+                  id="select-bulk-peoneta"
+                  label="Peoneta"
+                  value={selectDraftPeoneta}
+                  onChange={(e) => setSelectDraftPeoneta(e.target.value)}
+                  options={peonetaSelectOpts}
+                  disabled={selectAssignBusy}
+                  autoComplete="off"
+                />
+                <Select
+                  id="select-bulk-vehicle"
+                  label="Vehículo"
+                  value={selectDraftVehicle}
+                  onChange={(e) => setSelectDraftVehicle(e.target.value)}
+                  options={vehicleSelectOpts}
+                  disabled={selectAssignBusy}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={closeOrderSelectMode}
+                  disabled={selectAssignBusy}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  icon={<UserCircle size={14} aria-hidden />}
+                  onClick={handleAssignSelectedOrders}
+                  disabled={selectAssignBusy || selectedOrderIds.size === 0}
+                  loading={selectAssignBusy}
+                >
+                  Asignar seleccionados
+                  {selectedOrderIds.size > 0 ? ` (${selectedOrderIds.size})` : ''}
+                </Button>
+              </div>
+            </div>
           ) : null}
 
           {bulkAssignOpen && assigned.length > 0 ? (
@@ -2154,16 +2413,45 @@ function RouteDetailSidePanel({
                       isDelivered && 'glass-card-order--delivered',
                       isRejected && 'glass-card-order--rejected',
                       isInTransit && 'glass-card-order--in-transit',
+                      orderSelectMode &&
+                        selectedOrderIds.has(o.id) &&
+                        'ring-2 ring-primary-500/50 dark:ring-primary-400/40',
                     )}
                   >
                     <div className="p-3 space-y-3">
                       <div className="flex items-start gap-3 min-w-0">
-                        <div
-                          className="shrink-0 flex items-center justify-center size-8 rounded-lg bg-stone-100 dark:bg-stone-800 text-xs font-bold text-stone-600 dark:text-stone-300 tabular-nums"
-                          aria-hidden
-                        >
-                          {orderIndex + 1}
-                        </div>
+                        {orderSelectMode ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleOrderSelected(o.id)}
+                            aria-pressed={selectedOrderIds.has(o.id)}
+                            aria-label={
+                              selectedOrderIds.has(o.id)
+                                ? `Quitar selección del pedido ${orderIndex + 1}`
+                                : `Seleccionar pedido ${orderIndex + 1}`
+                            }
+                            className={clsx(
+                              'shrink-0 flex items-center justify-center size-8 rounded-lg border cursor-pointer transition-colors duration-200',
+                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
+                              selectedOrderIds.has(o.id)
+                                ? 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-950/50 dark:text-primary-300'
+                                : 'border-stone-200 bg-stone-100 text-stone-400 hover:border-stone-300 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-500',
+                            )}
+                          >
+                            {selectedOrderIds.has(o.id) ? (
+                              <CheckSquare size={18} aria-hidden />
+                            ) : (
+                              <Square size={18} aria-hidden />
+                            )}
+                          </button>
+                        ) : (
+                          <div
+                            className="shrink-0 flex items-center justify-center size-8 rounded-lg bg-stone-100 dark:bg-stone-800 text-xs font-bold text-stone-600 dark:text-stone-300 tabular-nums"
+                            aria-hidden
+                          >
+                            {orderIndex + 1}
+                          </div>
+                        )}
                         <div
                           className={clsx(
                             'size-9 shrink-0 rounded-xl flex items-center justify-center',
@@ -2348,7 +2636,7 @@ function RouteDetailSidePanel({
                         </div>
                       ) : null}
 
-                      {canManage && !bulkAssignOpen ? (
+                      {canManage && !bulkAssignOpen && !orderSelectMode ? (
                         <div className="flex gap-2 pt-1 border-t border-stone-200/70 dark:border-stone-800/70">
                           <OrderCardAction
                             icon={<UserCircle size={15} />}
@@ -2375,6 +2663,10 @@ function RouteDetailSidePanel({
                             disabled={busyId !== null && busyId !== o.id}
                           />
                         </div>
+                      ) : canManage && orderSelectMode ? (
+                        <p className="text-[11px] text-stone-500 dark:text-stone-400 pt-1 border-t border-stone-200/70 dark:border-stone-800/70">
+                          Marca la casilla y asigna chofer / peoneta / vehículo arriba.
+                        </p>
                       ) : canManage && bulkAssignOpen ? (
                         <p className="text-[11px] text-stone-500 dark:text-stone-400 pt-1 border-t border-stone-200/70 dark:border-stone-800/70">
                           Usa los rangos Desde–Hasta del panel superior para asignar por pedido.
@@ -2608,6 +2900,10 @@ function RouteDetailSidePanel({
           const conf = sameVehicleConfirm;
           setSameVehicleConfirm(null);
           if (!conf) return;
+          if (conf.bulkSelect) {
+            void performAssignSelectedOrders();
+            return;
+          }
           if (conf.bulk) {
             void performBulkApplyRules();
             return;
@@ -2617,7 +2913,7 @@ function RouteDetailSidePanel({
         title="Mismo vehículo en varios pedidos"
         message={
           sameVehicleConfirm
-            ? sameVehicleConfirm.bulk
+            ? sameVehicleConfirm.bulkSelect || sameVehicleConfirm.bulk
               ? `¿Asignar el mismo vehículo (${sameVehicleConfirm.plate}) a los pedidos ${sameVehicleConfirm.otherCodes.join(', ')}?`
               : orderApplyToAll
                 ? `¿Estás seguro de asignar el mismo vehículo (${sameVehicleConfirm.plate}) a los ${sameVehicleConfirm.otherCodes.length} pedidos de esta ruta?`
