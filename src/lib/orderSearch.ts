@@ -12,7 +12,12 @@ export function normalizeSearchText(value?: string | null): string {
 
 /**
  * true si el pedido coincide con la búsqueda por número de referencia
- * (OC, factura, referencia, código) o por destino (calle, ciudad, región, cliente).
+ * (OC, factura, referencia), destino (calle, ciudad, región, cliente) o
+ * equipo asignado (chofer, peoneta).
+ *
+ * Deliberadamente NO compara contra `order.code` (folio/id interno, ej. "1083-1")
+ * ni contra la posición del pedido en la lista, para evitar falsos positivos
+ * al buscar por un número.
  */
 export function orderMatchesSearch(order: Order, query: string): boolean {
   const q = normalizeSearchText(query);
@@ -20,7 +25,6 @@ export function orderMatchesSearch(order: Order, query: string): boolean {
 
   const refs = parseOrderReferenceFields(order.notes);
   const haystack = [
-    order.code,
     refs?.numeroOc,
     refs?.factura,
     refs?.referencia,
@@ -28,6 +32,8 @@ export function orderMatchesSearch(order: Order, query: string): boolean {
     order.destination?.street,
     order.destination?.city,
     order.destination?.region,
+    order.driverName,
+    order.peonetaName,
   ];
 
   return haystack.some((field) => normalizeSearchText(field).includes(q));

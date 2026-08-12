@@ -2157,11 +2157,11 @@ function RouteDetailSidePanel({
                 <input
                   type="search"
                   name="order-search"
-                  placeholder="Buscar por referencia o destino…"
+                  placeholder="Buscar por referencia, destino, chofer o peoneta…"
                   value={orderSearchQuery}
                   onChange={(e) => setOrderSearchQuery(e.target.value)}
                   autoComplete="off"
-                  aria-label="Buscar pedidos por referencia o destino"
+                  aria-label="Buscar pedidos por referencia, destino, chofer o peoneta"
                   className="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-stone-950/60 border border-stone-200 dark:border-stone-700 rounded-lg text-[12px] text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 />
                 {orderSearchQuery ? (
