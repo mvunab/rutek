@@ -37,6 +37,7 @@ import {
   suggestNextRouteSequence,
 } from '../../lib/routeSequence';
 import { resolveOrderStatusLabel } from '../../lib/orderStatusLabels';
+import { orderMatchesSearch } from '../../lib/orderSearch';
 import { orderStatusColors } from '../../lib/statusColors';
 import { resolveAssignee, resolveVehicle, buildPartialTeamAssignPayload } from '../../lib/teamAssignment';
 import { indicesCoveredByRules, type RangeAssignRule } from '../../lib/rangeAssignRules';
@@ -871,6 +872,8 @@ function RouteDetailSidePanel({
   type OrderListFilter = 'all' | 'open' | 'terminal' | 'unassigned' | OrderStatus;
 
   const [orderStatusFilter, setOrderStatusFilter] = useState<OrderListFilter>('all');
+  /** Búsqueda dinámica de pedidos por referencia (OC/factura/ref/código) o destino. */
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
 
   const assigned = useMemo(
     () =>
@@ -880,7 +883,7 @@ function RouteDetailSidePanel({
     [orders, route.id],
   );
 
-  const filteredAssigned = useMemo(() => {
+  const statusFilteredAssigned = useMemo(() => {
     if (orderStatusFilter === 'all') return assigned;
     if (orderStatusFilter === 'unassigned') {
       return assigned.filter(isOrderUnassigned);
@@ -894,6 +897,13 @@ function RouteDetailSidePanel({
     return assigned.filter((o) => o.status === orderStatusFilter);
   }, [assigned, orderStatusFilter]);
 
+  const trimmedOrderSearch = orderSearchQuery.trim();
+
+  const filteredAssigned = useMemo(() => {
+    if (!trimmedOrderSearch) return statusFilteredAssigned;
+    return statusFilteredAssigned.filter((o) => orderMatchesSearch(o, trimmedOrderSearch));
+  }, [statusFilteredAssigned, trimmedOrderSearch]);
+
   const assignedIndexById = useMemo(() => {
     const map = new Map<string, number>();
     assigned.forEach((o, i) => map.set(o.id, i));
@@ -902,6 +912,7 @@ function RouteDetailSidePanel({
 
   useEffect(() => {
     setOrderStatusFilter('all');
+    setOrderSearchQuery('');
     setOrderSelectMode(false);
     setSelectedOrderIds(new Set());
     setSelectDraftDriver('');
@@ -2054,7 +2065,7 @@ function RouteDetailSidePanel({
                 </h3>
                 {assigned.length > 0 ? (
                   <p className="text-[11px] text-stone-500 dark:text-stone-400 tabular-nums mt-0.5">
-                    {orderStatusFilter === 'all' ? (
+                    {orderStatusFilter === 'all' && !trimmedOrderSearch ? (
                       <>{assigned.length} en total</>
                     ) : (
                       <>
@@ -2062,10 +2073,13 @@ function RouteDetailSidePanel({
                           {filteredAssigned.length}
                         </span>
                         <span className="text-stone-400"> / {assigned.length}</span>
-                        {orderStatusFilter !== 'all' ? (
+                        {orderStatusFilter !== 'all' || trimmedOrderSearch ? (
                           <button
                             type="button"
-                            onClick={() => setOrderStatusFilter('all')}
+                            onClick={() => {
+                              setOrderStatusFilter('all');
+                              setOrderSearchQuery('');
+                            }}
                             className="ml-2 text-primary-700 dark:text-primary-300 hover:underline cursor-pointer transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 rounded"
                           >
                             Limpiar filtro
@@ -2132,6 +2146,36 @@ function RouteDetailSidePanel({
                 </div>
               ) : null}
             </div>
+
+            {assigned.length > 0 ? (
+              <div className="relative">
+                <Search
+                  size={13}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500"
+                  aria-hidden
+                />
+                <input
+                  type="search"
+                  name="order-search"
+                  placeholder="Buscar por referencia o destino…"
+                  value={orderSearchQuery}
+                  onChange={(e) => setOrderSearchQuery(e.target.value)}
+                  autoComplete="off"
+                  aria-label="Buscar pedidos por referencia o destino"
+                  className="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-stone-950/60 border border-stone-200 dark:border-stone-700 rounded-lg text-[12px] text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                />
+                {orderSearchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setOrderSearchQuery('')}
+                    aria-label="Limpiar búsqueda"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300 cursor-pointer"
+                  >
+                    <X size={13} aria-hidden />
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
 
             {assigned.length > 0 ? (
               <div
@@ -2359,16 +2403,25 @@ function RouteDetailSidePanel({
             </div>
           ) : filteredAssigned.length === 0 ? (
             <div className="rounded-xl border border-dashed border-stone-300 bg-stone-100/80 dark:border-stone-700 dark:bg-stone-900/30 py-8 text-center space-y-2">
-              <Filter size={22} className="mx-auto text-stone-400 dark:text-stone-600" aria-hidden />
+              {trimmedOrderSearch ? (
+                <Search size={22} className="mx-auto text-stone-400 dark:text-stone-600" aria-hidden />
+              ) : (
+                <Filter size={22} className="mx-auto text-stone-400 dark:text-stone-600" aria-hidden />
+              )}
               <p className="text-xs text-stone-500">
-                {orderStatusFilter === 'unassigned'
-                  ? 'Ningún pedido sin asignación en esta ruta.'
-                  : 'Ningún pedido con ese estado en esta ruta.'}
+                {trimmedOrderSearch
+                  ? 'Ningún pedido coincide con esa búsqueda.'
+                  : orderStatusFilter === 'unassigned'
+                    ? 'Ningún pedido sin asignación en esta ruta.'
+                    : 'Ningún pedido con ese estado en esta ruta.'}
               </p>
               <button
                 type="button"
                 className="text-[11px] font-medium text-primary-700 dark:text-primary-300 hover:underline cursor-pointer"
-                onClick={() => setOrderStatusFilter('all')}
+                onClick={() => {
+                  setOrderStatusFilter('all');
+                  setOrderSearchQuery('');
+                }}
               >
                 Ver todos ({assigned.length})
               </button>
