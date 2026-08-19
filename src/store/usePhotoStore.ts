@@ -8,6 +8,12 @@ interface PhotoStore {
   loading: boolean;
   loaded: boolean;
   fetchPhotos: () => Promise<void>;
+  /**
+   * Trae solo las fotos de una ruta puntual (detalle de ruta) en vez de
+   * descargar todas las fotos del tenant. Hace upsert por id sobre el
+   * arreglo global para no romper otras vistas que leen `photos`.
+   */
+  fetchPhotosByRoute: (routeId: string) => Promise<void>;
 }
 
 function mapPhotoType(raw: string): PhotoType {
@@ -62,6 +68,29 @@ export const usePhotoStore = create<PhotoStore>((set) => ({
         return;
       }
       set({ photos: [], loaded: true });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  fetchPhotosByRoute: async (routeId) => {
+    set({ loading: true });
+    try {
+      const data = await api.get<Record<string, unknown>[]>(
+        `/route-photos?route_id=${encodeURIComponent(routeId)}`,
+      );
+      const mapped = (Array.isArray(data) ? data : []).map(mapRoutePhotoFromApi);
+      set((state) => {
+        const byId = new Map(mapped.map((p) => [p.id, p]));
+        const existingIds = new Set(state.photos.map((p) => p.id));
+        const merged = state.photos.map((p) => byId.get(p.id) ?? p);
+        for (const p of mapped) {
+          if (!existingIds.has(p.id)) merged.push(p);
+        }
+        return { photos: merged, loaded: true };
+      });
+    } catch (err) {
+      if (isNetworkError(err)) return;
     } finally {
       set({ loading: false });
     }

@@ -834,14 +834,15 @@ function RouteDetailSidePanel({
   const { clients, fetchClients } = useClientStore();
   const { users, fetchUsers } = useUserStore();
   const { vehicles, fetchVehicles } = useVehicleStore();
-  const { photos, fetchPhotos } = usePhotoStore();
+  const { photos, fetchPhotosByRoute } = usePhotoStore();
 
   useEffect(() => {
     void fetchClients();
     void fetchUsers();
     void fetchVehicles();
-    void fetchPhotos();
-  }, [fetchClients, fetchUsers, fetchVehicles, fetchPhotos]);
+    // Solo las fotos de ESTA ruta, no las de todo el tenant.
+    void fetchPhotosByRoute(route.id);
+  }, [fetchClients, fetchUsers, fetchVehicles, fetchPhotosByRoute, route.id]);
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
