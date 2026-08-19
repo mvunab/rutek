@@ -64,6 +64,13 @@ const PANEL_WIDTH_KEY = 'rutek-route-panel-width';
 const PANEL_MIN = 300;
 const PANEL_DEFAULT = 440;
 
+/**
+ * Cantidad de pedidos que se pintan por tanda en el detalle de ruta.
+ * Rutas importadas pueden tener más de mil pedidos; renderizarlas todas de
+ * una vez congela la pestaña (ver investigación de ruta IMP-1119).
+ */
+const ORDERS_PAGE_SIZE = 80;
+
 /** ~58% del viewport, hasta 820px — permite pasar un poco más de la mitad. */
 function getPanelMaxPx(): number {
   if (typeof window === 'undefined') return 760;
@@ -909,6 +916,27 @@ function RouteDetailSidePanel({
     assigned.forEach((o, i) => map.set(o.id, i));
     return map;
   }, [assigned]);
+
+  /** Evidencias de esta ruta (evita escanear TODAS las fotos del tenant por cada pedido). */
+  const routePhotos = useMemo(
+    () => photos.filter((p) => p.routeId === route.id || p.routeCode === route.code),
+    [photos, route.id, route.code],
+  );
+
+  /**
+   * Rutas con muchísimos pedidos (importaciones grandes) pueden tener miles de
+   * filas: renderizarlas todas de una vez congela la pestaña. Se pintan de a
+   * `ORDERS_PAGE_SIZE` y se permite cargar más a demanda.
+   */
+  const [visibleOrderCount, setVisibleOrderCount] = useState(ORDERS_PAGE_SIZE);
+  const visibleAssigned = useMemo(
+    () => filteredAssigned.slice(0, visibleOrderCount),
+    [filteredAssigned, visibleOrderCount],
+  );
+
+  useEffect(() => {
+    setVisibleOrderCount(ORDERS_PAGE_SIZE);
+  }, [route.id, orderStatusFilter, trimmedOrderSearch]);
 
   useEffect(() => {
     setOrderStatusFilter('all');
@@ -2428,7 +2456,7 @@ function RouteDetailSidePanel({
             </div>
           ) : (
             <ul className="space-y-2">
-              {filteredAssigned.map((o) => {
+              {visibleAssigned.map((o) => {
                 const orderIndex = assignedIndexById.get(o.id) ?? 0;
                 const destinatario = o.clientName?.trim() || 'Por confirmar';
                 const originParts = orderAddressParts(o.origin);
@@ -2448,7 +2476,7 @@ function RouteDetailSidePanel({
                 const showStatusOnCard = isDelivered || isRejected || isInTransit;
                 const inspectionPhotos =
                   isDelivered || isRejected
-                    ? photosForOrderOnRoute(photos, route, o)
+                    ? photosForOrderOnRoute(routePhotos, route, o)
                     : [];
                 const deliveryReceiver = isDelivered
                   ? pickDeliveryReceiverForOrder(routeDeliveryRecords, o.id, o.code)
@@ -2829,6 +2857,23 @@ function RouteDetailSidePanel({
               })}
             </ul>
           )}
+          {filteredAssigned.length > visibleAssigned.length ? (
+            <div className="flex flex-col items-center gap-1 pt-2">
+              <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                Mostrando {visibleAssigned.length} de {filteredAssigned.length} pedidos
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() =>
+                  setVisibleOrderCount((n) => Math.min(n + ORDERS_PAGE_SIZE, filteredAssigned.length))
+                }
+              >
+                Cargar {Math.min(ORDERS_PAGE_SIZE, filteredAssigned.length - visibleAssigned.length)} más
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
       {detailOrder ? (
