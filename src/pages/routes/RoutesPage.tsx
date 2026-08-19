@@ -821,7 +821,15 @@ function RouteDetailSidePanel({
 }) {
   const { user, tenant } = useAuthStore();
   const canManage = user?.role === 'admin' || user?.role === 'operator';
-  const { orders, detachOrderFromRoute, fetchOrders, addOrder, updateOrder, reactivateOrder } = useOrderStore();
+  const {
+    orders,
+    detachOrderFromRoute,
+    fetchOrdersByRoute,
+    removeOrdersForRoute,
+    addOrder,
+    updateOrder,
+    reactivateOrder,
+  } = useOrderStore();
   const { fetchRoutes, addOrderToRoute, assignDriverToOrders, deleteRoute, updateRoute } = useRouteStore();
   const { clients, fetchClients } = useClientStore();
   const { users, fetchUsers } = useUserStore();
@@ -1165,7 +1173,8 @@ function RouteDetailSidePanel({
       addOrderToRoute(route.id, created.id);
       setCreateOrderOpen(false);
       setCreateFormKey((k) => k + 1);
-      await fetchOrders();
+      // `addOrder` ya insertó el pedido creado en el store; no hace falta
+      // volver a descargar todos los pedidos del tenant.
       await fetchRoutes();
     } catch (err) {
       let msg = 'No se pudo crear el pedido en esta ruta.';
@@ -1193,7 +1202,7 @@ function RouteDetailSidePanel({
     try {
       await detachOrderFromRoute(orderId);
       setEditingOrderId((prev) => (prev === orderId ? null : prev));
-      await fetchOrders();
+      // `detachOrderFromRoute` ya actualizó ese pedido en el store.
       await fetchRoutes();
     } catch {
       setActionError('No se pudo quitar el pedido de la ruta.');
@@ -1207,7 +1216,7 @@ function RouteDetailSidePanel({
     setBusyId(orderId);
     try {
       await reactivateOrder(orderId);
-      await fetchOrders();
+      // `reactivateOrder` ya actualizó ese pedido en el store.
       await fetchRoutes();
       toast.info(
         'Pedido reactivado',
@@ -1276,7 +1285,7 @@ function RouteDetailSidePanel({
         bultos: data.bultos,
       });
       setEditingOrderId(null);
-      await fetchOrders();
+      // `updateOrder` ya actualizó ese pedido en el store.
       await fetchRoutes();
     } catch (err) {
       let msg = 'No se pudo actualizar el pedido.';
@@ -1416,7 +1425,9 @@ function RouteDetailSidePanel({
     setActionError(null);
     try {
       await assignDriverToOrders(route.id, payload);
-      await fetchOrders();
+      // Asignación masiva vía endpoint dedicado (no pasa por el store):
+      // solo refrescamos los pedidos de ESTA ruta, no todo el tenant.
+      await fetchOrdersByRoute(route.id);
       toast.info(
         `Asignación aplicada a ${orderIds.length} pedido${orderIds.length === 1 ? '' : 's'}`,
       );
@@ -1563,7 +1574,10 @@ function RouteDetailSidePanel({
         }
       }
 
-      await fetchOrders();
+      // La rama de equipo usa `assignDriverToOrders` (bulk, no toca el store);
+      // la de ubicación ya actualizó cada pedido vía `updateOrder`. Alcanza
+      // con refrescar los pedidos de esta ruta.
+      await fetchOrdersByRoute(route.id);
 
       if (locationError) {
         setActionError(locationError);
@@ -1695,7 +1709,10 @@ function RouteDetailSidePanel({
         });
       }
 
-      await fetchOrders();
+      // Rama "aplicar a todos" usa `assignDriverToOrders` (bulk, no toca el
+      // store); la otra ya actualizó el pedido vía `updateOrder`. Alcanza
+      // con refrescar los pedidos de esta ruta.
+      await fetchOrdersByRoute(route.id);
       setExpandedOrderId(null);
       setOrderDraftDriver('');
       setOrderDraftPeoneta('');
@@ -1796,7 +1813,9 @@ function RouteDetailSidePanel({
     setActionError(null);
     try {
       const result = await deleteRoute(route.id);
-      await fetchOrders();
+      // La ruta (y sus pedidos) ya no existen: los quitamos del store local
+      // sin necesidad de volver a descargar todos los pedidos del tenant.
+      removeOrdersForRoute(route.id);
       await fetchRoutes();
       setDeleteRouteOpen(false);
       onClose();

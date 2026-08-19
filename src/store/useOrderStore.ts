@@ -16,6 +16,12 @@ interface OrderStore {
   loading: boolean;
   loaded: boolean;
   fetchOrders: () => Promise<void>;
+  /**
+   * Refresca solo los pedidos de una ruta (tras acciones masivas: asignación
+   * por rango, ubicación en lote, etc.). Evita re-descargar TODOS los
+   * pedidos del tenant cuando el cambio quedó acotado a una ruta.
+   */
+  fetchOrdersByRoute: (routeId: string) => Promise<void>;
   setFilters: (filters: Partial<OrderFilters>) => void;
   resetFilters: () => void;
   selectOrder: (order: Order | null) => void;
@@ -177,6 +183,27 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       set({ orders: [], loaded: true });
     } finally {
       set({ loading: false });
+    }
+  },
+
+  fetchOrdersByRoute: async (routeId) => {
+    try {
+      const data = await api.get<Record<string, unknown>[]>(
+        `/orders?route_id=${encodeURIComponent(routeId)}`,
+      );
+      const mapped = Array.isArray(data) ? data.map(mapOrderFromApi) : [];
+      set((state) => {
+        const byId = new Map(mapped.map((o) => [o.id, o]));
+        const existingIds = new Set(state.orders.map((o) => o.id));
+        const merged = state.orders.map((o) => byId.get(o.id) ?? o);
+        for (const o of mapped) {
+          if (!existingIds.has(o.id)) merged.push(o);
+        }
+        return { orders: merged };
+      });
+    } catch (err) {
+      if (isNetworkError(err)) return;
+      throw err;
     }
   },
 
