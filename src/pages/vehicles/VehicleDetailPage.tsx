@@ -113,7 +113,7 @@ function VehicleDetailContent({ id }: { id: string }) {
     () =>
       routes
         .filter((r) => r.vehicleId === vehicle.id)
-        .toSorted((a, b) => b.date.localeCompare(a.date))
+        .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))
         .slice(0, RECENT_LIMIT),
     [routes, vehicle],
   );
