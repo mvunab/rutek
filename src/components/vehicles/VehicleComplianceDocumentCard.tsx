@@ -261,6 +261,7 @@ export function VehicleComplianceDocumentCard({
             type="file"
             accept={ACCEPT}
             className="sr-only"
+            aria-label={`Subir documento ${item.label}`}
             onChange={(e) => void handleFile(e.target.files?.[0])}
           />
 

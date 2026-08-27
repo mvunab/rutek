@@ -38,6 +38,13 @@ const emptyOrderForm: OrderFormData = {
   bultos: 1,
 };
 
+const priorityOptions = [
+  { value: 'low', label: 'Baja' },
+  { value: 'medium', label: 'Media' },
+  { value: 'high', label: 'Alta' },
+  { value: 'urgent', label: 'Urgente' },
+];
+
 interface OrderFormProps {
   initial?: Partial<OrderFormData>;
   onSubmit: (data: OrderFormData) => void | Promise<void>;
@@ -131,11 +138,13 @@ export function OrderForm({
     });
   }, [form.clientId, lockedClientId, clients]);
 
-  useEffect(() => {
-    const next = effectiveInitial.bultos ?? emptyOrderForm.bultos;
-    setBultosText(String(next));
-    setForm((prev) => ({ ...prev, bultos: next }));
-  }, [effectiveInitial.bultos]);
+  const initialBultos = effectiveInitial.bultos ?? emptyOrderForm.bultos;
+  const [bultosSource, setBultosSource] = useState(initialBultos);
+  if (initialBultos !== bultosSource) {
+    setBultosSource(initialBultos);
+    setBultosText(String(initialBultos));
+    setForm((prev) => ({ ...prev, bultos: initialBultos }));
+  }
 
   const setField =
     (field: keyof OrderFormData) =>
@@ -176,13 +185,6 @@ export function OrderForm({
     },
     [{ value: '', label: 'Seleccionar cliente…' }],
   );
-
-  const priorityOptions = [
-    { value: 'low', label: 'Baja' },
-    { value: 'medium', label: 'Media' },
-    { value: 'high', label: 'Alta' },
-    { value: 'urgent', label: 'Urgente' },
-  ];
 
   return (
     <div className={clsx('space-y-5', fieldClass)}>

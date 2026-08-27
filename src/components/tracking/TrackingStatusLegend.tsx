@@ -1,4 +1,5 @@
-import { buildStatusCounts, TrackingOrderStatusMarker } from './TrackingOrderStatusMarker';
+import { TrackingOrderStatusMarker } from './TrackingOrderStatusMarker';
+import { buildStatusCounts } from './trackingOrderStatusUtils';
 
 interface TrackingStatusLegendProps {
   orders: Array<{ status: string }>;
@@ -9,20 +10,16 @@ export function TrackingStatusLegend({ orders }: TrackingStatusLegendProps) {
   if (counts.length === 0) return null;
 
   return (
-    <div
-      className="rounded-xl border border-stone-200 bg-white px-4 py-3"
-      role="list"
-      aria-label="Resumen por estado"
-    >
+    <div className="rounded-xl border border-stone-200 bg-white px-4 py-3">
       <p className="text-xs font-bold text-stone-600 mb-2">Estados de los pedidos</p>
-      <div className="flex flex-wrap gap-2">
+      <ul className="flex flex-wrap gap-2" aria-label="Resumen por estado">
         {counts.map(({ status, count }) => (
-          <div key={status} role="listitem" className="inline-flex items-center gap-1.5">
+          <li key={status} className="inline-flex items-center gap-1.5">
             <TrackingOrderStatusMarker status={status} />
             <span className="text-xs font-bold text-stone-500 tabular-nums">×{count}</span>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }

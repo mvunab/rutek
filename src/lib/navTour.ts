@@ -28,14 +28,6 @@ export function markNavTourCompleted(userId: string): void {
   }
 }
 
-export function resetNavTour(userId: string): void {
-  try {
-    localStorage.removeItem(`${STORAGE_PREFIX}${userId}`);
-  } catch {
-    /* ignore */
-  }
-}
-
 const tenantStepsBase: NavTourStep[] = [
   {
     id: 'intro',
@@ -168,7 +160,7 @@ function navTargetsByRole(
 ): Set<string> {
   const modules = moduleTargets(tenant);
   const base: Record<UserRole, string[]> = {
-    super_admin: superAdminSteps.map((s) => s.target).filter(Boolean) as string[],
+    super_admin: superAdminSteps.flatMap((s) => (s.target ? [s.target] : [])) as string[],
     admin: [
       '/dashboard',
       '/rutas',

@@ -52,7 +52,7 @@ export function ClientBillingPanel({ clientId }: { clientId: string }) {
   const valuationEnabled = isValuationModuleEnabled(tenant);
   const [assignment, setAssignment] = useState<ClientBillingAssignment | null>(null);
   const [templates, setTemplates] = useState<BillingFlowTemplate[]>([]);
-  const [graph, setGraph] = useState<BillingFlowGraph>(emptyStarterGraph());
+  const [graph, setGraph] = useState<BillingFlowGraph>(() => emptyStarterGraph());
   const [templateId, setTemplateId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

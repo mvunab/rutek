@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { pingBackend, onNetworkError, clearAccessToken } from '../lib/api';
+import { pingBackend, onNetworkError, clearLegacyAccessTokenStorage } from '../lib/api';
 import { useAuthStore } from './useAuthStore';
 
 type HealthStatus = 'unknown' | 'checking' | 'online' | 'offline';
@@ -15,7 +15,7 @@ let inflight: Promise<boolean> | null = null;
 
 function clearLocalSession() {
   useAuthStore.getState().clearAuth();
-  clearAccessToken();
+  clearLegacyAccessTokenStorage();
 }
 
 export const useHealthStore = create<HealthStore>((set, get) => ({

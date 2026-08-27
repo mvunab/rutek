@@ -21,7 +21,7 @@ export function RouteValuationPanel({
   const tenant = useAuthStore((s) => s.tenant);
   const valuationEnabled = isValuationModuleEnabled(tenant);
   const [valuation, setValuation] = useState<RouteValuation | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(valuationEnabled);
   const [computing, setComputing] = useState(false);
   const [error, setError] = useState('');
 
@@ -46,10 +46,7 @@ export function RouteValuationPanel({
   }, [routeId, valuationEnabled]);
 
   useEffect(() => {
-    if (!valuationEnabled) {
-      setLoading(false);
-      return;
-    }
+    if (!valuationEnabled) return;
     void load();
   }, [load, refreshKey, valuationEnabled]);
 
@@ -210,9 +207,9 @@ function BreakdownList({
         {title}
       </p>
       <ul className="space-y-0.5">
-        {lines.map((line, i) => (
+        {lines.map((line) => (
           <li
-            key={`${line.label}-${i}`}
+            key={`${line.side}-${line.label}-${line.amount}`}
             className="flex justify-between gap-2 text-[11px] text-stone-600 dark:text-stone-300"
           >
             <span className="truncate">{line.label}</span>

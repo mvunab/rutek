@@ -48,6 +48,17 @@ export interface TimelineEvent {
   highlight?: boolean;
 }
 
+const timelineDateFormatter = new Intl.DateTimeFormat('es-CL', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+const timelineTimeFormatter = new Intl.DateTimeFormat('es-CL', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pendiente',
   confirmed: 'Confirmado',
@@ -217,10 +228,9 @@ export function buildTimeline(info: TrackingInfo): TimelineEvent[] {
 }
 
 export function groupTimelineByDate(events: TimelineEvent[]): Map<string, TimelineEvent[]> {
-  const fmt = new Intl.DateTimeFormat('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
   const map = new Map<string, TimelineEvent[]>();
   for (const e of events) {
-    const key = fmt.format(e.at);
+    const key = timelineDateFormatter.format(e.at);
     const list = map.get(key) ?? [];
     list.push(e);
     map.set(key, list);
@@ -229,5 +239,5 @@ export function groupTimelineByDate(events: TimelineEvent[]): Map<string, Timeli
 }
 
 export function formatTime(d: Date): string {
-  return new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+  return timelineTimeFormatter.format(d);
 }

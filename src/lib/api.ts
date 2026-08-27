@@ -14,6 +14,9 @@ const API_URL = resolveApiUrl();
 
 const PING_TIMEOUT_MS = 8_000;
 
+/** Clave legacy (pre-cookie HttpOnly); se limpia al arrancar. */
+const LEGACY_ACCESS_TOKEN_KEY = 'rutek-access-token';
+
 export class ApiError extends Error {
   readonly status: number;
   readonly body: string;
@@ -58,18 +61,14 @@ function notifyNetworkError(err: NetworkError) {
   }
 }
 
-export const ACCESS_TOKEN_KEY = 'rutek-access-token';
-
-export function getAccessToken(): string | null {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
-}
-
-export function setAccessToken(token: string) {
-  localStorage.setItem(ACCESS_TOKEN_KEY, token);
-}
-
-export function clearAccessToken() {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
+/** Elimina restos de JWT en web storage (migración; la sesión vive en cookie HttpOnly). */
+export function clearLegacyAccessTokenStorage() {
+  try {
+    localStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 type AuthExpiredListener = () => void;
@@ -90,24 +89,21 @@ function notifyAuthExpired() {
   }
 }
 
-function handleUnauthorized(accessToken: string | null) {
-  if (!accessToken) return;
-  clearAccessToken();
+function handleUnauthorized() {
+  clearLegacyAccessTokenStorage();
   notifyAuthExpired();
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const accessToken = getAccessToken();
-
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
   };
 
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       ...options,
+      credentials: 'include',
       headers: {
         ...headers,
         ...(options.headers as Record<string, string>),
@@ -122,7 +118,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     if (res.status === 401) {
-      handleUnauthorized(accessToken);
+      handleUnauthorized();
     }
     throw new ApiError(res.status, body);
   }
@@ -133,22 +129,24 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+  post: <T>(path: string, body?: unknown) =>
+    request<T>(path, {
+      method: 'POST',
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 
-  /** Sube un FormData (multipart) con Authorization automático. */
+  /** Sube un FormData (multipart); la cookie HttpOnly viaja con credentials. */
   postForm: async <T>(path: string, form: FormData): Promise<T> => {
-    const accessToken = getAccessToken();
     let res: Response;
     try {
       res = await fetch(`${API_URL}${path}`, {
         method: 'POST',
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+        credentials: 'include',
         body: form,
       });
     } catch (err) {
@@ -159,7 +157,7 @@ export const api = {
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       if (res.status === 401) {
-        handleUnauthorized(accessToken);
+        handleUnauthorized();
       }
       throw new ApiError(res.status, body);
     }
@@ -186,6 +184,7 @@ export async function pingBackend(externalSignal?: AbortSignal): Promise<boolean
     try {
       await fetch(`${API_URL}${path}`, {
         method: 'GET',
+        credentials: 'include',
         signal: controller.signal,
         cache: 'no-store',
       });
@@ -201,3 +200,5 @@ export async function pingBackend(externalSignal?: AbortSignal): Promise<boolean
 }
 
 export const getApiUrl = () => API_URL;
+
+clearLegacyAccessTokenStorage();

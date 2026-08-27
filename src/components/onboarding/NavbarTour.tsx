@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { clsx } from 'clsx';
 import { X } from 'lucide-react';
@@ -96,6 +96,7 @@ export function NavbarTour({
 }: NavbarTourProps) {
   const titleId = useId();
   const bodyId = useId();
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
 
   const [active, setActive] = useState(false);
@@ -143,6 +144,8 @@ export function NavbarTour({
     setBubblePos(computeBubble(nextSpotlight, { width, height }));
   }, [stepIndex, steps]);
 
+  const syncLayoutEvent = useEffectEvent(syncLayout);
+
   const startNonce = useNavTourStore((s) => s.startNonce);
 
   const beginTour = useCallback(() => {
@@ -178,7 +181,7 @@ export function NavbarTour({
   useEffect(() => {
     if (!active) return;
 
-    const onReflow = () => syncLayout();
+    const onReflow = () => syncLayoutEvent();
     window.addEventListener('resize', onReflow);
     window.addEventListener('scroll', onReflow, true);
 
@@ -186,16 +189,28 @@ export function NavbarTour({
       window.removeEventListener('resize', onReflow);
       window.removeEventListener('scroll', onReflow, true);
     };
-  }, [active, syncLayout]);
+  }, [active]);
 
   useEffect(() => {
-    if (!active) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') finish();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (active) {
+      if (!dialog.open) dialog.showModal();
+    } else if (dialog.open) {
+      dialog.close();
+    }
+  }, [active]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const onCancel = (e: Event) => {
+      e.preventDefault();
+      finish();
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [active, finish]);
+    dialog.addEventListener('cancel', onCancel);
+    return () => dialog.removeEventListener('cancel', onCancel);
+  }, [finish]);
 
   useEffect(() => {
     if (!active) return;
@@ -224,7 +239,12 @@ export function NavbarTour({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] motion-reduce:transition-none" aria-hidden={false}>
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      aria-describedby={bodyId}
+      className="fixed inset-0 z-[200] m-0 max-w-none max-h-none w-full h-full bg-transparent p-0 border-none overflow-visible motion-reduce:transition-none"
+    >
       {/* Backdrop con recorte visual vía box-shadow */}
       {spotlight ? (
         <div
@@ -243,10 +263,6 @@ export function NavbarTour({
 
       <div
         ref={bubbleRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={bodyId}
         className={clsx(
           'fixed z-[201] w-[min(100vw-2rem,22rem)] rounded-2xl border border-stone-200/80 dark:border-stone-700',
           'bg-white dark:bg-stone-900 shadow-2xl p-5 motion-reduce:transition-none transition-[top,left] duration-200 ease-out',
@@ -294,7 +310,7 @@ export function NavbarTour({
           </div>
         </div>
       </div>
-    </div>,
+    </dialog>,
     document.body,
   );
 }

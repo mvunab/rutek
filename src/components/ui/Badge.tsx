@@ -76,25 +76,27 @@ export function OrderStatusBadge({ status }: { status: string }) {
   return <Badge variant={variant} dot>{label}</Badge>;
 }
 
+const routeStatusBadgeVariants: Record<RouteStatus, BadgeVariant> = {
+  not_started: 'info',
+  in_progress: 'warning',
+  completed: 'success',
+  cancelled: 'danger',
+};
+
 export function RouteStatusBadge({ status }: { status: RouteStatus | string }) {
   const normalized = normalizeRouteStatus(String(status));
   const label = routeStatusLabel(normalized);
-  const variants: Record<RouteStatus, BadgeVariant> = {
-    not_started: 'info',
-    in_progress: 'warning',
-    completed: 'success',
-    cancelled: 'danger',
-  };
-  return <Badge variant={variants[normalized]} dot>{label}</Badge>;
+  return <Badge variant={routeStatusBadgeVariants[normalized]} dot>{label}</Badge>;
 }
 
+const priorityBadgeConfig: Record<OrderPriority, { label: string; variant: BadgeVariant }> = {
+  low: { label: 'Baja', variant: 'slate' },
+  medium: { label: 'Media', variant: 'info' },
+  high: { label: 'Alta', variant: 'warning' },
+  urgent: { label: 'Urgente', variant: 'danger' },
+};
+
 export function PriorityBadge({ priority }: { priority: OrderPriority }) {
-  const config: Record<OrderPriority, { label: string; variant: BadgeVariant }> = {
-    low: { label: 'Baja', variant: 'slate' },
-    medium: { label: 'Media', variant: 'info' },
-    high: { label: 'Alta', variant: 'warning' },
-    urgent: { label: 'Urgente', variant: 'danger' },
-  };
-  const { label, variant } = config[priority];
+  const { label, variant } = priorityBadgeConfig[priority];
   return <Badge variant={variant}>{label}</Badge>;
 }

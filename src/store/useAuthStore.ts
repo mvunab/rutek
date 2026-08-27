@@ -2,7 +2,21 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Tenant } from '../types';
 import { authService } from '../services/auth.service';
-import { clearAccessToken, onAuthExpired } from '../lib/api';
+import { clearLegacyAccessTokenStorage, onAuthExpired } from '../lib/api';
+
+try {
+  const nextKey = 'rutek-auth:v1';
+  const legacyKey = 'rutek-auth';
+  if (!localStorage.getItem(nextKey)) {
+    const legacy = localStorage.getItem(legacyKey);
+    if (legacy) {
+      localStorage.setItem(nextKey, legacy);
+      localStorage.removeItem(legacyKey);
+    }
+  }
+} catch {
+  /* ignore */
+}
 
 interface AuthStore {
   user: User | null;
@@ -76,7 +90,7 @@ export const useAuthStore = create<AuthStore>()(
                 isSuperAdmin: result.isSuperAdmin,
               });
             } else {
-              clearAccessToken();
+              clearLegacyAccessTokenStorage();
               set({
                 user: null,
                 tenant: null,
@@ -85,7 +99,7 @@ export const useAuthStore = create<AuthStore>()(
               });
             }
           } catch {
-            clearAccessToken();
+            clearLegacyAccessTokenStorage();
             set({
               user: null,
               tenant: null,
@@ -111,7 +125,7 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       clearAuth: () => {
-        clearAccessToken();
+        clearLegacyAccessTokenStorage();
         set({
           user: null,
           tenant: null,
@@ -135,7 +149,7 @@ export const useAuthStore = create<AuthStore>()(
       },
     }),
     {
-      name: 'rutek-auth',
+      name: 'rutek-auth:v1',
       version: 1,
       migrate: (persisted, version) => {
         if (version < 1 && persisted && typeof persisted === 'object') {

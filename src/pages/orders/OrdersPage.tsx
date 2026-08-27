@@ -25,12 +25,6 @@ export function OrdersPage() {
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  if (!user || user.role !== 'client') {
-    return <Navigate to="/rutas" replace />;
-  }
-
-  const filteredOrders = getFilteredOrders();
-
   const statusOptions = useMemo(
     () => [
       { value: 'all', label: 'Todos los estados' },
@@ -46,6 +40,12 @@ export function OrdersPage() {
     [tenant?.customOrderStatuses],
   );
 
+  if (!user || user.role !== 'client') {
+    return <Navigate to="/rutas" replace />;
+  }
+
+  const filteredOrders = getFilteredOrders();
+
   return (
     <div className="space-y-5">
       <div className="rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900/60 px-4 py-3 text-sm text-stone-600 dark:text-stone-300">
@@ -56,16 +56,25 @@ export function OrdersPage() {
       </div>
 
       <div className="flex flex-col gap-3">
-        <div className="flex gap-3">
-          <div className="relative flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" />
-            <input
-              type="text"
-              placeholder="Buscar por código o ciudad…"
-              value={filters.search ?? ''}
-              onChange={(e) => setFilters({ search: e.target.value })}
-              className="w-full pl-9 pr-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
-            />
+        <div className="flex gap-3 items-end">
+          <div className="flex-1">
+            <label
+              htmlFor="orders-search"
+              className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1.5"
+            >
+              Buscar
+            </label>
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" aria-hidden />
+              <input
+                id="orders-search"
+                type="text"
+                placeholder="Buscar por código o ciudad…"
+                value={filters.search ?? ''}
+                onChange={(e) => setFilters({ search: e.target.value })}
+                className="w-full pl-9 pr-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
+              />
+            </div>
           </div>
           <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}>
             Filtros

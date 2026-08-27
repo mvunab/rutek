@@ -42,7 +42,6 @@ export function RouteProgressWay({ progress }: RouteProgressWayProps) {
               <li
                 key={step.id}
                 className="flex flex-1 flex-col items-center min-w-0 relative"
-                role="listitem"
                 aria-current={current ? 'step' : undefined}
               >
                 {i > 0 && (

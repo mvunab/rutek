@@ -14,6 +14,11 @@ import { OrderRejectionInfo } from './OrderRejectionInfo';
 import type { DbDeliveryRecord } from '../../types/api';
 import { useAuthStore } from '../../store/useAuthStore';
 
+const statusHistoryDateFormatter = new Intl.DateTimeFormat('es-CL', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
+
 function statusIcon(status: string) {
   if (status === 'delivered') return <CheckCircle2 size={14} className="text-emerald-500" aria-hidden />;
   if (status === 'in_transit') return <TruckIcon size={14} className="text-violet-500" aria-hidden />;
@@ -65,10 +70,10 @@ function OrderStatusTimeline({ orderId }: { orderId: string }) {
           const isLast = i === history.length - 1;
           const label = resolveOrderStatusLabel(evt.status, tenant);
           const date = evt.changedAt
-            ? new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(evt.changedAt))
+            ? statusHistoryDateFormatter.format(new Date(evt.changedAt))
             : null;
           return (
-            <li key={i} className="ml-4 pb-5 last:pb-0">
+            <li key={`${evt.status}-${evt.changedAt}`} className="ml-4 pb-5 last:pb-0">
               <span
                 className={`absolute -left-[5px] mt-1 flex size-2.5 items-center justify-center rounded-full ring-2 ring-white dark:ring-stone-900 ${isLast ? statusDotColor(evt.status) : 'bg-stone-300 dark:bg-stone-600'}`}
                 aria-hidden
@@ -166,7 +171,7 @@ export function OrderDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [order.id, order.routeId, order.status]);
+  }, [order.id, order.routeId, order.status, order.code]);
 
   return (
     <Modal open onClose={onClose} title={`Pedido ${order.code}`} size="lg">

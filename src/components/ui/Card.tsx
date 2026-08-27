@@ -17,18 +17,25 @@ const paddingClasses = {
 };
 
 export function Card({ children, className, padding = 'md', hover, onClick }: CardProps) {
+  const classes = clsx(
+    'bg-surface border border-stone-200/80 rounded-2xl shadow-card',
+    'dark:bg-stone-900 dark:border-stone-800 dark:shadow-none',
+    paddingClasses[padding],
+    hover && 'hover:border-stone-300 hover:shadow-soft dark:hover:border-stone-600 transition-[box-shadow,border-color] duration-150 cursor-pointer',
+    onClick && 'cursor-pointer text-left w-full',
+    className,
+  );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={classes}>
+        {children}
+      </button>
+    );
+  }
+
   return (
-    <div
-      onClick={onClick}
-      className={clsx(
-        'bg-surface border border-stone-200/80 rounded-2xl shadow-card',
-        'dark:bg-stone-900 dark:border-stone-800 dark:shadow-none',
-        paddingClasses[padding],
-        hover && 'hover:border-stone-300 hover:shadow-soft dark:hover:border-stone-600 transition-[box-shadow,border-color] duration-150 cursor-pointer',
-        onClick && 'cursor-pointer',
-        className
-      )}
-    >
+    <div className={classes}>
       {children}
     </div>
   );

@@ -121,34 +121,9 @@ export const CLIENT_ACTIVITY_KIND_LABELS: Record<ClientActivityKind, string> = {
   task: 'Tarea',
 };
 
-export const OPPORTUNITY_STAGE_LABELS: Record<OpportunityStage, string> = {
-  new: 'Nueva',
-  qualification: 'Calificación',
-  proposal: 'Propuesta',
-  negotiation: 'Negociación',
-  won: 'Ganada',
-  lost: 'Perdida',
-};
-
-export const OPPORTUNITY_STAGE_PROBABILITY: Record<OpportunityStage, number> = {
-  new: 10,
-  qualification: 25,
-  proposal: 50,
-  negotiation: 75,
-  won: 100,
-  lost: 0,
-};
-
 /** Legado */
 export const OPPORTUNITY_STATUS_LABELS: Record<OpportunityStatus, string> = {
   open: 'Abierta',
   won: 'Ganada',
   lost: 'Perdida',
 };
-
-export const PIPELINE_STAGES: OpportunityStage[] = [
-  'new',
-  'qualification',
-  'proposal',
-  'negotiation',
-];

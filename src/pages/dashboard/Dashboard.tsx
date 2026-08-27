@@ -1,21 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Package, Truck, Users, Map, TrendingUp, Clock,
-  CheckCircle2, AlertCircle, ArrowRight,
+  Package, Truck, CheckCircle2, AlertCircle, Map,
 } from 'lucide-react';
-import {
-  AreaChart, Area, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
-} from 'recharts';
 import { StatCard } from '../../components/ui/Card';
-import { OrderStatusBadge, RouteStatusBadge } from '../../components/ui/Badge';
-import { Button } from '../../components/ui/Button';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDashboardStore } from '../../store/useDashboardStore';
 import { useOrderStore } from '../../store/useOrderStore';
 import { useRouteStore } from '../../store/useRouteStore';
-import { formatRouteDisplayLabel } from '../../lib/routeSequence';
 import { useClientStore } from '../../store/useClientStore';
 import { EntityStatusBreakdown } from '../../components/dashboard/EntityStatusBreakdown';
 import {
@@ -30,9 +22,13 @@ import {
   enrichStatusChartPoints,
   recentOrdersLast7Days,
 } from '../../lib/dashboardStatusBreakdown';
-import { DASHBOARD_SERIES_COLORS, orderStatusColors } from '../../lib/statusColors';
-
-const ACTIVE_ROUTES_PAGE_SIZE = 10;
+import { DashboardActiveRoutes } from './DashboardActiveRoutes';
+import { ACTIVE_ROUTES_PAGE_SIZE } from './dashboardActiveRoutesConstants';
+import { DashboardOrdersChart } from './DashboardOrdersChart';
+import { DashboardRecentOrders } from './DashboardRecentOrders';
+import { DashboardSecondaryStats } from './DashboardSecondaryStats';
+import { DashboardStatusPieChart } from './DashboardStatusPieChart';
+import { DashboardWelcome } from './DashboardWelcome';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -110,29 +106,13 @@ export function Dashboard() {
     orders.length > 0 && !ordersWeeklyChartHasActivity(effectiveOrdersChart);
 
   if (isSuperAdmin) {
-    navigate('/super-admin', { replace: true });
-    return null;
+    return <Navigate to="/super-admin" replace />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Welcome */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-stone-900 dark:text-stone-100">
-            Buen día, {user?.name.split(' ')[0]} 👋
-          </h2>
-          <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
-            Aquí tienes el resumen operacional de hoy
-          </p>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-lg">
-          <span aria-hidden="true" className="size-2 rounded-full bg-emerald-500 animate-pulse motion-reduce:animate-none" />
-          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Operación activa</span>
-        </div>
-      </div>
+      <DashboardWelcome userName={user?.name.split(' ')[0] ?? ''} />
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Pedidos totales"
@@ -164,23 +144,12 @@ export function Dashboard() {
         />
       </div>
 
-      {/* Secondary stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Rutas activas', value: kpis.activeRoutes, icon: <Map size={16} />, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/40' },
-          { label: 'Cuentas', value: kpis.totalClients, icon: <Users size={16} />, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
-          { label: 'Efectividad', value: `${kpis.deliveryRate}%`, icon: <TrendingUp size={16} />, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/40' },
-          { label: 'Tiempo prom.', value: kpis.avgDeliveryTime > 0 ? `${kpis.avgDeliveryTime} d` : '—', icon: <Clock size={16} />, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40' },
-        ].map((item) => (
-          <div key={item.label} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-4 flex items-center gap-3 shadow-sm">
-            <div className={`p-2 rounded-lg ${item.bg} dark:opacity-90 ${item.color}`}>{item.icon}</div>
-            <div>
-              <p className="text-xl font-bold text-stone-900 dark:text-stone-100">{item.value}</p>
-              <p className="text-xs text-stone-400 dark:text-stone-500">{item.label}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      <DashboardSecondaryStats
+        activeRoutes={kpis.activeRoutes}
+        totalClients={kpis.totalClients}
+        deliveryRate={kpis.deliveryRate}
+        avgDeliveryTime={kpis.avgDeliveryTime}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <EntityStatusBreakdown
@@ -206,285 +175,32 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Orders chart */}
-        <div className="lg:col-span-2 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Pedidos de la semana</h3>
-              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Creados vs entregados</p>
-            </div>
-            <div className="flex items-center gap-4 text-xs text-stone-500 dark:text-stone-400">
-              <span className="flex items-center gap-1.5">
-                <span
-                  className="w-3 h-0.5 rounded inline-block"
-                  style={{ backgroundColor: DASHBOARD_SERIES_COLORS.created }}
-                  aria-hidden
-                />
-                Creados
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span
-                  className="w-3 h-0.5 rounded inline-block"
-                  style={{ backgroundColor: DASHBOARD_SERIES_COLORS.delivered }}
-                  aria-hidden
-                />
-                Entregados
-              </span>
-            </div>
-          </div>
-          {hasOrdersChart ? (
-            <>
-            {ordersChartWeekEmpty ? (
-              <p className="text-xs text-stone-400 dark:text-stone-500 mb-2">
-                Sin pedidos creados ni entregados en los últimos 7 días; hay {orders.length} pedido
-                {orders.length === 1 ? '' : 's'} en el sistema.
-              </p>
-            ) : null}
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={effectiveOrdersChart} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorCreated" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={DASHBOARD_SERIES_COLORS.created} stopOpacity={0.15} />
-                    <stop offset="95%" stopColor={DASHBOARD_SERIES_COLORS.created} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorDelivered" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={DASHBOARD_SERIES_COLORS.delivered} stopOpacity={0.15} />
-                    <stop offset="95%" stopColor={DASHBOARD_SERIES_COLORS.delivered} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f0ec" />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fill: '#a8a29e', fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  interval={0}
-                />
-                <YAxis tick={{ fill: '#a8a29e', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e7e5e4', borderRadius: '8px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                  labelStyle={{ color: '#57534e' }}
-                  itemStyle={{ color: '#292524' }}
-                />
-                <Area type="monotone" dataKey="value" name="Creados" stroke={DASHBOARD_SERIES_COLORS.created} strokeWidth={2} fill="url(#colorCreated)" dot={false} />
-                <Area type="monotone" dataKey="value2" name="Entregados" stroke={DASHBOARD_SERIES_COLORS.delivered} strokeWidth={2} fill="url(#colorDelivered)" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-            </>
-          ) : (
-            <div className="h-[200px] flex items-center justify-center text-sm text-stone-400 dark:text-stone-500">
-              Sin pedidos en el sistema
-            </div>
-          )}
-        </div>
-
-        {/* Pie chart */}
-        <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-1">Estado de pedidos</h3>
-          <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">Distribución actual</p>
-          {hasStatusChart ? (
-            <>
-              <ResponsiveContainer width="100%" height={140}>
-                <PieChart>
-                  <Pie
-                    data={effectiveStatusChart}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={60}
-                    dataKey="value"
-                    paddingAngle={3}
-                  >
-                    {effectiveStatusChart.map((entry) => {
-                      const fill =
-                        entry.fill ??
-                        (entry.key ? orderStatusColors(entry.key).fill : orderStatusColors('').fill);
-                      return <Cell key={entry.key ?? entry.label} fill={fill} />;
-                    })}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e7e5e4', borderRadius: '8px', fontSize: '12px' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-2 mt-2">
-                {effectiveStatusChart.map((item) => {
-                  const fill =
-                    item.fill ??
-                    (item.key ? orderStatusColors(item.key).fill : orderStatusColors('').fill);
-                  return (
-                    <div key={item.key ?? item.label} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span
-                          aria-hidden="true"
-                          className="size-2.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: fill }}
-                        />
-                        <span className="text-xs text-stone-500 dark:text-stone-400">{item.label}</span>
-                      </div>
-                      <span className="text-xs font-semibold text-stone-700 dark:text-stone-200 tabular-nums">
-                        {item.value}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <div className="h-[140px] flex items-center justify-center text-sm text-stone-400 dark:text-stone-500">
-              Sin pedidos en el sistema
-            </div>
-          )}
-        </div>
+        <DashboardOrdersChart
+          data={effectiveOrdersChart}
+          hasOrdersChart={hasOrdersChart}
+          ordersChartWeekEmpty={ordersChartWeekEmpty}
+          ordersCount={orders.length}
+        />
+        <DashboardStatusPieChart
+          data={effectiveStatusChart}
+          hasStatusChart={hasStatusChart}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Recent Orders */}
-        <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-sm">
-          <div className="flex items-center justify-between p-5 border-b border-stone-100 dark:border-stone-800">
-            <div>
-              <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Pedidos recientes</h3>
-              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
-                Últimos 7 días · para agrupar en rutas
-              </p>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate('/rutas')}
-              icon={<ArrowRight size={16} aria-hidden />}
-              iconPosition="right"
-            >
-              Ir a rutas
-            </Button>
-          </div>
-          <div className="divide-y divide-stone-50 dark:divide-stone-800">
-            {recentOrders.length === 0 ? (
-              <div className="p-8 text-center text-sm text-stone-400 dark:text-stone-500">
-                Sin pedidos creados en los últimos 7 días
-              </div>
-            ) : (
-              recentOrders.map((order) => (
-                <div key={order.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-xs font-mono font-semibold text-stone-700 dark:text-stone-200">{order.code}</span>
-                      <OrderStatusBadge status={order.status} />
-                    </div>
-                    <p className="text-xs text-stone-400 dark:text-stone-500 truncate">{order.clientName}</p>
-                  </div>
-                  <p className="text-xs text-stone-400 dark:text-stone-500 flex-shrink-0">{order.estimatedDelivery}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Active Routes */}
-        <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-sm">
-          <div className="flex items-center justify-between p-5 border-b border-stone-100 dark:border-stone-800">
-            <div>
-              <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Rutas activas</h3>
-              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
-                {activeRoutes.length > 0
-                  ? `${activeRoutes.length} en curso · máx. ${ACTIVE_ROUTES_PAGE_SIZE} por página`
-                  : 'Itinerario: pedidos y bultos totales'}
-              </p>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate('/rutas')}
-              icon={<ArrowRight size={16} aria-hidden />}
-              iconPosition="right"
-            >
-              Ver rutas
-            </Button>
-          </div>
-          <div className="divide-y divide-stone-50 dark:divide-stone-800">
-            {paginatedActiveRoutes.map((route) => (
-              <div key={route.id} className="px-5 py-3.5 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-semibold text-stone-700 dark:text-stone-200 tabular-nums" translate="no">
-                      N° {formatRouteDisplayLabel(route)}
-                    </span>
-                    <RouteStatusBadge status={route.status} />
-                  </div>
-                  <span className="text-xs text-stone-400 dark:text-stone-500">{route.orderIds.length} paradas</span>
-                </div>
-                <div className="flex items-center gap-4 text-xs text-stone-400 dark:text-stone-500">
-                  <span className="flex items-center gap-1">
-                    <Truck size={11} />
-                    {route.driverName ?? 'Sin asignar'}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Map size={11} />
-                    {route.estimatedDistance} km
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock size={11} />
-                    {Math.floor(route.estimatedDuration / 60)}h {route.estimatedDuration % 60}m
-                  </span>
-                </div>
-                {(() => {
-                  const totalInRoute = orders.filter((o) => o.routeId === route.id).length;
-                  const deliveredInRoute = orders.filter(
-                    (o) => o.routeId === route.id && o.status === 'delivered',
-                  ).length;
-                  if (totalInRoute === 0 || route.status === 'cancelled') return null;
-                  const pct = Math.round((deliveredInRoute / totalInRoute) * 100);
-                  return (
-                    <div
-                      className="mt-2.5 w-full bg-stone-100 dark:bg-stone-800 rounded-full h-1"
-                      title={`${deliveredInRoute}/${totalInRoute} pedidos entregados`}
-                    >
-                      <div
-                        className="bg-primary-500 h-1 rounded-full"
-                        style={{ width: `${pct}%`, transition: 'width 0.25s ease' }}
-                      />
-                    </div>
-                  );
-                })()}
-              </div>
-            ))}
-            {activeRoutes.length === 0 && (
-              <div className="p-8 text-center text-sm text-stone-400 dark:text-stone-500">No hay rutas activas</div>
-            )}
-          </div>
-          {activeRoutes.length > ACTIVE_ROUTES_PAGE_SIZE ? (
-            <div
-              className="flex items-center justify-between gap-2 px-5 py-3 border-t border-stone-100 dark:border-stone-800"
-              aria-label="Paginación de rutas activas"
-            >
-              <span className="text-xs text-stone-500 dark:text-stone-400 tabular-nums">
-                Página {activeRoutesPage} de {activeRoutesTotalPages}
-              </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={activeRoutesPage <= 1}
-                  onClick={() => setActiveRoutesPage((p) => Math.max(1, p - 1))}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={activeRoutesPage >= activeRoutesTotalPages}
-                  onClick={() =>
-                    setActiveRoutesPage((p) => Math.min(activeRoutesTotalPages, p + 1))
-                  }
-                >
-                  Siguiente
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </div>
+        <DashboardRecentOrders
+          recentOrders={recentOrders}
+          onViewRoutes={() => navigate('/rutas')}
+        />
+        <DashboardActiveRoutes
+          activeRoutes={activeRoutes}
+          paginatedRoutes={paginatedActiveRoutes}
+          activeRoutesPage={activeRoutesPage}
+          activeRoutesTotalPages={activeRoutesTotalPages}
+          orders={orders}
+          onPageChange={setActiveRoutesPage}
+          onViewRoutes={() => navigate('/rutas')}
+        />
       </div>
     </div>
   );

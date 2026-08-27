@@ -1,12 +1,4 @@
-import {
-  api,
-  ApiError,
-  setAccessToken,
-  clearAccessToken,
-  getAccessToken,
-  isHttpError,
-} from '../lib/api';
-import { isAccessTokenExpired } from '../lib/jwt';
+import { api, ApiError, clearLegacyAccessTokenStorage, isHttpError } from '../lib/api';
 import type { User, Tenant } from '../types';
 import type { DbTenant } from '../types/api';
 
@@ -50,20 +42,16 @@ function mapUserFromLogin(
 
 function mapTenantFromDb(raw: DbTenant): Tenant {
   const customRaw = raw.custom_order_statuses;
-  const customOrderStatuses = Array.isArray(customRaw)
-    ? (customRaw as { slug?: string; label?: string }[])
-        .filter(
-          (row) =>
-            row &&
-            typeof row.slug === 'string' &&
-            typeof row.label === 'string',
-        )
-        .map((row) => ({
-          slug: row.slug!.trim(),
-          label: row.label!.trim(),
-        }))
-        .filter((row) => row.slug && row.label)
-    : undefined;
+  let customOrderStatuses: { slug: string; label: string }[] | undefined;
+  if (Array.isArray(customRaw)) {
+    customOrderStatuses = [];
+    for (const row of customRaw as { slug?: string; label?: string }[]) {
+      if (!row || typeof row.slug !== 'string' || typeof row.label !== 'string') continue;
+      const slug = row.slug.trim();
+      const label = row.label.trim();
+      if (slug && label) customOrderStatuses.push({ slug, label });
+    }
+  }
   return {
     id: raw.id,
     name: raw.name,
@@ -120,11 +108,12 @@ async function enrichTenantOrderCatalog(tenant: Tenant | null): Promise<Tenant |
 export const authService = {
   async signIn(email: string, password: string): Promise<AuthResponse | null> {
     try {
+      // El API setea cookie HttpOnly; no persistimos el JWT en web storage.
       const res = await api.post<LoginResponse>('/auth/login', {
         email,
         password,
       });
-      setAccessToken(res.access_token);
+      clearLegacyAccessTokenStorage();
 
       const isSuperAdmin = res.user.role === 'super_admin';
       const tenantId = res.user.tenantId || null;
@@ -149,16 +138,15 @@ export const authService = {
   },
 
   async signOut(): Promise<void> {
-    clearAccessToken();
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      /* ignore: limpiamos estado local igual */
+    }
+    clearLegacyAccessTokenStorage();
   },
 
   async getSession(): Promise<AuthResponse | null> {
-    const token = getAccessToken();
-    if (!token || isAccessTokenExpired(token)) {
-      clearAccessToken();
-      return null;
-    }
-
     try {
       const me = await api.get<LoginResponseUser>('/auth/me');
       const isSuperAdmin = me.role === 'super_admin';
@@ -177,7 +165,7 @@ export const authService = {
       };
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        clearAccessToken();
+        clearLegacyAccessTokenStorage();
         return null;
       }
       throw err;

@@ -82,10 +82,13 @@ export function normalizeExcelFormat(raw: Record<string, unknown>): ExcelFormatC
 
 export function normalizeExcelFormatsList(data: unknown): ExcelFormatConfig[] {
   if (!Array.isArray(data)) return [];
-  return data
-    .filter((row): row is Record<string, unknown> => row != null && typeof row === 'object')
-    .map(normalizeExcelFormat)
-    .filter((f) => f.id && f.name);
+  const result: ExcelFormatConfig[] = [];
+  for (const row of data) {
+    if (row == null || typeof row !== 'object') continue;
+    const f = normalizeExcelFormat(row);
+    if (f.id && f.name) result.push(f);
+  }
+  return result;
 }
 
 /** Índice máximo de columna mapeada (para reconstruir selects sin Excel de muestra). */

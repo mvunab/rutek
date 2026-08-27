@@ -140,74 +140,77 @@ export function normalizeValuationLedger(raw: Record<string, unknown>): Valuatio
       ? (raw.summary as Record<string, unknown>)
       : {};
 
-  const items = itemsRaw
-    .filter((row): row is Record<string, unknown> => Boolean(row && typeof row === 'object'))
-    .map((row) => ({
-      orderId: String(row.order_id ?? row.orderId ?? ''),
-      orderCode: String(row.order_code ?? row.orderCode ?? ''),
-      orderStatus: String(row.order_status ?? row.orderStatus ?? ''),
-      bultos: numLedger(row.bultos),
-      clientId: String(row.client_id ?? row.clientId ?? ''),
-      clientName: String(row.client_name ?? row.clientName ?? ''),
+  const items: ValuationLedger['items'] = [];
+  for (const row of itemsRaw) {
+    if (!row || typeof row !== 'object') continue;
+    const r = row as Record<string, unknown>;
+    const item = {
+      orderId: String(r.order_id ?? r.orderId ?? ''),
+      orderCode: String(r.order_code ?? r.orderCode ?? ''),
+      orderStatus: String(r.order_status ?? r.orderStatus ?? ''),
+      bultos: numLedger(r.bultos),
+      clientId: String(r.client_id ?? r.clientId ?? ''),
+      clientName: String(r.client_name ?? r.clientName ?? ''),
       billingClientId:
-        row.billing_client_id != null
-          ? String(row.billing_client_id)
-          : row.billingClientId != null
-            ? String(row.billingClientId)
+        r.billing_client_id != null
+          ? String(r.billing_client_id)
+          : r.billingClientId != null
+            ? String(r.billingClientId)
             : null,
       billingClientName:
-        row.billing_client_name != null
-          ? String(row.billing_client_name)
-          : row.billingClientName != null
-            ? String(row.billingClientName)
+        r.billing_client_name != null
+          ? String(r.billing_client_name)
+          : r.billingClientName != null
+            ? String(r.billingClientName)
             : null,
       billingSource: ((): ValuationLedgerItem['billingSource'] => {
-        const s = String(row.billing_source ?? row.billingSource ?? 'pricing_profile');
+        const s = String(r.billing_source ?? r.billingSource ?? 'pricing_profile');
         if (s === 'assignment' || s === 'template' || s === 'pricing_profile') return s;
         return 'pricing_profile';
       })(),
       flowName:
-        row.flow_name != null
-          ? String(row.flow_name)
-          : row.flowName != null
-            ? String(row.flowName)
+        r.flow_name != null
+          ? String(r.flow_name)
+          : r.flowName != null
+            ? String(r.flowName)
             : null,
-      routeClientCharge: numLedger(row.route_client_charge ?? row.routeClientCharge),
-      routeId: String(row.route_id ?? row.routeId ?? ''),
-      routeCode: String(row.route_code ?? row.routeCode ?? ''),
-      routeName: String(row.route_name ?? row.routeName ?? ''),
-      routeCreatedAt: String(row.route_created_at ?? row.routeCreatedAt ?? ''),
+      routeClientCharge: numLedger(r.route_client_charge ?? r.routeClientCharge),
+      routeId: String(r.route_id ?? r.routeId ?? ''),
+      routeCode: String(r.route_code ?? r.routeCode ?? ''),
+      routeName: String(r.route_name ?? r.routeName ?? ''),
+      routeCreatedAt: String(r.route_created_at ?? r.routeCreatedAt ?? ''),
       driverId:
-        row.driver_id != null
-          ? String(row.driver_id)
-          : row.driverId != null
-            ? String(row.driverId)
+        r.driver_id != null
+          ? String(r.driver_id)
+          : r.driverId != null
+            ? String(r.driverId)
             : null,
       driverName:
-        row.driver_name != null
-          ? String(row.driver_name)
-          : row.driverName != null
-            ? String(row.driverName)
+        r.driver_name != null
+          ? String(r.driver_name)
+          : r.driverName != null
+            ? String(r.driverName)
             : null,
       peonetaId:
-        row.peoneta_id != null
-          ? String(row.peoneta_id)
-          : row.peonetaId != null
-            ? String(row.peonetaId)
+        r.peoneta_id != null
+          ? String(r.peoneta_id)
+          : r.peonetaId != null
+            ? String(r.peonetaId)
             : null,
       peonetaName:
-        row.peoneta_name != null
-          ? String(row.peoneta_name)
-          : row.peonetaName != null
-            ? String(row.peonetaName)
+        r.peoneta_name != null
+          ? String(r.peoneta_name)
+          : r.peonetaName != null
+            ? String(r.peonetaName)
             : null,
-      clientCharge: numLedger(row.client_charge ?? row.clientCharge),
-      driverPay: numLedger(row.driver_pay ?? row.driverPay),
-      peonetaPay: numLedger(row.peoneta_pay ?? row.peonetaPay),
-      workerPayTotal: numLedger(row.worker_pay_total ?? row.workerPayTotal),
-      margin: numLedger(row.margin),
-    }))
-    .filter((row) => Boolean(row.orderId));
+      clientCharge: numLedger(r.client_charge ?? r.clientCharge),
+      driverPay: numLedger(r.driver_pay ?? r.driverPay),
+      peonetaPay: numLedger(r.peoneta_pay ?? r.peonetaPay),
+      workerPayTotal: numLedger(r.worker_pay_total ?? r.workerPayTotal),
+      margin: numLedger(r.margin),
+    };
+    if (item.orderId) items.push(item);
+  }
 
   return {
     enabled: Boolean(raw.enabled),

@@ -294,16 +294,3 @@ export function downloadRoutesExportXlsx(
   return { rowCount: dataRows.length, routeCount: routes.length, filename };
 }
 
-/** @deprecated Usar {@link downloadRoutesExportXlsx}. */
-export function downloadRoutesExportCsv(
-  routes: Route[],
-  orders: Order[],
-  options?: {
-    clientNames?: Map<string, string>;
-    tenant?: Tenant | null;
-    dateRange?: RoutesDateRangeFilter;
-    deliveryRecords?: DbDeliveryRecord[];
-  },
-): { rowCount: number; routeCount: number; filename: string } {
-  return downloadRoutesExportXlsx(routes, orders, options);
-}

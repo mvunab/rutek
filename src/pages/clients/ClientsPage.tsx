@@ -97,6 +97,9 @@ function ClientForm({ initial = EMPTY_INITIAL, onSubmit, onCancel, submitLabel =
       <div className="flex items-center gap-3 pt-1">
         <button
           type="button"
+          role="switch"
+          aria-checked={form.active}
+          aria-label="Cliente activo"
           onClick={() => setForm(prev => ({ ...prev, active: !prev.active }))}
           className={clsx(
             'relative w-10 h-5 rounded-full transition-colors',
@@ -106,9 +109,11 @@ function ClientForm({ initial = EMPTY_INITIAL, onSubmit, onCancel, submitLabel =
           <span className={clsx(
             'absolute top-0.5 h-4 w-4 bg-white dark:bg-stone-200 rounded-full shadow transition-transform',
             form.active ? 'translate-x-5' : 'translate-x-0.5'
-          )} />
+          )} aria-hidden />
         </button>
-        <span className="text-sm text-stone-600 dark:text-stone-300">Cliente activo</span>
+        <span className="text-sm text-stone-600 dark:text-stone-300" aria-hidden>
+          Cliente activo
+        </span>
       </div>
       <div className="flex justify-end gap-3 pt-2">
         <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
@@ -159,15 +164,24 @@ export function ClientsPage() {
     <div className="space-y-5">
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" />
-          <input
-            type="text"
-            placeholder="Buscar por empresa, contacto, email…"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent shadow-sm"
-          />
+        <div className="flex-1">
+          <label
+            htmlFor="clients-search"
+            className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1.5"
+          >
+            Buscar
+          </label>
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" aria-hidden />
+            <input
+              id="clients-search"
+              type="text"
+              placeholder="Buscar por empresa, contacto, email…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-600 rounded-lg text-sm text-stone-800 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent shadow-sm"
+            />
+          </div>
         </div>
         <div className="flex items-center gap-1.5">
           {(['all', 'active', 'inactive'] as const).map((s) => (
@@ -215,7 +229,7 @@ export function ClientsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((client) => (
-            <div key={client.id} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-5 hover:border-stone-300 dark:hover:border-stone-600 hover:shadow-md transition-all shadow-sm group">
+            <div key={client.id} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-5 hover:border-stone-300 dark:hover:border-stone-600 hover:shadow-md transition-[border-color,box-shadow] shadow-sm group">
               <div className="flex items-start justify-between gap-2 mb-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div aria-hidden="true" className="size-10 bg-primary-50 dark:bg-primary-950/50 border border-primary-100 dark:border-primary-800 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400 font-semibold text-sm flex-shrink-0">

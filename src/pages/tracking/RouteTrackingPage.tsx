@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, use, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Loader2,
@@ -13,26 +13,19 @@ import {
 } from 'lucide-react';
 import { TRACKING_BRAND } from '../../lib/trackingTheme';
 import { useForceLightTheme } from '../../hooks/useForceLightTheme';
-import {
-  TrackingOrderStatusMarker,
-  trackingOrderAccentClass,
-} from '../../components/tracking/TrackingOrderStatusMarker';
+import { TrackingOrderStatusMarker } from '../../components/tracking/TrackingOrderStatusMarker';
+import { trackingOrderAccentClass } from '../../components/tracking/trackingOrderStatusUtils';
 import { TrackingStatusLegend } from '../../components/tracking/TrackingStatusLegend';
 import { RouteProgressWay } from '../../components/tracking/RouteProgressWay';
 import { computeRouteProgress, orderWayStepIndex, ROUTE_WAY_STEP_LABELS } from '../../lib/routeTrackingReport';
 import { formatDeliveryDateTime } from '../../lib/deliveryReceiver';
-import { TrackingEvidenceGallery, type TrackingPhoto } from '../../components/tracking/TrackingEvidenceGallery';
+import { TrackingEvidenceGallery } from '../../components/tracking/TrackingEvidenceGallery';
+import { TrackingLoadErrorBoundary } from './TrackingLoadErrorBoundary';
+import { loadRouteTracking, type RouteTrackingInfo } from './trackingPublicLoaders';
 
 const BX_BLUE = TRACKING_BRAND.blue;
 const BX_LIGHT = TRACKING_BRAND.light;
 const BX_DEW = TRACKING_BRAND.dew;
-
-function resolveApi(): string {
-  const fromEnv = import.meta.env.VITE_API_URL;
-  if (typeof fromEnv === 'string' && fromEnv.trim()) return fromEnv.trim().replace(/\/$/, '');
-  if (import.meta.env.MODE === 'development') return 'http://localhost:4000';
-  return '';
-}
 
 /** El token incluye un punto (body.sig); useParams() a veces lo trunca — leer desde pathname. */
 function resolveRouteTrackingToken(paramToken?: string): string {
@@ -46,85 +39,81 @@ function resolveRouteTrackingToken(paramToken?: string): string {
   return paramToken ? decodeURIComponent(paramToken) : '';
 }
 
-type RouteTrackingInfo = {
-  routeCode: string;
-  routeNumber?: string;
-  routeDisplay?: string;
-  routeName: string;
-  clientName: string;
-  tenant: { name: string; logo: string | null };
-  orders: Array<{
-    code: string;
-    status: string;
-    bultos: number;
-    clientName: string;
-    destination: { city: string };
-    numeroOc?: string | null;
-    factura?: string | null;
-    referencia?: string | null;
-    receiverName?: string | null;
-    receiverRut?: string | null;
-    deliveredAt?: string | null;
-    photos?: TrackingPhoto[];
-  }>;
-  expiresAt: string;
-};
+function RouteTrackingLoading() {
+  return (
+    <div
+      className="min-h-screen bg-gray-50 flex items-center justify-center text-stone-900"
+      style={{ colorScheme: 'light' }}
+    >
+      <div className="flex flex-col items-center gap-3 text-stone-500" role="status" aria-live="polite">
+        <Loader2
+          className="size-10 animate-spin motion-reduce:animate-none"
+          style={{ color: BX_BLUE }}
+          aria-hidden
+        />
+        <p className="text-sm font-medium">Cargando seguimiento…</p>
+      </div>
+    </div>
+  );
+}
+
+function RouteTrackingError({ message }: { message: string }) {
+  return (
+    <div
+      className="min-h-screen bg-gray-50 flex items-center justify-center px-4 text-stone-900"
+      style={{ colorScheme: 'light' }}
+    >
+      <article className="max-w-md w-full text-center bg-white rounded-2xl shadow-md p-8 border border-stone-100">
+        <XCircle className="size-14 text-red-400 mx-auto mb-4" aria-hidden />
+        <h1 className="text-xl font-extrabold text-stone-900">Link inválido o expirado</h1>
+        <p className="text-sm text-stone-500 mt-2">{message}</p>
+        <p className="text-xs text-stone-400 mt-2">Solicita un nuevo link al operador.</p>
+      </article>
+    </div>
+  );
+}
 
 export function RouteTrackingPage() {
   useForceLightTheme();
   const { token: paramToken } = useParams();
   const token = useMemo(() => resolveRouteTrackingToken(paramToken), [paramToken]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<RouteTrackingInfo | null>(null);
-  const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    const run = async () => {
-      if (!token) {
-        setError('Token inválido');
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(
-          `${resolveApi()}/public/route-tracking/${encodeURIComponent(token)}`,
-          { headers: { Accept: 'application/json' } },
-        );
-        const ct = res.headers.get('content-type') ?? '';
-        if (!res.ok) throw new Error('Token inválido o expirado');
-        if (!ct.includes('application/json')) {
-          throw new Error('Respuesta inválida del servidor');
-        }
-        const data = (await res.json()) as RouteTrackingInfo;
-        setInfo(data);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Token inválido o expirado');
-      } finally {
-        setLoading(false);
-      }
-    };
-    void run();
-  }, [token]);
+  if (!token) {
+    return <RouteTrackingError message="Token inválido" />;
+  }
+
+  return (
+    <TrackingLoadErrorBoundary
+      fallback={(error) => (
+        <RouteTrackingError message={error.message || 'Token inválido o expirado'} />
+      )}
+    >
+      <Suspense fallback={<RouteTrackingLoading />}>
+        <RouteTrackingContent token={token} />
+      </Suspense>
+    </TrackingLoadErrorBoundary>
+  );
+}
+
+function RouteTrackingContent({ token }: { token: string }) {
+  const info = use(loadRouteTracking(token));
+  const [copied, setCopied] = useState(false);
 
   const grouped = useMemo(() => {
     const map = new Map<string, RouteTrackingInfo['orders']>();
-    for (const o of info?.orders ?? []) {
+    for (const o of info.orders) {
       const city = o.destination?.city?.trim() || '—';
       map.set(city, [...(map.get(city) ?? []), o]);
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'es'));
-  }, [info?.orders]);
+  }, [info.orders]);
 
   const routeProgress = useMemo(
-    () => computeRouteProgress(info?.orders ?? []),
-    [info?.orders],
+    () => computeRouteProgress(info.orders),
+    [info.orders],
   );
 
   const publicUrl = useMemo(() => {
-    if (!token) return '';
     try {
       return `${window.location.origin}/tracking/route/${encodeURIComponent(token)}`;
     } catch {
@@ -138,40 +127,6 @@ export function RouteTrackingPage() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  if (loading) {
-    return (
-      <div
-        className="min-h-screen bg-gray-50 flex items-center justify-center text-stone-900"
-        style={{ colorScheme: 'light' }}
-      >
-        <div className="flex flex-col items-center gap-3 text-stone-500" role="status" aria-live="polite">
-          <Loader2
-            className="size-10 animate-spin motion-reduce:animate-none"
-            style={{ color: BX_BLUE }}
-            aria-hidden
-          />
-          <p className="text-sm font-medium">Cargando seguimiento…</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !info) {
-    return (
-      <div
-        className="min-h-screen bg-gray-50 flex items-center justify-center px-4 text-stone-900"
-        style={{ colorScheme: 'light' }}
-      >
-        <article className="max-w-md w-full text-center bg-white rounded-2xl shadow-md p-8 border border-stone-100">
-          <XCircle className="size-14 text-red-400 mx-auto mb-4" aria-hidden />
-          <h1 className="text-xl font-extrabold text-stone-900">Link inválido o expirado</h1>
-          <p className="text-sm text-stone-500 mt-2">{error}</p>
-          <p className="text-xs text-stone-400 mt-2">Solicita un nuevo link al operador.</p>
-        </article>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 text-stone-900" style={{ colorScheme: 'light' }}>

@@ -17,7 +17,3 @@ export function isValuationModuleEnabled(
   const flags = featureFlags ?? tenant?.featureFlags ?? null;
   return flags?.['valuation_module_enabled'] === true;
 }
-
-/** @deprecated Preferir `isValuationModuleEnabled(tenant)`. */
-export const VALUATION_MODULE_ENABLED =
-  import.meta.env.VITE_VALUATION_MODULE === 'true';

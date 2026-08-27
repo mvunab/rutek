@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { X, ChevronLeft, ChevronRight, MapPin, Package, Calendar } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { RoutePhoto } from '../../types';
@@ -20,35 +20,59 @@ export function PhotoLightbox({
   onIndexChange: (n: number) => void;
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const idx = Math.min(Math.max(index, 0), photos.length - 1);
   const photo = photos[idx];
   const photoSrc = normalizeMediaUrl(photo?.photoUrl ?? '');
 
   useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const onCancel = (e: Event) => {
+      e.preventDefault();
+      onClose();
+    };
+    dialog.addEventListener('cancel', onCancel);
+    return () => dialog.removeEventListener('cancel', onCancel);
+  }, [onClose]);
+
+  useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowLeft' && idx > 0) onIndexChange(idx - 1);
       if (e.key === 'ArrowRight' && idx < photos.length - 1) onIndexChange(idx + 1);
     };
     document.addEventListener('keydown', h);
     return () => document.removeEventListener('keydown', h);
-  }, [idx, photos.length, onIndexChange, onClose]);
+  }, [idx, photos.length, onIndexChange]);
 
   if (!photo) return null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialogRef}
       aria-label={`Evidencia — ${photo.orderCode}`}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-950 p-4"
-      onClick={onClose}
+      className="fixed inset-0 z-[60] m-0 max-w-none max-h-none w-full h-full border-none bg-stone-950 p-4 open:flex items-center justify-center backdrop:bg-stone-950"
     >
+      <button
+        type="button"
+        aria-label="Cerrar"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
       <button
         type="button"
         onClick={onClose}
         aria-label="Cerrar"
-        className="absolute top-4 right-4 p-2 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-100"
+        className="absolute top-4 right-4 z-10 p-2 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-100"
       >
         <X size={20} aria-hidden />
       </button>
@@ -61,7 +85,7 @@ export function PhotoLightbox({
             onIndexChange(idx - 1);
           }}
           aria-label="Foto anterior"
-          className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-100"
+          className="absolute left-4 top-1/2 z-10 -translate-y-1/2 p-3 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-100"
         >
           <ChevronLeft size={22} aria-hidden />
         </button>
@@ -74,16 +98,13 @@ export function PhotoLightbox({
             onIndexChange(idx + 1);
           }}
           aria-label="Siguiente foto"
-          className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-100"
+          className="absolute right-4 top-1/2 z-10 -translate-y-1/2 p-3 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-100"
         >
           <ChevronRight size={22} aria-hidden />
         </button>
       ) : null}
 
-      <div
-        className="flex flex-col items-center gap-4 max-w-3xl w-full"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="relative z-10 flex flex-col items-center gap-4 max-w-3xl w-full">
         <div className="relative rounded-xl overflow-hidden shadow-2xl bg-stone-900 max-h-[65vh]">
           <img
             src={photoSrc}
@@ -119,12 +140,11 @@ export function PhotoLightbox({
           </div>
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1 max-w-full" role="list" aria-label="Miniaturas">
+        <ul className="flex gap-2 overflow-x-auto pb-1 max-w-full" aria-label="Miniaturas">
           {photos.map((p, i) => (
+            <li key={p.id}>
             <button
-              key={p.id}
               type="button"
-              role="listitem"
               aria-label={`Ver foto ${i + 1}`}
               aria-pressed={i === idx}
               onClick={() => onIndexChange(i)}
@@ -145,9 +165,10 @@ export function PhotoLightbox({
                 }}
               />
             </button>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
-    </div>
+    </dialog>
   );
 }

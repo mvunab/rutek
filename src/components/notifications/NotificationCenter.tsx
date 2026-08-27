@@ -113,22 +113,34 @@ export function NotificationCenter({
   const clearHistory = useToastStore((s) => s.clearHistory);
   const unread = useToastStore((s) => s.unreadCount());
 
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Cerrar con Escape
   useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open) {
+      if (!dialog.open) dialog.showModal();
+    } else if (dialog.open) {
+      dialog.close();
+    }
+  }, [open]);
 
-  // Focus trap básico: enfocar el panel al abrir
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const onCancel = (e: Event) => {
+      e.preventDefault();
+      onClose();
+    };
+    dialog.addEventListener('cancel', onCancel);
+    return () => dialog.removeEventListener('cancel', onCancel);
+  }, [onClose]);
+
   useEffect(() => {
     if (open) panelRef.current?.focus();
   }, [open]);
 
-  // Marcar todas como leídas al abrir
   useEffect(() => {
     if (open && unread > 0) {
       const id = setTimeout(() => markAllRead(), 800);
@@ -137,26 +149,26 @@ export function NotificationCenter({
   }, [open, unread, markAllRead]);
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        aria-hidden="true"
+    <dialog
+      ref={dialogRef}
+      aria-label="Centro de notificaciones"
+      className={clsx(
+        'fixed inset-0 z-50 m-0 max-w-none max-h-none w-full h-full',
+        'bg-transparent p-0 border-none',
+        'backdrop:bg-black/20 dark:backdrop:bg-black/40 backdrop:transition-opacity backdrop:duration-200',
+      )}
+    >
+      <button
+        type="button"
+        aria-label="Cerrar"
+        className="absolute inset-0 cursor-default"
         onClick={onClose}
-        className={clsx(
-          'fixed inset-0 z-40 bg-black/20 dark:bg-black/40 transition-opacity duration-200',
-          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
-        )}
       />
-
-      {/* Drawer */}
       <div
         ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Centro de notificaciones"
         tabIndex={-1}
         className={clsx(
-          'fixed top-0 right-0 z-50 h-full w-full max-w-sm',
+          'fixed top-0 right-0 z-10 h-full w-full max-w-sm',
           'flex flex-col bg-white dark:bg-stone-950',
           'border-l border-stone-200 dark:border-stone-800 shadow-2xl',
           'transition-transform duration-250 ease-in-out focus:outline-none',
@@ -238,6 +250,6 @@ export function NotificationCenter({
           </div>
         )}
       </div>
-    </>
+    </dialog>
   );
 }

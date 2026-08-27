@@ -85,14 +85,6 @@ async function nominatimSearch(
 }
 
 /**
- * Busca una dirección o lugar en Chile. Devuelve el mejor match o null.
- */
-export async function geocodeChileAddress(query: string): Promise<GeocodeResult | null> {
-  const results = await geocodeChilePlaces(query, 1);
-  return results[0] ?? null;
-}
-
-/**
  * Varias coincidencias (útil para "Ripley Arauco Maipú" vs homónimos).
  * Si la query parece POI, también prueba variantes con ", Chile".
  */

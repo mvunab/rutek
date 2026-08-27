@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from './Button';
@@ -14,6 +14,8 @@ interface ModalProps {
   /** Sin cabecera por defecto; el contenido define título y cierre. */
   bare?: boolean;
   contentClassName?: string;
+  /** id del título para aria-labelledby (opcional). */
+  titleId?: string;
 }
 
 const sizeClasses = {
@@ -36,60 +38,83 @@ export function Modal({
   footer,
   bare = false,
   contentClassName,
+  titleId,
 }: ModalProps) {
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    if (open) document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleDomId = titleId ?? (title ? 'rutek-modal-title' : undefined);
+  const onCloseEvent = useEffectEvent(onClose);
 
   useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden';
-    else document.body.style.overflow = '';
-    return () => { document.body.style.overflow = ''; };
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open) {
+      if (!dialog.open) dialog.showModal();
+    } else if (dialog.open) {
+      dialog.close();
+    }
   }, [open]);
 
-  if (!open) return null;
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const onCancel = (e: Event) => {
+      e.preventDefault();
+      onCloseEvent();
+    };
+    /** Cierre al click en el backdrop nativo (`showModal`), no en el panel. */
+    const onBackdropClick = (e: MouseEvent) => {
+      if (e.target === dialog) onCloseEvent();
+    };
+    dialog.addEventListener('cancel', onCancel);
+    dialog.addEventListener('click', onBackdropClick);
+    return () => {
+      dialog.removeEventListener('cancel', onCancel);
+      dialog.removeEventListener('click', onBackdropClick);
+    };
+  }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-stone-900/40 dark:bg-black/60 backdrop-blur-sm animate-modal-backdrop-enter motion-reduce:animate-none"
-        onClick={onClose}
-        aria-hidden
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        className={clsx(
-          'relative w-full bg-white border border-stone-200 rounded-2xl shadow-2xl',
-          'dark:bg-stone-900 dark:border-stone-700',
-          'flex flex-col max-h-[90vh]',
-          'animate-modal-content-enter motion-reduce:animate-none',
-          sizeClasses[size],
-        )}
-      >
-        {!bare && (title || description) ? (
-          <div className="flex items-start justify-between gap-4 p-6 border-b border-stone-100 dark:border-stone-800">
-            <div>
-              {title ? <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">{title}</h2> : null}
-              {description ? <p className="text-sm text-stone-500 dark:text-stone-400 mt-1">{description}</p> : null}
-            </div>
-            <Button variant="ghost" size="sm" onClick={onClose} icon={<X size={16} />} className="flex-shrink-0 -mt-1 -mr-2" aria-label="Cerrar" />
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleDomId}
+      className={clsx(
+        'fixed inset-0 z-50 m-auto w-[calc(100%-2rem)] border border-stone-200 rounded-2xl shadow-2xl p-0',
+        'bg-white dark:bg-stone-900 dark:border-stone-700',
+        'flex flex-col max-h-[90vh] open:flex',
+        'backdrop:bg-stone-900/40 dark:backdrop:bg-black/60 backdrop:backdrop-blur-sm',
+        'animate-modal-content-enter motion-reduce:animate-none',
+        sizeClasses[size],
+      )}
+    >
+      {!bare && (title || description) ? (
+        <div className="flex items-start justify-between gap-4 p-6 border-b border-stone-100 dark:border-stone-800">
+          <div>
+            {title ? (
+              <h2 id={titleDomId} className="text-lg font-semibold text-stone-900 dark:text-stone-100">
+                {title}
+              </h2>
+            ) : null}
+            {description ? <p className="text-sm text-stone-500 dark:text-stone-400 mt-1">{description}</p> : null}
           </div>
-        ) : null}
-        <div className={clsx('overflow-y-auto flex-1', bare ? contentClassName : clsx('p-6', contentClassName))}>
-          {children}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            icon={<X size={16} />}
+            className="flex-shrink-0 -mt-1 -mr-2"
+            aria-label="Cerrar"
+          />
         </div>
-        {footer && (
-          <div className="border-t border-stone-100 dark:border-stone-800 px-6 py-4 flex justify-end gap-3">
-            {footer}
-          </div>
-        )}
+      ) : null}
+      <div className={clsx('overflow-y-auto flex-1', bare ? contentClassName : clsx('p-6', contentClassName))}>
+        {children}
       </div>
-    </div>
+      {footer && (
+        <div className="border-t border-stone-100 dark:border-stone-800 px-6 py-4 flex justify-end gap-3">
+          {footer}
+        </div>
+      )}
+    </dialog>
   );
 }
 
@@ -162,10 +187,11 @@ export function TypeToConfirmModal({
   loading = false,
 }: TypeToConfirmModalProps) {
   const [typed, setTyped] = useState('');
-
-  useEffect(() => {
-    if (!open) setTyped('');
-  }, [open]);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    setTyped('');
+  }
 
   const canConfirm =
     typed.trim().toLowerCase() === confirmPhrase.trim().toLowerCase();

@@ -9,6 +9,16 @@ import { Card } from '../../components/ui/Card';
 import type { Route, Order } from '../../types';
 import { formatRouteDisplayTitle } from '../../lib/routeSequence';
 
+const weekdayDateFormatter = new Intl.DateTimeFormat('es-CL', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+});
+const routeStartFormatter = new Intl.DateTimeFormat('es-CL', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
+
 const ROUTE_STATUS_LABEL: Record<string, string> = {
   not_started: 'Sin iniciar',
   in_progress: 'En progreso',
@@ -60,7 +70,7 @@ export function PeonetaDashboardPage() {
     const myOrders = orders.filter((o) => o.peonetaId === user.id);
     if (myOrders.length === 0) return [];
 
-    const routeIds = new Set(myOrders.map((o) => o.routeId).filter(Boolean) as string[]);
+    const routeIds = new Set(myOrders.flatMap((o) => (o.routeId ? [o.routeId] : [])));
     const routeMap = new Map(routes.map((r) => [r.id, r]));
 
     const cards: RouteCard[] = [];
@@ -83,10 +93,14 @@ export function PeonetaDashboardPage() {
 
   const isLoading = (routesLoading && !routesLoaded) || (ordersLoading && !ordersLoaded);
 
-  const delivered = myRouteCards
-    .flatMap((c) => c.myOrders)
-    .filter((o) => o.status === 'delivered').length;
-  const total = myRouteCards.flatMap((c) => c.myOrders).length;
+  let delivered = 0;
+  let total = 0;
+  for (const c of myRouteCards) {
+    for (const o of c.myOrders) {
+      total += 1;
+      if (o.status === 'delivered') delivered += 1;
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -97,7 +111,7 @@ export function PeonetaDashboardPage() {
             Hola, {user?.name?.split(' ')[0] ?? 'peoneta'}
           </h1>
           <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
-            {new Intl.DateTimeFormat('es-CL', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}
+            {weekdayDateFormatter.format(new Date())}
           </p>
         </div>
         {total > 0 && (
@@ -137,7 +151,7 @@ export function PeonetaDashboardPage() {
       {!isLoading && myRouteCards.map(({ route, myOrders }) => {
         const delivered = myOrders.filter((o) => o.status === 'delivered').length;
         const startFormatted = route.startTime
-          ? new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(route.startTime))
+          ? routeStartFormatter.format(new Date(route.startTime))
           : null;
 
         return (

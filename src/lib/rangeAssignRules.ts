@@ -54,9 +54,11 @@ export function applyRangeRules(
 /** Índices 0-based cubiertos por al menos una regla con chofer, peoneta o vehículo. */
 export function indicesCoveredByRules(total: number, rules: RangeAssignRule[]): number[] {
   const applied = applyRangeRules(total, rules);
-  return Object.entries(applied)
-    .filter(([, v]) => Boolean(v.driverId || v.vehicleId || v.peonetaId))
-    .map(([i]) => Number(i))
-    .filter((i) => i >= 0 && i < total)
-    .toSorted((a, b) => a - b);
+  const indices: number[] = [];
+  for (const [key, v] of Object.entries(applied)) {
+    if (!v.driverId && !v.vehicleId && !v.peonetaId) continue;
+    const i = Number(key);
+    if (i >= 0 && i < total) indices.push(i);
+  }
+  return indices.toSorted((a, b) => a - b);
 }

@@ -31,16 +31,14 @@ export function OrderInspectionThumbnails({
           ({photos.length})
         </span>
       </p>
-      <div
+      <ul
         className="flex flex-wrap gap-1.5"
-        role="list"
         aria-label={`${photos.length} foto${photos.length === 1 ? '' : 's'} de inspección`}
       >
         {photos.map((photo, index) => (
+          <li key={photo.id}>
           <button
-            key={photo.id}
             type="button"
-            role="listitem"
             onClick={() => onPhotoClick(index)}
             aria-label={
               photo.description?.trim()
@@ -69,8 +67,9 @@ export function OrderInspectionThumbnails({
               />
             </span>
           </button>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }

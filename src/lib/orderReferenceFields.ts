@@ -21,7 +21,3 @@ export function parseOrderReferenceFields(notes?: string | null): OrderReference
   return { numeroOc, factura, referencia };
 }
 
-export function hasOrderReferenceFields(fields: OrderReferenceFields | null): fields is OrderReferenceFields {
-  if (!fields) return false;
-  return Boolean(fields.numeroOc || fields.factura || fields.referencia);
-}

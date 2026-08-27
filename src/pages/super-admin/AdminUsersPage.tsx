@@ -2,7 +2,23 @@ import { useEffect, useState } from 'react';
 import { Shield, Trash2, CheckCircle2, AlertCircle, Key, X } from 'lucide-react';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
+import { Input, Select } from '../../components/ui/Input';
+
+const roleColors: Record<string, string> = {
+  admin: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400',
+  operator: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400',
+  driver: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400',
+  client: 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400',
+};
+
+function generatePassword() {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
+  let pass = '';
+  for (let i = 0; i < 12; i++) {
+    pass += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return pass;
+}
 
 export function AdminUsersPage() {
   const { allUsers, loading, fetchAllUsers, updateUser, deleteUser, resetUserPassword } = useSuperAdminStore();
@@ -14,16 +30,7 @@ export function AdminUsersPage() {
 
   useEffect(() => {
     fetchAllUsers();
-  }, []);
-
-  const generatePassword = () => {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
-    let pass = '';
-    for (let i = 0; i < 12; i++) {
-      pass += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return pass;
-  };
+  }, [fetchAllUsers]);
 
   const openResetPassword = (userId: string, userName: string) => {
     setResetModalUserId(userId);
@@ -45,13 +52,6 @@ export function AdminUsersPage() {
     return matchesSearch && matchesRole;
   });
 
-  const roleColors: Record<string, string> = {
-    admin: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400',
-    operator: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400',
-    driver: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400',
-    client: 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400',
-  };
-
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -63,19 +63,28 @@ export function AdminUsersPage() {
 
       <div className="flex items-center gap-3">
         <div className="flex-1">
-          <Input placeholder="Buscar por nombre o email..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input
+            id="admin-users-search"
+            label="Buscar"
+            placeholder="Buscar por nombre o email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
-        <select
+        <Select
+          id="admin-users-role-filter"
+          label="Rol"
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-3 py-2 border border-stone-200 dark:border-stone-700 rounded-lg text-sm bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100"
-        >
-          <option value="all">Todos los roles</option>
-          <option value="admin">Admin</option>
-          <option value="operator">Operador</option>
-          <option value="driver">Repartidor</option>
-          <option value="client">Cliente</option>
-        </select>
+          options={[
+            { value: 'all', label: 'Todos los roles' },
+            { value: 'admin', label: 'Admin' },
+            { value: 'operator', label: 'Operador' },
+            { value: 'driver', label: 'Repartidor' },
+            { value: 'client', label: 'Cliente' },
+          ]}
+          containerClassName="w-48"
+        />
       </div>
 
       <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-sm overflow-hidden">
@@ -142,23 +151,29 @@ export function AdminUsersPage() {
           <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200 dark:border-stone-800">
               <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">Resetear Contraseña</h2>
-              <button onClick={() => setResetModalUserId(null)} className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300">
-                <X size={20} />
+              <button
+                type="button"
+                onClick={() => setResetModalUserId(null)}
+                aria-label="Cerrar"
+                className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+              >
+                <X size={20} aria-hidden />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-stone-500 dark:text-stone-400">
                 Se reseteará la contraseña de <strong>{resetModalUserName}</strong>. Se enviará un correo con la nueva contraseña.
               </p>
-              <div>
-                <label className="block text-xs font-medium text-stone-500 dark:text-stone-400 mb-1">Nueva contraseña</label>
-                <div className="flex gap-2">
-                  <Input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-                  <Button variant="ghost" size="sm" onClick={() => setNewPassword(generatePassword())}>
-                    Generar
-                  </Button>
-                </div>
-              </div>
+              <Input
+                id="admin-reset-password"
+                label="Nueva contraseña"
+                type="text"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <Button variant="ghost" size="sm" onClick={() => setNewPassword(generatePassword())}>
+                Generar
+              </Button>
             </div>
             <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-stone-200 dark:border-stone-800">
               <Button variant="ghost" onClick={() => setResetModalUserId(null)}>Cancelar</Button>

@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   Calculator,
-  Check,
-  AlertCircle,
   ChevronDown,
   Lock,
   Unlock,
@@ -10,7 +8,6 @@ import {
 import { clsx } from 'clsx';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
 import { api, ApiError } from '../../lib/api';
 import {
   DEFAULT_PRICING_PROFILE,
@@ -19,34 +16,7 @@ import {
 import type { PricingProfile } from '../../types/pricing';
 import { isValuationModuleEnabled } from '../../lib/valuationModule';
 import { useAuthStore } from '../../store/useAuthStore';
-
-function MoneyInput({
-  label,
-  value,
-  onChange,
-  hint,
-  disabled,
-}: {
-  label: string;
-  value: number;
-  onChange: (n: number) => void;
-  hint?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <Input
-      label={label}
-      type="number"
-      inputMode="numeric"
-      min={0}
-      step={1}
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-      hint={hint}
-    />
-  );
-}
+import { PricingProfileForm } from './PricingProfileForm';
 
 export function PricingProfileSection({ onSaved }: { onSaved?: () => void }) {
   const tenant = useAuthStore((s) => s.tenant);
@@ -64,18 +34,24 @@ export function PricingProfileSection({ onSaved }: { onSaved?: () => void }) {
       setLoading(false);
       return;
     }
+    let cancelled = false;
     void (async () => {
       setLoading(true);
       setError('');
       try {
         const data = await api.get<{ pricing_profile?: unknown }>('/tenant/pricing-profile');
+        if (cancelled) return;
         setProfile(normalizePricingProfile(data.pricing_profile));
       } catch {
+        if (cancelled) return;
         setError('No se pudo cargar el perfil de valorización.');
       } finally {
         setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [valuationEnabled]);
 
   const patchClient = (patch: Partial<PricingProfile['client']>) =>
@@ -204,140 +180,19 @@ export function PricingProfileSection({ onSaved }: { onSaved?: () => void }) {
               <Lock size={14} aria-hidden />
               Desbloquea el bloque para ver y editar las tarifas.
             </p>
-          ) : loading ? (
-            <p className="text-sm text-stone-400">Cargando perfil…</p>
           ) : (
-            <div className="space-y-6">
-              <label className="flex items-center gap-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={profile.enabled}
-                  onChange={(e) => setProfile((p) => ({ ...p, enabled: e.target.checked }))}
-                  className="h-4 w-4 rounded border-stone-300 dark:border-stone-600 accent-primary-600"
-                />
-                <span className="text-sm font-medium text-stone-800 dark:text-stone-200">
-                  Activar valorización automática
-                </span>
-              </label>
-
-              <div>
-                <h3 className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-3">
-                  Cobro al cliente (fallback sin flujo)
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  <MoneyInput
-                    label="Base por ruta (CLP)"
-                    value={profile.client.basePerRoute}
-                    onChange={(n) => patchClient({ basePerRoute: n })}
-                  />
-                  <MoneyInput
-                    label="Por pedido entregado"
-                    value={profile.client.perDeliveredOrder}
-                    onChange={(n) => patchClient({ perDeliveredOrder: n })}
-                  />
-                  <MoneyInput
-                    label="Por bulto entregado"
-                    value={profile.client.perBultoDelivered}
-                    onChange={(n) => patchClient({ perBultoDelivered: n })}
-                  />
-                  <MoneyInput
-                    label="Por pedido rechazado"
-                    value={profile.client.perRejectedOrder}
-                    onChange={(n) => patchClient({ perRejectedOrder: n })}
-                  />
-                  <MoneyInput
-                    label="Por kilómetro"
-                    value={profile.client.perKm}
-                    onChange={(n) => patchClient({ perKm: n })}
-                    hint="Usa la distancia estimada de la ruta."
-                  />
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-3">
-                  Pago chofer
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  <MoneyInput
-                    label="Fijo por chofer en ruta"
-                    value={profile.worker.driver.fixedPerRoute}
-                    onChange={(n) => patchDriver({ fixedPerRoute: n })}
-                  />
-                  <MoneyInput
-                    label="Por pedido entregado"
-                    value={profile.worker.driver.perDeliveredOrder}
-                    onChange={(n) => patchDriver({ perDeliveredOrder: n })}
-                  />
-                  <Input
-                    label="% del cobro al cliente"
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    max={100}
-                    step={1}
-                    value={profile.worker.driver.percentOfClientCharge}
-                    onChange={(e) =>
-                      patchDriver({
-                        percentOfClientCharge: Math.min(
-                          100,
-                          Math.max(0, Number(e.target.value) || 0),
-                        ),
-                      })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-3">
-                  Pago peoneta
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <MoneyInput
-                    label="Fijo por peoneta en ruta"
-                    value={profile.worker.peoneta.fixedPerRoute}
-                    onChange={(n) => patchPeoneta({ fixedPerRoute: n })}
-                  />
-                  <MoneyInput
-                    label="Por pedido entregado"
-                    value={profile.worker.peoneta.perDeliveredOrder}
-                    onChange={(n) => patchPeoneta({ perDeliveredOrder: n })}
-                  />
-                </div>
-              </div>
-
-              <p className="text-xs text-stone-500 dark:text-stone-400">
-                Versión del perfil: {profile.version}. Al guardar se incrementa la versión; las
-                rutas ya valorizadas conservan el snapshot anterior.
-              </p>
-
-              {error ? (
-                <p
-                  className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-1.5"
-                  role="alert"
-                >
-                  <AlertCircle size={14} aria-hidden />
-                  {error}
-                </p>
-              ) : null}
-
-              <div className="flex flex-wrap items-center gap-3">
-                <Button type="button" loading={saving} onClick={() => void handleSave()}>
-                  Guardar perfil
-                </Button>
-                {saved ? (
-                  <span
-                    className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    <Check size={16} aria-hidden />
-                    Perfil guardado
-                  </span>
-                ) : null}
-              </div>
-            </div>
+            <PricingProfileForm
+              profile={profile}
+              loading={loading}
+              saving={saving}
+              error={error}
+              saved={saved}
+              onProfileChange={setProfile}
+              onPatchClient={patchClient}
+              onPatchDriver={patchDriver}
+              onPatchPeoneta={patchPeoneta}
+              onSave={() => void handleSave()}
+            />
           )}
         </div>
       ) : (

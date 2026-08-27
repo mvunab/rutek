@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Info, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useToastStore, type Toast, type ToastSeverity } from '../../store/useToastStore';
 
@@ -45,7 +45,6 @@ function ToastItem({ toast }: { toast: Toast }) {
   const duration = toast.duration ?? 5000;
 
   const [visible, setVisible] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Entrada con pequeño delay para que el CSS transite desde opacity-0
   useEffect(() => {
@@ -58,16 +57,13 @@ function ToastItem({ toast }: { toast: Toast }) {
   useEffect(() => {
     if (!duration) return;
     const start = Date.now();
-    const tick = () => {
+    const id = setInterval(() => {
       const elapsed = Date.now() - start;
       const pct = Math.max(0, 100 - (elapsed / duration) * 100);
       setProgress(pct);
-      if (pct > 0) {
-        timerRef.current = setTimeout(tick, 50);
-      }
-    };
-    timerRef.current = setTimeout(tick, 50);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+      if (pct <= 0) clearInterval(id);
+    }, 50);
+    return () => clearInterval(id);
   }, [duration]);
 
   const handleDismiss = () => {

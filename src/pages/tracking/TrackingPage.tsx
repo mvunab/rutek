@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, use, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Box,
@@ -29,18 +29,13 @@ import { TRACKING_BRAND } from '../../lib/trackingTheme';
 import { useForceLightTheme } from '../../hooks/useForceLightTheme';
 import { TrackingOrderStatusMarker } from '../../components/tracking/TrackingOrderStatusMarker';
 import { TrackingEvidenceGallery } from '../../components/tracking/TrackingEvidenceGallery';
+import { TrackingLoadErrorBoundary } from './TrackingLoadErrorBoundary';
+import { loadOrderTracking } from './trackingPublicLoaders';
 
 /** Azul corporativo estilo referencia */
 const BX_BLUE = TRACKING_BRAND.blue;
 const BX_LIGHT = TRACKING_BRAND.light;
 const BX_DEW = TRACKING_BRAND.dew;
-
-function resolveApi(): string {
-  const fromEnv = import.meta.env.VITE_API_URL;
-  if (typeof fromEnv === 'string' && fromEnv.trim()) return fromEnv.trim().replace(/\/$/, '');
-  if (import.meta.env.MODE === 'development') return 'http://localhost:4000';
-  return '';
-}
 
 function HorizontalTimeline({
   activeIndex,
@@ -80,7 +75,6 @@ function HorizontalTimeline({
             <li
               key={step.id}
               className="flex flex-1 flex-col items-center min-w-0 relative"
-              role="listitem"
               aria-current={current ? 'step' : undefined}
             >
               {i > 0 && (
@@ -253,9 +247,9 @@ function HistoryTimeline({ info }: { info: TrackingInfo }) {
             <div key={dateLabel} className="mb-4 p-4 rounded-lg w-full">
               <div className="text-lg font-bold mb-2 text-stone-800">{dateLabel}</div>
               <ul className="space-y-3">
-                {events.map((ev, idx) => (
+                {events.map((ev) => (
                   <li
-                    key={`${dateLabel}-${idx}`}
+                    key={`${dateLabel}-${ev.at.toISOString()}-${ev.title}`}
                     className="text-sm text-stone-700 flex items-center gap-4"
                   >
                     <strong className="tabular-nums w-12 shrink-0 text-stone-800">
@@ -301,66 +295,39 @@ function HistoryTimeline({ info }: { info: TrackingInfo }) {
   );
 }
 
-export function TrackingPage() {
-  useForceLightTheme();
-  const { token } = useParams<{ token: string }>();
-  const [info, setInfo] = useState<TrackingInfo | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!token) {
-      setError('Token inválido');
-      setLoading(false);
-      return;
-    }
-    fetch(`${resolveApi()}/public/tracking/${token}`, {
-      headers: { Accept: 'application/json' },
-    })
-      .then(async (r) => {
-        const ct = r.headers.get('content-type') ?? '';
-        if (!r.ok) throw new Error('Token inválido o expirado');
-        if (!ct.includes('application/json')) {
-          throw new Error('Respuesta inválida del servidor');
-        }
-        return r.json();
-      })
-      .then(setInfo)
-      .catch((e) => setError(e.message || 'Error al cargar el seguimiento'))
-      .finally(() => setLoading(false));
-  }, [token]);
-
-  const handleShare = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center text-stone-900" style={{ colorScheme: 'light' }}>
-        <div className="flex flex-col items-center gap-3 text-stone-500" role="status" aria-live="polite">
-          <Loader2 className="size-10 animate-spin motion-reduce:animate-none" style={{ color: BX_BLUE }} aria-hidden />
-          <p className="text-sm font-medium">Cargando seguimiento…</p>
-        </div>
-      </div>
-    );
+async function handleShare() {
+  try {
+    await navigator.clipboard.writeText(window.location.href);
+  } catch {
+    /* ignore */
   }
+}
 
-  if (error || !info) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 text-stone-900" style={{ colorScheme: 'light' }}>
-        <article className="max-w-md w-full text-center bg-white rounded-2xl shadow-md p-8 border border-stone-100">
-          <XCircle className="size-14 text-red-400 mx-auto mb-4" aria-hidden />
-          <h1 className="text-xl font-extrabold text-stone-900">Link inválido o expirado</h1>
-          <p className="text-sm text-stone-500 mt-2">{error}</p>
-        </article>
+function TrackingLoading() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center text-stone-900" style={{ colorScheme: 'light' }}>
+      <div className="flex flex-col items-center gap-3 text-stone-500" role="status" aria-live="polite">
+        <Loader2 className="size-10 animate-spin motion-reduce:animate-none" style={{ color: BX_BLUE }} aria-hidden />
+        <p className="text-sm font-medium">Cargando seguimiento…</p>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
+function TrackingError({ message }: { message: string }) {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 text-stone-900" style={{ colorScheme: 'light' }}>
+      <article className="max-w-md w-full text-center bg-white rounded-2xl shadow-md p-8 border border-stone-100">
+        <XCircle className="size-14 text-red-400 mx-auto mb-4" aria-hidden />
+        <h1 className="text-xl font-extrabold text-stone-900">Link inválido o expirado</h1>
+        <p className="text-sm text-stone-500 mt-2">{message}</p>
+      </article>
+    </div>
+  );
+}
+
+function TrackingPageContent({ token }: { token: string }) {
+  const info = use(loadOrderTracking(token));
   const activeIndex = getActiveStepIndex(info);
   const rejected = info.status === 'rejected' || info.status === 'cancelled';
   const headline = getStatusHeadline(info);
@@ -466,5 +433,28 @@ export function TrackingPage() {
         </footer>
       </div>
     </div>
+  );
+}
+
+export function TrackingPage() {
+  useForceLightTheme();
+  const { token } = useParams<{ token: string }>();
+
+  if (!token) {
+    return <TrackingError message="Token inválido" />;
+  }
+
+  return (
+    <TrackingLoadErrorBoundary
+      fallback={(error) => (
+        <TrackingError
+          message={error.message || 'Error al cargar el seguimiento'}
+        />
+      )}
+    >
+      <Suspense fallback={<TrackingLoading />}>
+        <TrackingPageContent token={token} />
+      </Suspense>
+    </TrackingLoadErrorBoundary>
   );
 }

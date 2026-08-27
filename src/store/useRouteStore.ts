@@ -45,7 +45,7 @@ function mapRouteFromApi(row: Record<string, unknown>): Route {
     vehicleId: row.vehicle_id ? String(row.vehicle_id) : undefined,
     vehiclePlate: row.vehicle_plate ? String(row.vehicle_plate) : undefined,
     stops,
-    orderIds: stops.map((s) => s.orderId).filter(Boolean),
+    orderIds: stops.flatMap((s) => (s.orderId ? [s.orderId] : [])),
     startTime: row.start_time != null ? String(row.start_time) : undefined,
     endTime: row.end_time != null ? String(row.end_time) : undefined,
     estimatedDistance: Number(row.estimated_distance ?? 0),

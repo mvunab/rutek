@@ -12,6 +12,7 @@ const dateFormatter = new Intl.DateTimeFormat('es-CL', {
   month: 'short',
   year: 'numeric',
 });
+const capacityFormatter = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 });
 
 export function formatVehicleDate(iso?: string | null): string {
   if (!iso?.trim()) return '—';
@@ -23,5 +24,5 @@ export function formatVehicleDate(iso?: string | null): string {
 
 export function formatVehicleCapacity(value: number): string {
   if (!Number.isFinite(value)) return '—';
-  return new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 }).format(value);
+  return capacityFormatter.format(value);
 }

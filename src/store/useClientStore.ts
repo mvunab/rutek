@@ -57,11 +57,12 @@ export const useClientStore = create<ClientStore>((set, get) => ({
     set({ loading: true });
     try {
       const data = await api.get<DbClient[]>('/clients');
-      set({
-        clients: data
-          .map(toClient)
-          .filter((c) => c.companyName !== '__SIN_CUENTA__'),
-      });
+      const clients = [];
+      for (const row of data) {
+        const c = toClient(row);
+        if (c.companyName !== '__SIN_CUENTA__') clients.push(c);
+      }
+      set({ clients });
     } finally {
       set({ loading: false });
     }
