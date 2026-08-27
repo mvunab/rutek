@@ -45,18 +45,11 @@ export function Modal({
   const onCloseEvent = useEffectEvent(onClose);
 
   useEffect(() => {
+    if (!open) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
-    if (open) {
-      if (!dialog.open) dialog.showModal();
-    } else if (dialog.open) {
-      dialog.close();
-    }
-  }, [open]);
+    if (!dialog.open) dialog.showModal();
 
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
     const onCancel = (e: Event) => {
       e.preventDefault();
       onCloseEvent();
@@ -70,8 +63,13 @@ export function Modal({
     return () => {
       dialog.removeEventListener('cancel', onCancel);
       dialog.removeEventListener('click', onBackdropClick);
+      if (dialog.open) dialog.close();
     };
-  }, []);
+  }, [open]);
+
+  // No montar cerrado: `display:flex` en className anula el `display:none`
+  // nativo de <dialog> y deja el formulario encima de la página.
+  if (!open) return null;
 
   return (
     <dialog
@@ -80,7 +78,9 @@ export function Modal({
       className={clsx(
         'fixed inset-0 z-50 m-auto w-[calc(100%-2rem)] border border-stone-200 rounded-2xl shadow-2xl p-0',
         'bg-white dark:bg-stone-900 dark:border-stone-700',
-        'flex flex-col max-h-[90vh] open:flex',
+        // `open:flex` (no `flex` suelto): evita anular el display:none del dialog cerrado
+        // y el flash antes de showModal().
+        'flex-col max-h-[90vh] open:flex',
         'backdrop:bg-stone-900/40 dark:backdrop:bg-black/60 backdrop:backdrop-blur-sm',
         'animate-modal-content-enter motion-reduce:animate-none',
         sizeClasses[size],
