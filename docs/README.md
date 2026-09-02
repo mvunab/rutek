@@ -27,9 +27,11 @@ En el repositorio **rutek-api** (carpeta hermana):
 
 ### Referencias rápidas
 
+- **Docker local (API + Postgres + MinIO):** [rutek-api/docs/DOCKER.md](../../rutek-api/docs/DOCKER.md)
 - Swagger (dev): `http://localhost:4000/api/docs`
 - Demo prod: `https://rutek.mardev.cl`
 - Scripts de deploy: `rutek-api/deploy/`
+- **Bootstrap / seed completo:** [rutek-api/deploy/README-BOOTSTRAP.md](../../rutek-api/deploy/README-BOOTSTRAP.md)
 - **Servicios en servidor y túneles SSH:** [rutek-api/deploy/README-SERVICIOS-TUNEL.md](../../rutek-api/deploy/README-SERVICIOS-TUNEL.md)
 - **Acceso a la DB (DbGate + MCP):** [rutek-api/deploy/README-DEV-DATABASE.md](../../rutek-api/deploy/README-DEV-DATABASE.md)
 - **Cursor + MCP + modelos locales:** [rutek-api/deploy/mcp/README-MCP-CURSOR.md](../../rutek-api/deploy/mcp/README-MCP-CURSOR.md)

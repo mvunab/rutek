@@ -6,13 +6,25 @@ Repositorio hermano del backend: **rutek-api** (NestJS + Prisma + PostgreSQL).
 
 ## Desarrollo local
 
+### Backend + infra (Docker, recomendado)
+
+```bash
+cd ../rutek-api
+cp .env.docker.example .env
+docker compose up -d --build
+```
+
+Ver [rutek-api/docs/DOCKER.md](../rutek-api/docs/DOCKER.md).
+
+### Frontend
+
 ```bash
 npm install
 cp .env.example .env   # VITE_API_URL=http://localhost:4000
 npm run dev            # http://localhost:5173
 ```
 
-Levantar API y Postgres según `rutek-api/README.md`.
+Alternativa: API en el host según [rutek-api/README.md](../rutek-api/README.md).
 
 ## Documentación
 
