@@ -28,6 +28,7 @@ En el repositorio **rutek-api** (carpeta hermana):
 ### Referencias rápidas
 
 - **Docker local (API + Postgres + MinIO):** [rutek-api/docs/DOCKER.md](../../rutek-api/docs/DOCKER.md)
+- **Checklist front ↔ API Docker:** [rutek-api/docs/FRONTEND_DOCKER.md](../../rutek-api/docs/FRONTEND_DOCKER.md)
 - Swagger (dev): `http://localhost:4000/api/docs`
 - Demo prod: `https://rutek.mardev.cl`
 - Scripts de deploy: `rutek-api/deploy/`
